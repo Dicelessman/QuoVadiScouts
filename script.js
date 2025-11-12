@@ -1858,8 +1858,38 @@ async function eliminaStruttura(id) {
   }
   
   if (confirm("Vuoi davvero eliminare questa struttura?")) {
-    await deleteDoc(doc(db, "strutture", id));
-    aggiornaLista();
+    try {
+      // Invalidiamo la cache locale PRIMA dell'eliminazione
+      localStorage.removeItem('strutture_cache');
+      localStorage.removeItem('strutture_cache_timestamp');
+      console.log('🗑️ Cache invalidata prima dell\'eliminazione');
+      
+      // Rimuovi la struttura dall'array locale immediatamente per feedback visivo
+      const index = strutture.findIndex(s => s.id === id);
+      if (index !== -1) {
+        strutture.splice(index, 1);
+        window.strutture = strutture;
+        // Aggiorna la visualizzazione immediatamente
+        renderStrutture(filtra(strutture));
+        console.log('✅ Struttura rimossa dall\'array locale');
+      }
+      
+      // Elimina da Firestore
+      const strutturaRef = doc(db, "strutture", id);
+      await deleteDoc(strutturaRef);
+      console.log('✅ Struttura eliminata da Firestore');
+      
+      // Ricarica da Firestore per sincronizzazione completa
+      setTimeout(async () => {
+        await aggiornaLista();
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Errore nell\'eliminazione:', error);
+      alert('❌ Errore nell\'eliminazione: ' + error.message);
+      // Ricarica la lista in caso di errore
+      await aggiornaLista();
+    }
   }
 }
 
@@ -1954,8 +1984,26 @@ async function eliminaStrutturaConConferma(id) {
       if (modalScheda) {
         modalScheda.remove();
       }
-      await deleteDoc(doc(db, "strutture", id));
-      aggiornaLista();
+      
+      // Invalidiamo la cache locale PRIMA dell'eliminazione
+      localStorage.removeItem('strutture_cache');
+      localStorage.removeItem('strutture_cache_timestamp');
+      console.log('🗑️ Cache invalidata prima dell\'eliminazione');
+      
+      // Rimuovi la struttura dall'array locale immediatamente per feedback visivo
+      const index = strutture.findIndex(s => s.id === id);
+      if (index !== -1) {
+        strutture.splice(index, 1);
+        window.strutture = strutture;
+        // Aggiorna la visualizzazione immediatamente
+        renderStrutture(filtra(strutture));
+        console.log('✅ Struttura rimossa dall\'array locale');
+      }
+      
+      // Elimina da Firestore
+      const strutturaRef = doc(db, "strutture", id);
+      await deleteDoc(strutturaRef);
+      console.log('✅ Struttura eliminata da Firestore');
       
       // Mostra messaggio di successo
       const successModal = document.createElement('div');
@@ -1995,9 +2043,16 @@ async function eliminaStrutturaConConferma(id) {
         }
       }, 3000);
       
+      // Ricarica da Firestore per sincronizzazione completa (dopo un breve delay)
+      setTimeout(async () => {
+        await aggiornaLista();
+      }, 500);
+      
     } catch (error) {
       console.error('❌ Errore nell\'eliminazione:', error);
       alert('❌ Errore nell\'eliminazione: ' + error.message);
+      // Ricarica la lista in caso di errore
+      await aggiornaLista();
     }
   };
   
