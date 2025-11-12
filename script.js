@@ -7449,13 +7449,30 @@ function generaContenutoStampa(struttureElenco) {
 // === Scheda Completa Struttura (Visualizzazione + Modifica) ===
 let modalScheda = null;
 let isEditMode = false;
+// Mappa per memorizzare strutture temporanee non ancora salvate
+let struttureTemporanee = new Map();
 
 async function mostraSchedaCompleta(strutturaId) {
-  const struttura = strutture.find(s => s.id === strutturaId);
+  // Prima cerca nell'array normale
+  let struttura = strutture.find(s => s.id === strutturaId);
+  
+  // Se non trovata, cerca nelle strutture temporanee
+  if (!struttura) {
+    struttura = struttureTemporanee.get(strutturaId);
+  }
+  
   if (!struttura) {
     console.error('Struttura non trovata:', strutturaId);
     return;
   }
+  
+  // Chiama la funzione principale con la struttura trovata
+  mostraSchedaCompletaConStruttura(struttura);
+}
+
+// Funzione helper per aprire la scheda con una struttura specifica
+async function mostraSchedaCompletaConStruttura(struttura) {
+  const strutturaId = struttura.id;
 
   // Track analytics
   if (window.analyticsManager) {
@@ -7468,8 +7485,13 @@ async function mostraSchedaCompleta(strutturaId) {
   }));
   
   // Determina se è una nuova struttura: solo se l'ID inizia con 'new_'
-  // Se la struttura ha già un ID Firestore valido, è una struttura esistente
-  const isNewStructure = strutturaId.startsWith('new_') && (!struttura.id || struttura.id.startsWith('new_'));
+  // Se la struttura ha già un ID Firestore valido (non inizia con 'new_'), è una struttura esistente
+  const isNewStructure = strutturaId.startsWith('new_');
+  
+  // Se è una nuova struttura, salvala nella mappa temporanea per riferimento
+  if (isNewStructure) {
+    struttureTemporanee.set(strutturaId, struttura);
+  }
   
   // Rimuovi modal esistente se presente
   if (modalScheda) {
@@ -7575,13 +7597,8 @@ async function mostraSchedaCompleta(strutturaId) {
   `;
   cancelBtn.onclick = () => {
     if (isNewStructure) {
-      // Rimuovi la struttura temporanea e chiudi il modal
-      const index = strutture.findIndex(s => s.id === strutturaId);
-      if (index !== -1) {
-        strutture.splice(index, 1);
-        // Aggiorna le strutture globali
-        window.strutture = strutture;
-      }
+      // Rimuovi la struttura temporanea dalla mappa
+      struttureTemporanee.delete(strutturaId);
       modalScheda.remove();
     } else {
       toggleEditMode();
@@ -7604,13 +7621,8 @@ async function mostraSchedaCompleta(strutturaId) {
   `;
   closeBtn.onclick = () => {
     if (isNewStructure) {
-      // Rimuovi la struttura temporanea
-      const index = strutture.findIndex(s => s.id === strutturaId);
-      if (index !== -1) {
-        strutture.splice(index, 1);
-        // Aggiorna le strutture globali
-        window.strutture = strutture;
-      }
+      // Rimuovi la struttura temporanea dalla mappa
+      struttureTemporanee.delete(strutturaId);
     }
     modalScheda.remove();
   };
