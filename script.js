@@ -8960,15 +8960,20 @@ async function mostraSchedaCompleta(strutturaId) {
         struttura.createdBy = getCurrentUser()?.uid || null;
         struttura.version = 1;
         
+        // Rimuovi la struttura temporanea dall'array PRIMA di crearla su Firestore
+        const indexTemp = strutture.findIndex(s => s.id === strutturaId);
+        if (indexTemp !== -1) {
+          strutture.splice(indexTemp, 1);
+        }
+        
         // Crea nuova struttura in Firestore
         const docRef = await addDoc(colRef, struttura);
         
-        // Aggiorna l'ID locale con quello di Firestore
+        // Aggiorna l'ID con quello di Firestore
         struttura.id = docRef.id;
-        const index = strutture.findIndex(s => s.id === strutturaId);
-        if (index !== -1) {
-          strutture[index] = { ...struttura };
-        }
+        
+        // Aggiungi la struttura con l'ID corretto all'array
+        strutture.push({ ...struttura });
         
         // Aggiorna le strutture globali
         window.strutture = strutture;
