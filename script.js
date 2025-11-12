@@ -8965,6 +8965,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   // Funzione per salvare modifiche
   async function salvaModificheScheda(strutturaId) {
     try {
+      // I dati del form vengono già aggiornati direttamente nell'oggetto struttura
+      // tramite gli event handler onchange dei campi, quindi non serve leggerli dal form
+      
+      // Verifica che non sia già stata salvata (controlla se l'ID è ancora temporaneo)
+      if (isNewStructure && !strutturaId.startsWith('new_')) {
+        console.warn('⚠️ Struttura già salvata, aggiorno invece di creare');
+        // Tratta come aggiornamento invece di creazione
+        isNewStructure = false;
+      }
+      
       if (isNewStructure) {
         // Aggiorna metadati per nuova struttura
         struttura.lastModified = new Date();
@@ -8978,27 +8988,33 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         
         // Verifica che non esista già una struttura con lo stesso contenuto
         // (per evitare duplicati se l'utente clicca più volte su "Crea")
-        const strutturaEsistente = strutture.find(s => 
-          s.Struttura === struttura.Struttura && 
-          s.Luogo === struttura.Luogo && 
-          s.Prov === struttura.Prov &&
-          s.id && !s.id.startsWith('new_') // Solo strutture già salvate
-        );
-        
-        if (strutturaEsistente) {
-          alert('⚠️ Una struttura identica esiste già!');
-          modalScheda.remove();
-          return;
+        if (struttura.Struttura && struttura.Luogo && struttura.Prov) {
+          const strutturaEsistente = strutture.find(s => 
+            s.Struttura && struttura.Struttura &&
+            s.Struttura.trim() === struttura.Struttura.trim() && 
+            s.Luogo && struttura.Luogo &&
+            s.Luogo.trim() === struttura.Luogo.trim() && 
+            s.Prov && struttura.Prov &&
+            s.Prov.trim() === struttura.Prov.trim() &&
+            s.id && !s.id.startsWith('new_') // Solo strutture già salvate
+          );
+          
+          if (strutturaEsistente) {
+            alert('⚠️ Una struttura identica esiste già!');
+            modalScheda.remove();
+            return;
+          }
         }
         
         // Crea nuova struttura in Firestore
         const docRef = await addDoc(colRef, struttura);
         
         // Aggiorna l'ID con quello di Firestore
-        struttura.id = docRef.id;
+        const nuovoId = docRef.id;
+        struttura.id = nuovoId;
         
         // Verifica che non esista già nell'array prima di aggiungerla
-        const giaPresente = strutture.find(s => s.id === docRef.id);
+        const giaPresente = strutture.find(s => s.id === nuovoId);
         if (!giaPresente) {
           // Aggiungi la struttura con l'ID corretto all'array
           strutture.push({ ...struttura });
@@ -9007,7 +9023,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           window.strutture = strutture;
         } else {
           console.warn('⚠️ Struttura già presente nell\'array, aggiorno invece di duplicare');
-          const index = strutture.findIndex(s => s.id === docRef.id);
+          const index = strutture.findIndex(s => s.id === nuovoId);
           if (index !== -1) {
             strutture[index] = { ...struttura };
             window.strutture = strutture;
@@ -9015,7 +9031,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         }
         
         // Log attività
-        await logActivity('structure_created', docRef.id, getCurrentUser()?.uid, {
+        await logActivity('structure_created', nuovoId, getCurrentUser()?.uid, {
           name: struttura.Struttura,
           location: struttura.Luogo
         });
@@ -9047,7 +9063,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         }
         
         modalScheda.remove();
-        
+        return; // Esci dalla funzione dopo la creazione
       } else {
         // Salva versione precedente prima di modificare
         await salvaVersione(struttura, getCurrentUser()?.uid);
