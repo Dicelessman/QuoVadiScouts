@@ -306,9 +306,15 @@ class OfflineSyncManager {
   // Apre IndexedDB
   async openIndexedDB() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open('QuoVadiScoutDB', 2); // Incremento versione per forzare upgrade
+      // Apri sempre la versione corrente senza forzare il numero di versione
+      const request = indexedDB.open('QuoVadiScoutDB');
       
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        if (window && window.handleIndexedDBError) {
+          window.handleIndexedDBError(request.error, 'offline-sync.openIndexedDB');
+        }
+        reject(request.error);
+      };
       request.onsuccess = () => {
         const db = request.result;
         

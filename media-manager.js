@@ -104,10 +104,10 @@ class MediaManager {
       const publicIdPath = cloudinaryResponse.public_id;
       
       // URL immagine principale con trasformazioni
-      const imageUrl = `${baseUrl}/upload/w_1920,h_1080,c_limit,q_auto:good,f_auto/${publicIdPath}.${cloudinaryResponse.format}`;
+      const imageUrl = `${baseUrl}/upload/w_1920,h_1080,c_limit,q_auto:good,f_auto,dpr_auto/${publicIdPath}.${cloudinaryResponse.format}`;
       
       // URL thumbnail
-      const thumbnailUrl = `${baseUrl}/upload/w_300,h_300,c_fill,g_auto,q_auto:eco,f_auto/${publicIdPath}.${cloudinaryResponse.format}`;
+      const thumbnailUrl = `${baseUrl}/upload/w_300,h_300,c_fill,g_auto,q_auto:eco,f_auto,dpr_auto/${publicIdPath}.${cloudinaryResponse.format}`;
       
       const result = {
         id: `img_${timestamp}`,
@@ -384,6 +384,8 @@ class MediaManager {
   // Recupera galleria immagini per una struttura
   async getGallery(structureId) {
     try {
+      // Garantisce che lo store esista prima dell'accesso
+      await this.ensureImageStore();
       // Cloudinary non ha modo di listare immagini lato client
       // Quindi usiamo IndexedDB locale per salvare i riferimenti
       const db = await this.openIndexedDB();
@@ -504,9 +506,18 @@ class MediaManager {
   // Apre IndexedDB
   async openIndexedDB() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open('QuoVadiScoutDB', 2);
+      // Apri sempre la versione corrente senza forzare il numero di versione
+      const request = indexedDB.open('QuoVadiScoutDB');
       
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        if (window && window.handleIndexedDBError) {
+          window.handleIndexedDBError(request.error, 'media-manager.openIndexedDB');
+        }
+        reject(request.error);
+      };
+      request.onblocked = () => {
+        console.warn('⚠️ MediaManager: upgrade IndexedDB bloccato da un\'altra scheda');
+      };
       request.onsuccess = () => resolve(request.result);
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
@@ -517,6 +528,40 @@ class MediaManager {
           imageStore.createIndex('structureId', 'structureId', { unique: false });
           imageStore.createIndex('uploadedAt', 'uploadedAt', { unique: false });
         }
+      };
+    });
+  }
+
+  // Verifica/esegue upgrade schema per store immagini
+  async ensureImageStore() {
+    // Primo open senza versione per leggere la versione corrente
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('QuoVadiScoutDB');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    if (db.objectStoreNames && db.objectStoreNames.contains('images')) {
+      db.close();
+      return;
+    }
+    const nextVersion = (db.version || 1) + 1;
+    db.close();
+    // Esegue upgrade creando lo store mancante
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.open('QuoVadiScoutDB', nextVersion);
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => console.warn('⚠️ MediaManager: upgrade schema bloccato');
+      req.onupgradeneeded = (event) => {
+        const upgradedDb = event.target.result;
+        if (!upgradedDb.objectStoreNames.contains('images')) {
+          const imageStore = upgradedDb.createObjectStore('images', { keyPath: 'id' });
+          imageStore.createIndex('structureId', 'structureId', { unique: false });
+          imageStore.createIndex('uploadedAt', 'uploadedAt', { unique: false });
+        }
+      };
+      req.onsuccess = () => {
+        req.result.close();
+        resolve();
       };
     });
   }

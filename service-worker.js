@@ -10,8 +10,10 @@ const MAX_CACHED_STRUCTURES = 50;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/index.local.html',
   '/styles.css',
   '/script.js',
+  '/dist/script.js',
   '/dashboard.html',
   '/dashboard.css',
   '/dashboard.js',
@@ -405,7 +407,8 @@ async function getCachedStructure(structureId) {
 
 async function openIndexedDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('QuoVadiScoutDB', 1);
+    // Apri sempre la versione corrente senza forzare il numero di versione
+    const request = indexedDB.open('QuoVadiScoutDB');
     
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);

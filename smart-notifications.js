@@ -12,8 +12,22 @@ class SmartNotificationManager {
     this.maxNotificationsPerDay = 10;
     this.minTimeBetweenNotifications = 30 * 60 * 1000; // 30 minuti
     
-    this.initializeLocationTracking();
+    // Avvia il tracking SOLO dopo gesto utente
+    this.deferLocationUntilUserGesture();
     this.loadUserData();
+  }
+
+  deferLocationUntilUserGesture() {
+    const start = () => {
+      this.initializeLocationTracking();
+      window.removeEventListener('click', start, { capture: true });
+      const centerBtn = document.getElementById('centerMapBtn');
+      if (centerBtn) centerBtn.removeEventListener('click', start);
+    };
+    // Qualsiasi primo click o il pulsante “centra mappa” sbloccano la geolocalizzazione
+    window.addEventListener('click', start, { once: true, capture: true });
+    const centerBtn = document.getElementById('centerMapBtn');
+    if (centerBtn) centerBtn.addEventListener('click', start, { once: true });
   }
 
   async initializeLocationTracking() {

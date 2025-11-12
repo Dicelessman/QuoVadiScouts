@@ -7,6 +7,19 @@ class ErrorHandler {
   constructor() {
     this.errorCounts = new Map();
     this.maxRetries = 3;
+    // Inizializza Sentry se configurato
+    try {
+      if (window.SENTRY_CONFIG && window.SENTRY_CONFIG.dsn && window.Sentry && window.Sentry.init) {
+        window.Sentry.init({
+          dsn: window.SENTRY_CONFIG.dsn,
+          tracesSampleRate: window.SENTRY_CONFIG.tracesSampleRate || 0,
+          environment: window.SENTRY_CONFIG.environment || 'development'
+        });
+        console.log('🛰️ Sentry inizializzato');
+      }
+    } catch (e) {
+      console.warn('⚠️ Sentry non inizializzato:', e?.message);
+    }
   }
 
   /**
@@ -93,6 +106,12 @@ class ErrorHandler {
         stack: error.stack
       });
     }
+    // Forward a Sentry se disponibile
+    if (window.Sentry && window.Sentry.captureException) {
+      try {
+        window.Sentry.captureException(error, { tags: { context } });
+      } catch (_) {}
+    }
     
     return false;
   }
@@ -112,6 +131,12 @@ class ErrorHandler {
         reason: event.reason?.toString(),
         stack: event.reason?.stack
       });
+    }
+    // Forward a Sentry
+    if (window.Sentry && window.Sentry.captureException) {
+      try {
+        window.Sentry.captureException(event.reason);
+      } catch (_) {}
     }
     
     return true;

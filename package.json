@@ -1,0 +1,9 @@
+{
+  "name": "quovadiscout-local-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
+

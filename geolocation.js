@@ -14,7 +14,12 @@ class GeolocationManager {
     this.markers = [];
     this.cache = new Map();
     
-    this.initGoogleMaps();
+    // OSM-only: inizializza Google solo se presente API key valida
+    if (this.configUtils && this.configUtils.isGoogleMapsConfigured && this.configUtils.isGoogleMapsConfigured()) {
+      this.initGoogleMaps();
+    } else {
+      console.log('ℹ️ Modalità OSM-only attiva (Google Maps disabilitato)');
+    }
   }
 
   /**

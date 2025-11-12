@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes" />
-<title>Quovadiscout - Strutture & Terreni</title>
+<title>Quovadiscout - Strutture & Terreni (Local)</title>
 <script>
-  // Rimuovi classe no-js se JavaScript è abilitato
   document.documentElement.classList.remove('no-js');
   document.documentElement.classList.add('js');
 </script>
@@ -27,7 +26,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="QuoVadiScout" />
 <script>
-  // Logger shim globale con cattura delle funzioni console originali
   (function(){
     window.DEBUG = window.DEBUG === true ? true : false;
     if (!window.__console) {
@@ -71,23 +69,20 @@
   }
 </style>
 <link rel="preload" href="/styles.css" as="style">
-<link rel="manifest" href="/api/manifest.js" />
+<link rel="manifest" href="manifest.json" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
 <link rel="preload" href="styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="styles.css"></noscript>
 <link rel="preload" href="geolocation-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="geolocation-styles.css"></noscript>
-<!-- Font Awesome non-blocking -->
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-<!-- Cloudinary SDK -->
 <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript" defer></script>
-<!-- Runtime config (Vercel serverless) -->
-<script src="/api/firebase-config.js" defer></script>
-<script src="/api/cloudinary-config.js" defer></script>
+<script src="firebase-config.local.js" defer></script>
+<script src="cloudinary-config.local.js" defer></script>
 <!-- Export libraries caricati on-demand in export.js -->
-<!-- Maps libraries -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style">
 <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /></noscript>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
@@ -97,7 +92,6 @@
 <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" /></noscript>
 </head>
 <body>
-  <!-- Fallback no-JavaScript -->
   <noscript>
     <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f5f5f5; display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 2rem;">
       <div style="text-align: center; max-width: 500px;">
@@ -109,10 +103,8 @@
     </div>
   </noscript>
   
-  <!-- Skip Navigation Link per Accessibilità -->
   <a href="#main-content" class="sr-only skip-link">Salta al contenuto principale</a>
   
-  <!-- Mobile-First Header -->
   <header class="app-header">
     <div class="header-main">
       <div class="header-brand">
@@ -126,45 +118,16 @@
     </div>
   </header>
 
-  <!-- Search Bar -->
   <div class="search-section" role="search">
     <div class="search-container">
       <input id="search" class="search-input" placeholder="Cerca strutture..." />
-      <button id="clearSearch" class="search-clear-btn" aria-label="Cancella ricerca" style="display: none;">✕</button>
     </div>
   </div>
 
-  <!-- Main Map -->
   <div id="mainMapContainer" class="main-map-container">
     <div class="map-header">
       <h3 class="map-title">🗺️ Mappa Strutture</h3>
       <div class="map-controls">
-        <div class="map-layers-dropdown" style="position: relative;">
-          <button id="layersMenuBtn" class="btn-map-control" title="Layer aggiuntivi">🗺️</button>
-          <div id="layersMenu" class="layers-menu hidden">
-            <div class="layers-menu-header">Layer Overlay</div>
-            <label class="layer-option">
-              <input type="checkbox" id="layer-railway" data-layer="railway">
-              <span>🚂 Rete Ferroviaria</span>
-            </label>
-            <label class="layer-option">
-              <input type="checkbox" id="layer-hiking" data-layer="hiking">
-              <span>🥾 Sentieri Escursionistici</span>
-            </label>
-            <label class="layer-option">
-              <input type="checkbox" id="layer-cycling" data-layer="cycling">
-              <span>🚴 Piste Ciclabili</span>
-            </label>
-            <label class="layer-option">
-              <input type="checkbox" id="layer-mtb" data-layer="mtb">
-              <span>🚵 Percorsi MTB</span>
-            </label>
-            <div class="layers-menu-divider"></div>
-            <button id="clearAllLayersBtn" class="layer-clear-btn">
-              🗑️ Rimuovi Tutti i Layer
-            </button>
-          </div>
-        </div>
         <button id="centerMapBtn" class="btn-map-control" title="Centro su di me">📍</button>
         <button id="toggleMapBtn" class="btn-map-control" title="Mostra/Nascondi mappa">👁️</button>
       </div>
@@ -172,16 +135,18 @@
     <div id="mainMap" class="main-map"></div>
   </div>
 
-  <!-- Main Navigation Menu -->
   <nav id="mainMenu" class="main-menu hidden" role="navigation" aria-label="Menu principale">
     <div class="menu-sections">
-      <!-- Search & Filters -->
       <section class="menu-section">
         <h3 class="menu-section-title">🔍 Ricerca & Filtri</h3>
         <div class="menu-items">
           <button class="menu-item" onclick="mostraRicercaAvanzata()">
             <span class="menu-icon"><i class="fas fa-search"></i></span>
             <span class="menu-label">Ricerca Avanzata</span>
+          </button>
+          <button class="menu-item" onclick="mostraMappa()">
+            <span class="menu-icon"><i class="fas fa-map-marked-alt"></i></span>
+            <span class="menu-label">Visualizza Mappa</span>
           </button>
           <button class="menu-item" id="sortMenuBtn">
             <span class="menu-icon"><i class="fas fa-sort-amount-down"></i></span>
@@ -202,7 +167,6 @@
         </div>
       </section>
 
-      <!-- Personal Lists -->
       <section class="menu-section">
         <h3 class="menu-section-title">📋 Le Mie Liste</h3>
         <div class="menu-items">
@@ -214,9 +178,6 @@
         </div>
       </section>
 
-
-
-      <!-- Actions -->
       <section class="menu-section">
         <h3 class="menu-section-title">⚡ Azioni Rapide</h3>
         <div class="menu-items">
@@ -239,7 +200,28 @@
         </div>
       </section>
 
-      <!-- User & Settings -->
+      <section class="menu-section">
+        <h3 class="menu-section-title">📊 Gestione Dati</h3>
+        <div class="menu-items">
+          <button class="menu-item" onclick="mostraModaleSincronizzazione()">
+            <span class="menu-icon"><i class="fas fa-sync-alt"></i></span>
+            <span class="menu-label">Sincronizza con Firestore</span>
+          </button>
+          <button class="menu-item" onclick="mostraOpzioniEsportazioneGenerale()">
+            <span class="menu-icon"><i class="fas fa-download"></i></span>
+            <span class="menu-label">Esporta Dati</span>
+          </button>
+          <button class="menu-item" onclick="mostraFeedAttivita()">
+            <span class="menu-icon"><i class="fas fa-history"></i></span>
+            <span class="menu-label">Feed Attività</span>
+          </button>
+          <button class="menu-item" onclick="location.href='dashboard.html'">
+            <span class="menu-icon"><i class="fas fa-chart-line"></i></span>
+            <span class="menu-label">Dashboard</span>
+          </button>
+        </div>
+      </section>
+
       <section class="menu-section">
         <h3 class="menu-section-title">⚙️ Impostazioni</h3>
         <div class="menu-items">
@@ -254,26 +236,6 @@
         </div>
       </section>
 
-      <!-- App Management -->
-      <section class="menu-section">
-        <h3 class="menu-section-title">📊 Gestione App</h3>
-        <div class="menu-items">
-          <button class="menu-item" onclick="mostraModaleSincronizzazione()">
-            <span class="menu-icon"><i class="fas fa-sync-alt"></i></span>
-            <span class="menu-label">Sincronizza con Firestore</span>
-          </button>
-          <button class="menu-item" onclick="mostraFeedAttivita()">
-            <span class="menu-icon"><i class="fas fa-history"></i></span>
-            <span class="menu-label">Feed Attività</span>
-          </button>
-          <button class="menu-item" onclick="location.href='dashboard.html'">
-            <span class="menu-icon"><i class="fas fa-chart-line"></i></span>
-            <span class="menu-label">Dashboard</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- Help & Support -->
       <section class="menu-section">
         <h3 class="menu-section-title">🆘 Aiuto & Supporto</h3>
         <div class="menu-items">
@@ -294,28 +256,18 @@
     </div>
   </nav>
 
-  <!-- Main Content -->
   <main id="main-content" class="main-content" role="main">
-    <!-- Results Counter -->
     <div class="results-header">
       <div class="results-info">
         <span id="resultsCount" class="results-count">0 strutture</span>
         <span id="resultsStatus" class="results-status"></span>
       </div>
     </div>
-    
-    <!-- Results Grid -->
-    <section id="results" class="results-container">
-      <!-- Cards will be dynamically inserted here -->
-    </section>
-    
-    <!-- Loading Indicator -->
+    <section id="results" class="results-container"></section>
     <div id="loadingIndicator" class="loading-indicator hidden">
       <div class="loading-spinner"></div>
       <span class="loading-text">Caricamento...</span>
     </div>
-    
-    <!-- Empty State -->
     <div id="emptyState" class="empty-state hidden">
       <div class="empty-icon"><i class="fas fa-search"></i></div>
       <h3 class="empty-title">Nessuna struttura trovata</h3>
@@ -324,7 +276,6 @@
     </div>
   </main>
 
-  <!-- Modale di modifica -->
   <div id="modal" class="modal hidden">
     <div class="modal-content">
       <button id="closeModal" class="close"><i class="fas fa-times"></i></button>
@@ -338,7 +289,6 @@
     </div>
   </div>
 
-  <!-- Reindirizza solo log/info/debug verso logger centralizzato (evita warn/error) -->
   <script>
     (function(){
       if (window.log) {
@@ -353,7 +303,6 @@
   <script src="dist/export.js" defer></script>
   <script src="dist/push-notifications.js" defer></script>
   <script src="dist/offline-sync.js" defer></script>
-  <!-- cloudinary-config.js rimosso: ora caricato da /api/cloudinary-config.js -->
   <script src="dist/media-manager.js" defer></script>
   <script src="dist/virtual-scroll.js" defer></script>
   <script src="dist/integrations.js" defer></script>
@@ -364,178 +313,15 @@
   <script src="dist/config.js" defer></script>
   <script src="dist/test-systems.js" defer></script>
   <script src="dist/toast-notifications.js" defer></script>
-  <!-- Geolocalizzazione -->
   <script src="dist/geolocation-config.js" defer></script>
   <script src="dist/geolocation.js" defer></script>
   <script src="dist/geolocation-ui.js" defer></script>
   <script src="dist/geolocation-integration.js" defer></script>
-  <!-- Configurazione icone personalizzate -->
   <script src="dist/icons-config.js" defer></script>
-  <!-- Gestione errori -->
+  <!-- Sentry (opzionale) -->
+  <!-- Sentry disabilitato in locale (DSN vuoto) -->
+  <script src="sentry-config.local.js" defer></script>
   <script src="dist/error-handler.js" defer></script>
-  <script type="module" src="script.js"></script>
-
-<script>
-// Registrazione Service Worker per PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    try {
-      // Prova a registrare il service worker
-      const registration = await navigator.serviceWorker.register('./service-worker.js');
-      log.info('✅ Service Worker registrato:', registration.scope);
-      
-      // Gestione aggiornamenti automatici
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Nuovo service worker disponibile
-            showUpdateNotification();
-          }
-        });
-      });
-      
-      // Listener per messaggi dal service worker
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data.action === 'SW_UPDATED') {
-          log.info('🔄 Service Worker aggiornato');
-        }
-      });
-      
-      // Controlla aggiornamenti ogni 30 minuti
-      setInterval(() => {
-        registration.update();
-      }, 30 * 60 * 1000);
-      
-    } catch (error) {
-      log.warn('⚠️ Service Worker non disponibile (modalità sviluppo):', error.message);
-      // In modalità sviluppo, continua senza service worker
-      log.info('📱 App funzionante senza PWA features');
-    }
-  });
-}
-
-// Mostra notifica di aggiornamento
-function showUpdateNotification() {
-  // Rimuovi notifica esistente se presente
-  const existingNotification = document.getElementById('updateNotification');
-  if (existingNotification) {
-    existingNotification.remove();
-  }
-  
-  const notification = document.createElement('div');
-  notification.id = 'updateNotification';
-  notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #2f6b2f;
-    color: white;
-    padding: 16px 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 10001;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    max-width: 350px;
-    animation: slideInRight 0.3s ease-out;
-  `;
-  
-  notification.innerHTML = `
-    <div style="flex: 1;">
-      <div style="font-weight: 500; margin-bottom: 4px;">🔄 Nuova versione disponibile!</div>
-      <div style="font-size: 14px; opacity: 0.9;">Ricarica la pagina per aggiornare l'app</div>
-    </div>
-    <button onclick="location.reload()" style="
-      background: rgba(255,255,255,0.2);
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-    ">Aggiorna ora</button>
-    <button onclick="this.closest('#updateNotification').remove()" style="
-      background: none;
-      color: white;
-      border: none;
-      padding: 4px;
-      cursor: pointer;
-      font-size: 18px;
-      opacity: 0.7;
-    ">×</button>
-  `;
-  
-  document.body.appendChild(notification);
-  
-  // Auto-rimuovi dopo 10 secondi
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.remove();
-    }
-  }, 10000);
-}
-
-// Gestione installazione PWA
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  
-  // Mostra pulsante installazione personalizzato
-  const installBtn = document.createElement('button');
-  installBtn.textContent = '📱 Installa App';
-  installBtn.className = 'btn-install';
-  installBtn.style.cssText = `
-    background: #2f6b2f;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-left: 8px;
-  `;
-  
-  installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      log.info('Risultato installazione:', outcome);
-      deferredPrompt = null;
-    }
-  });
-  
-  // Aggiungi pulsante alla topbar
-  const controls = document.querySelector('.controls-secondary');
-  if (controls) {
-    controls.appendChild(installBtn);
-  }
-});
-
-// Gestione installazione completata
-window.addEventListener('appinstalled', () => {
-  log.info('✅ PWA installata con successo');
-  deferredPrompt = null;
-});
-
-// Inizializzazione icone personalizzate
-document.addEventListener('DOMContentLoaded', () => {
-  // Aggiorna tutte le icone del menu
-  if (typeof updateMenuIcons === 'function') {
-    updateMenuIcons();
-  }
-  
-  // Aggiorna icone dinamiche se necessario
-  setTimeout(() => {
-    // Forza aggiornamento icone dopo caricamento completo
-    if (typeof updateMenuIcons === 'function') {
-      updateMenuIcons();
-    }
-  }, 1000);
-});
-</script>
-
+  <script type="module" src="dist/script.js"></script>
 </body>
 </html>

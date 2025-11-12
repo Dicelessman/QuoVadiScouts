@@ -4,7 +4,7 @@
 const vScrollLog = typeof window !== 'undefined' && window.log ? window.log : {
   info: () => {},
   error: (...args) => console.error(...args),
-  warn: () => {},
+  warn: (...args) => console.warn(...args),
   debug: () => {}
 };
 
@@ -38,6 +38,7 @@ class VirtualScroller {
   init() {
     // Se ci sono pochi elementi, renderizza normalmente
     if (this.items.length < this.minItemsToVirtualize) {
+      vScrollLog.debug('VirtualScroller: Lista piccola, rendering completo per', this.items.length, 'elementi');
       this.renderAll();
       return;
     }
@@ -47,55 +48,93 @@ class VirtualScroller {
     // Pulisci container
     this.container.innerHTML = '';
     
-    // Crea container per placeholder
-    this.placeholderContainer = document.createElement('div');
-    this.placeholderContainer.className = 'virtual-scroll-container';
-    this.placeholderContainer.style.cssText = `
-      position: relative;
-      min-height: ${this.items.length * this.placeholderHeight}px;
-    `;
-    
-    this.container.appendChild(this.placeholderContainer);
+    // IMPORTANTE: Non creare un container interno per il virtual scroll
+    // Inserisci direttamente gli elementi nel container grid per mantenere il layout
+    // Assicurati che il container padre mantenga la classe results-container
+    if (this.container && !this.container.classList.contains('results-container')) {
+      this.container.classList.add('results-container');
+    }
     
     // Crea placeholder per tutti gli elementi
     this.createPlaceholders();
     
-    // Renderizza elementi iniziali visibili
-    this.renderInitialItems();
+    // Usa doppio requestAnimationFrame per assicurarsi che i placeholder siano nel DOM e renderizzati
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // Renderizza elementi iniziali visibili
+        this.renderInitialItems();
+      });
+    });
   }
   
   // Crea placeholder per tutti gli elementi
   createPlaceholders() {
+    // Usa il container principale invece di un container interno
     this.items.forEach((item, index) => {
       const placeholder = document.createElement('div');
       placeholder.className = 'virtual-scroll-placeholder';
       placeholder.dataset.index = index;
       placeholder.style.cssText = `
-        position: absolute;
-        top: ${index * this.placeholderHeight}px;
-        left: 0;
-        right: 0;
         height: ${this.placeholderHeight}px;
         background: transparent;
+        min-height: ${this.placeholderHeight}px;
       `;
       
-      this.placeholderContainer.appendChild(placeholder);
+      // Inserisci direttamente nel container grid
+      this.container.appendChild(placeholder);
       this.observer.observe(placeholder);
     });
   }
   
   // Renderizza elementi inizialmente visibili
   renderInitialItems() {
-    const containerRect = this.container.getBoundingClientRect();
-    const visibleStart = Math.max(0, Math.floor(-containerRect.top / this.placeholderHeight) - 2);
-    const visibleEnd = Math.min(
-      this.items.length - 1, 
-      Math.ceil((window.innerHeight - containerRect.top) / this.placeholderHeight) + 2
-    );
+    // Per il grid layout, renderizza sempre almeno i primi elementi
+    // Calcola quanti elementi servono per riempire la viewport
+    const itemsPerRow = this.getEstimatedItemsPerRow();
+    // Renderizza almeno 3-4 righe di elementi per assicurarsi che siano visibili
+    const rowsToRender = 4;
+    const visibleEnd = Math.min(this.items.length - 1, itemsPerRow * rowsToRender - 1);
     
-    for (let i = visibleStart; i <= visibleEnd; i++) {
-      this.renderItemAtIndex(i);
+    // Renderizza sempre almeno i primi elementi, anche se il calcolo fallisce
+    const minItemsToRender = Math.min(16, this.items.length); // Almeno 16 elementi o tutti se ci sono meno
+    const maxItemsToRender = Math.max(visibleEnd + 1, minItemsToRender);
+    const finalEnd = Math.min(this.items.length - 1, maxItemsToRender);
+    
+    let renderedCount = 0;
+    // Renderizza immediatamente i primi elementi senza delay
+    for (let i = 0; i <= finalEnd; i++) {
+      const success = this.renderItemAtIndex(i);
+      if (success !== false) {
+        renderedCount++;
+      }
     }
+    
+    // Se non sono stati renderizzati elementi, prova un approccio alternativo
+    if (renderedCount === 0) {
+      vScrollLog.warn('VirtualScroller: Nessun elemento renderizzato, tentativo alternativo...');
+      // Renderizza direttamente i primi elementi senza placeholder
+      for (let i = 0; i < Math.min(12, this.items.length); i++) {
+        const item = this.items[i];
+        if (item) {
+          const renderedElement = this.renderItem(item, i);
+          if (renderedElement) {
+            this.container.appendChild(renderedElement);
+            this.visibleItems.add(i);
+            renderedElement.dataset.virtualIndex = i;
+            renderedElement.style.minHeight = `${this.placeholderHeight}px`;
+          }
+        }
+      }
+    }
+  }
+  
+  // Stima quanti elementi per riga in base alla larghezza dello schermo
+  getEstimatedItemsPerRow() {
+    const width = window.innerWidth;
+    if (width >= 1280) return 4;
+    if (width >= 1024) return 3;
+    if (width >= 640) return 2;
+    return 1;
   }
   
   // Gestisce intersezioni con viewport
@@ -110,16 +149,42 @@ class VirtualScroller {
   
   // Renderizza elemento specifico
   renderItemAtIndex(index, placeholder) {
-    if (!placeholder) {
-      placeholder = this.placeholderContainer.querySelector(`[data-index="${index}"]`);
+    // Se l'elemento è già stato renderizzato, salta
+    if (this.visibleItems.has(index)) {
+      return true;
     }
     
-    if (!placeholder || this.visibleItems.has(index)) {
-      return;
+    // Se non è stato passato un placeholder, cercalo
+    if (!placeholder) {
+      placeholder = this.container.querySelector(`.virtual-scroll-placeholder[data-index="${index}"]`);
+    }
+    
+    // Se non trova il placeholder, potrebbe essere già stato sostituito o non ancora creato
+    if (!placeholder) {
+      // Verifica se esiste già un elemento renderizzato per questo indice
+      const existingElement = this.container.querySelector(`[data-virtual-index="${index}"]`);
+      if (existingElement) {
+        this.visibleItems.add(index);
+        return true; // Già renderizzato
+      }
+      // Se non esiste neanche un elemento renderizzato, potrebbe essere un problema di timing
+      // Prova a cercare di nuovo dopo un breve delay
+      setTimeout(() => {
+        const retryPlaceholder = this.container.querySelector(`.virtual-scroll-placeholder[data-index="${index}"]`);
+        if (retryPlaceholder && !this.visibleItems.has(index)) {
+          this.renderItemAtIndex(index, retryPlaceholder);
+        }
+      }, 50);
+      return false;
     }
     
     try {
       const item = this.items[index];
+      if (!item) {
+        vScrollLog.warn('VirtualScroller: Item non trovato all\'indice', index);
+        return false;
+      }
+      
       const renderedElement = this.renderItem(item, index);
       
       if (renderedElement) {
@@ -129,22 +194,28 @@ class VirtualScroller {
         
         // Aggiungi attributi per tracking
         renderedElement.dataset.virtualIndex = index;
-        renderedElement.style.position = 'absolute';
-        renderedElement.style.top = `${index * this.placeholderHeight}px`;
-        renderedElement.style.left = '0';
-        renderedElement.style.right = '0';
-        renderedElement.style.height = `${this.placeholderHeight}px`;
+        // Il grid CSS gestirà automaticamente il posizionamento
+        renderedElement.style.minHeight = `${this.placeholderHeight}px`;
         
-        vScrollLog.debug('VirtualScroller: Renderizzato elemento', index);
+        return true;
+      } else {
+        vScrollLog.warn('VirtualScroller: renderItem non ha restituito un elemento per indice', index);
+        return false;
       }
     } catch (error) {
-      console.error('❌ VirtualScroller: Errore rendering elemento', index, error);
+      vScrollLog.error('VirtualScroller: Errore rendering elemento', index, error);
+      return false;
     }
   }
   
   // Renderizza tutti gli elementi (per liste piccole)
   renderAll() {
     this.container.innerHTML = '';
+    
+    // Assicurati che il container mantenga la classe results-container
+    if (this.container && !this.container.classList.contains('results-container')) {
+      this.container.classList.add('results-container');
+    }
     
     this.items.forEach((item, index) => {
       const renderedElement = this.renderItem(item, index);
@@ -171,18 +242,15 @@ class VirtualScroller {
   
   // Pulisce un elemento specifico
   clearItem(index) {
-    const element = this.placeholderContainer?.querySelector(`[data-virtual-index="${index}"]`);
+    const element = this.container.querySelector(`[data-virtual-index="${index}"]`);
     if (element) {
       const placeholder = document.createElement('div');
       placeholder.className = 'virtual-scroll-placeholder';
       placeholder.dataset.index = index;
       placeholder.style.cssText = `
-        position: absolute;
-        top: ${index * this.placeholderHeight}px;
-        left: 0;
-        right: 0;
         height: ${this.placeholderHeight}px;
         background: transparent;
+        min-height: ${this.placeholderHeight}px;
       `;
       
       element.replaceWith(placeholder);

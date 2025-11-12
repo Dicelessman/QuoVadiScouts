@@ -4,10 +4,12 @@
 const DEBUG = false; // Impostare a true per debug in produzione
 const log = {
   info: (...args) => DEBUG && console.log(...args),
-  error: (...args) => console.error(...args), // Sempre attivo per errori
-  warn: (...args) => DEBUG && console.warn(...args),
-  debug: (...args) => DEBUG && console.log('[DEBUG]', ...args)
+  debug: (...args) => DEBUG && (console.debug ? console.debug(...args) : console.log('[DEBUG]', ...args)),
+  warn: (...args) => (console.warn ? console.warn(...args) : console.log('[WARN]', ...args)),
+  error: (...args) => console.error(...args) // Sempre attivo per errori
 };
+// Espone il logger globalmente per gli altri script non-modulari
+window.log = log;
 
 // === Firebase SDK Imports ===
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -32,7 +34,11 @@ import {
   signOut,
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import {
   getStorage,
@@ -133,6 +139,22 @@ window.firebaseUploadBytes = uploadBytesResumable;
 window.firebaseGetDownloadURL = getDownloadURL;
 window.firebaseDeleteObject = deleteObject;
 window.firebaseListAll = listAll;
+
+// Esponi Firestore globalmente per export.js e altri script non-modulari
+window.db = db;
+window.firestore = {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  setDoc,
+  getDoc,
+  orderBy
+};
 
 // === Caricamento dati da Firestore ===
 async function caricaStrutture() {
@@ -265,10 +287,20 @@ let elementiPerPagina = 20;
 let isListViewMode = false;
 
 function renderStrutture(lista) {
+  // Log solo se DEBUG è attivo
+  if (DEBUG) {
+    console.log('🎨 renderStrutture chiamato con', lista.length, 'strutture');
+  }
+  
   const container = document.getElementById("results");
   const loadingIndicator = document.getElementById("loadingIndicator");
   const emptyState = document.getElementById("emptyState");
   const resultsCount = document.getElementById("resultsCount");
+  
+  if (!container) {
+    console.error('❌ Container results non trovato!');
+    return;
+  }
   
   // Nascondi loading indicator
   if (loadingIndicator) {
@@ -284,7 +316,11 @@ function renderStrutture(lista) {
   updateMainMap(lista);
   
   if (container) {
-  container.innerHTML = "";
+    container.innerHTML = "";
+    // Assicurati che il container mantenga sempre la classe CSS per il grid layout
+    if (!container.classList.contains('results-container')) {
+      container.classList.add('results-container');
+    }
   }
 
   if (lista.length === 0) {
@@ -298,17 +334,172 @@ function renderStrutture(lista) {
     }
   }
 
+  // Se la lista è molto lunga, usa virtual scrolling e mostra tutto senza paginazione
+  if (lista.length > 100 && typeof window.createVirtualScroller === 'function' && container) {
+    const buildCardElement = (s) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      const isInElenco = elencoPersonale.includes(s.id);
+      if (isListViewMode) {
+        card.innerHTML = `
+        <div class="card-header">
+          <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
+          <div class="card-actions">
+            <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}">
+              ${isInElenco ? '⭐' : '☆'}
+            </button>
+            <button class="btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
+              📝
+            </button>
+          </div>
+        </div>
+        
+        <div class="card-content">
+          <div class="card-field">
+            <span class="card-field-icon">📍</span>
+            <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
+          </div>
+          
+          <div class="card-badges">
+            ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
+            ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
+            ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+            ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
+            ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
+          </div>
+          
+          ${s.Referente || s.Contatto ? `
+          <div class="card-field">
+            <span class="card-field-icon">👤</span>
+            <span class="card-field-value">${s.Referente || ''} ${s.Contatto ? `• ${s.Contatto}` : ''}</span>
+          </div>` : ''}
+          
+          ${s.Info ? `<div class="card-field">
+            <span class="card-field-icon">ℹ️</span>
+            <span class="card-field-value">${s.Info.length > 100 ? s.Info.substring(0, 100) + '...' : s.Info}</span>
+          </div>` : ''}
+        </div>
+      `;
+      } else {
+        card.innerHTML = `
+        <div class="card-header">
+          <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
+          <div class="card-actions">
+            <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}">
+              ${isInElenco ? '⭐' : '☆'}
+            </button>
+            <button class="btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
+              📝
+            </button>
+          </div>
+        </div>
+        
+        <div class="card-content">
+          <div class="card-field">
+            <span class="card-field-icon">📍</span>
+            <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
+          </div>
+          
+          ${s.Info ? `<div class="card-field">
+            <span class="card-field-icon">ℹ️</span>
+            <span class="card-field-value">${s.Info}</span>
+          </div>` : ''}
+          
+          <div class="card-badges">
+            ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
+            ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
+            ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+            ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
+            ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
+          </div>
+          
+          ${s.Letti || s.Branco || s.Reparto || s.Compagnia ? `
+          <div class="card-field">
+            <span class="card-field-icon">🏕️</span>
+            <span class="card-field-value">
+              ${s.Letti ? `Letti: ${s.Letti}` : ''}
+              ${s.Branco ? ` • Branco: ${s.Branco}` : ''}
+              ${s.Reparto ? ` • Reparto: ${s.Reparto}` : ''}
+              ${s.Compagnia ? ` • Compagnia: ${s.Compagnia}` : ''}
+            </span>
+          </div>` : ''}
+          
+          ${s.Referente ? `<div class="card-field">
+            <span class="card-field-icon">👤</span>
+            <span class="card-field-value">${s.Referente}</span>
+          </div>` : ''}
+          
+          ${s.Email ? `<div class="card-field">
+            <span class="card-field-icon">📧</span>
+            <span class="card-field-value">${s.Email}</span>
+          </div>` : ''}
+          
+          ${s.Sito ? `<div class="card-field">
+            <span class="card-field-icon">🌐</span>
+            <span class="card-field-value">${s.Sito}</span>
+          </div>` : ''}
+          
+          ${s.Contatto ? `<div class="card-field">
+            <span class="card-field-icon">📞</span>
+            <span class="card-field-value">${s.Contatto}</span>
+          </div>` : ''}
+          
+          ${s['Ultimo controllo'] ? `<div class="card-field">
+            <span class="card-field-icon">📅</span>
+            <span class="card-field-value">Ultimo controllo: ${s['Ultimo controllo']}</span>
+          </div>` : ''}
+        </div>
+      `;
+      }
+      // Event listeners per la card
+      const titleEl = card.querySelector('.clickable-title');
+      if (titleEl) {
+        titleEl.addEventListener('click', () => mostraSchedaCompleta(s.id));
+      }
+      const toggleBtn = card.querySelector('.toggle-elenco');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          const id = s.id;
+          if (elencoPersonale.includes(id)) {
+            rimuoviDallElenco(id);
+            toggleBtn.classList.remove('in-elenco');
+            toggleBtn.textContent = '☆';
+          } else {
+            aggiungiAllElenco(id);
+            toggleBtn.classList.add('in-elenco');
+            toggleBtn.textContent = '⭐';
+          }
+        });
+      }
+      return card;
+    };
+    // Inizializza virtual scroller
+    container.style.position = 'relative';
+    try {
+      const scroller = window.createVirtualScroller(container, lista, buildCardElement, {
+        placeholderHeight: isListViewMode ? 140 : 220,
+        minItemsToVirtualize: 20,
+        rootMargin: '400px'
+      });
+      scroller.init();
+    } catch (error) {
+      console.error('❌ Errore durante inizializzazione virtual scroller:', error);
+      throw error;
+    }
+    // Niente paginazione in modalità virtualizzata
+    return;
+  }
+
   // Calcola paginazione
   const totalePagine = Math.ceil(lista.length / elementiPerPagina);
   const inizio = (paginaCorrente - 1) * elementiPerPagina;
   const fine = inizio + elementiPerPagina;
   const listaPagina = lista.slice(inizio, fine);
 
-  listaPagina.forEach((s) => {
+  listaPagina.forEach((s, idx) => {
     const card = document.createElement("div");
     card.className = "card";
     const isInElenco = elencoPersonale.includes(s.id);
-
     if (isListViewMode) {
       // Modalità elenco - layout orizzontale compatto
       card.innerHTML = `
@@ -348,6 +539,7 @@ function renderStrutture(lista) {
             <span class="card-field-icon">ℹ️</span>
             <span class="card-field-value">${s.Info.length > 100 ? s.Info.substring(0, 100) + '...' : s.Info}</span>
           </div>` : ''}
+          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx===0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
         </div>
       `;
     } else {
@@ -409,6 +601,7 @@ function renderStrutture(lista) {
             <span class="card-field-icon">🌐</span>
             <span class="card-field-value">${s.Sito}</span>
           </div>` : ''}
+          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx===0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
           
           ${s.Contatto ? `<div class="card-field">
             <span class="card-field-icon">📞</span>
@@ -567,7 +760,7 @@ function mostraRicercaAvanzata() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--bg-overlay, rgba(0,0,0,0.5));
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -584,7 +777,7 @@ function mostraRicercaAvanzata() {
     max-width: 95%;
     max-height: 95%;
     overflow-y: auto;
-    box-shadow: var(--shadow-xl, 0 10px 30px rgba(0,0,0,0.3));
+    box-shadow: var(--shadow-xl);
     position: relative;
     min-width: 320px;
     width: 100%;
@@ -598,7 +791,7 @@ function mostraRicercaAvanzata() {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #2f6b2f;
+    border-bottom: 2px solid var(--border-light);
   `;
   
   const title = document.createElement('h2');
@@ -626,7 +819,125 @@ function mostraRicercaAvanzata() {
   `;
   closeBtn.onclick = () => modal.remove();
   
-  header.appendChild(title);
+  // Funzione helper per creare i pulsanti (per evitar duplicazione)
+  const createActionButtons = () => {
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `display: flex; gap: 10px; flex-wrap: wrap;`;
+    
+    const leftActions = document.createElement('div');
+    leftActions.style.cssText = `display: flex; gap: 10px;`;
+    
+    const clearBtn = document.createElement('button');
+    clearBtn.innerHTML = '🧹 Pulisci';
+    clearBtn.type = 'button';
+    clearBtn.style.cssText = `
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    `;
+    clearBtn.onclick = () => {
+      form.reset();
+      // Pulisci anche i filtri attivi
+      document.getElementById('search').value = '';
+      const provEl = document.getElementById('filter-prov');
+      if (provEl) provEl.value = '';
+      
+      // Reset filtri avanzati
+      window.filtriAvanzatiAttivi = null;
+      const indicator = document.getElementById('indicatore-ricerca-avanzata');
+      if (indicator) indicator.remove();
+      
+      renderStrutture(filtra(strutture));
+    };
+    
+    const rightActions = document.createElement('div');
+    rightActions.style.cssText = `display: flex; gap: 10px;`;
+    
+    const saveBtn = document.createElement('button');
+    saveBtn.innerHTML = '💾 Salva Filtri';
+    saveBtn.type = 'button';
+    saveBtn.style.cssText = `
+      background: #17a2b8;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    `;
+    saveBtn.onclick = () => {
+      salvaFiltriAvanzati();
+    };
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.innerHTML = '❌ Annulla';
+    cancelBtn.type = 'button';
+    cancelBtn.style.cssText = `
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    `;
+    cancelBtn.onclick = () => modal.remove();
+    
+    const searchBtn = document.createElement('button');
+    searchBtn.innerHTML = '🔍 Cerca';
+    searchBtn.type = 'button';
+    searchBtn.style.cssText = `
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    `;
+    searchBtn.onclick = () => {
+      const filtriAvanzati = raccogliFiltriAvanzati();
+      applicaRicercaAvanzata(filtriAvanzati);
+      modal.remove();
+    };
+    
+    leftActions.appendChild(clearBtn);
+    rightActions.appendChild(saveBtn);
+    rightActions.appendChild(cancelBtn);
+    rightActions.appendChild(searchBtn);
+    
+    buttonContainer.appendChild(leftActions);
+    buttonContainer.appendChild(rightActions);
+    
+    return buttonContainer;
+  };
+  
+  // Pulsanti in header (in cima)
+  const headerButtons = createActionButtons();
+  headerButtons.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-light);
+  `;
+  
+  const headerContent = document.createElement('div');
+  headerContent.style.cssText = `width: 100%;`;
+  headerContent.appendChild(title);
+  headerContent.appendChild(headerButtons);
+  
+  header.appendChild(headerContent);
   header.appendChild(closeBtn);
   
   // Form di ricerca
@@ -863,109 +1174,28 @@ function mostraRicercaAvanzata() {
     form.appendChild(categoriaDiv);
   });
   
-  // Footer con pulsanti
+  // Footer con pulsanti (duplicati in fondo)
   const footer = document.createElement('div');
   footer.style.cssText = `
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding-top: 15px;
-    border-top: 1px solid #e9ecef;
+    border-top: 1px solid var(--border-light);
     gap: 10px;
   `;
   
-  const leftActions = document.createElement('div');
-  leftActions.style.cssText = `display: flex; gap: 10px;`;
-  
-  const clearBtn = document.createElement('button');
-  clearBtn.innerHTML = '🧹 Pulisci';
-  clearBtn.type = 'button';
-  clearBtn.style.cssText = `
-    background: #6c757d;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
+  // Riutilizza la funzione helper per creare i pulsanti del footer
+  const footerButtons = createActionButtons();
+  footerButtons.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
   `;
-  clearBtn.onclick = () => {
-    form.reset();
-    // Pulisci anche i filtri attivi
-    document.getElementById('search').value = '';
-    const provEl = document.getElementById('filter-prov');
-    if (provEl) provEl.value = '';
-    
-    // Reset filtri avanzati
-    window.filtriAvanzatiAttivi = null;
-    const indicator = document.getElementById('indicatore-ricerca-avanzata');
-    if (indicator) indicator.remove();
-    
-    renderStrutture(filtra(strutture));
-  };
   
-  const rightActions = document.createElement('div');
-  rightActions.style.cssText = `display: flex; gap: 10px;`;
-  
-  const saveBtn = document.createElement('button');
-  saveBtn.innerHTML = '💾 Salva Filtri';
-  saveBtn.type = 'button';
-  saveBtn.style.cssText = `
-    background: #17a2b8;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-  `;
-  saveBtn.onclick = () => {
-    salvaFiltriAvanzati();
-  };
-  
-  const searchBtn = document.createElement('button');
-  searchBtn.innerHTML = '🔍 Cerca';
-  searchBtn.type = 'button';
-  searchBtn.style.cssText = `
-    background: #28a745;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-  `;
-  searchBtn.onclick = () => {
-    const filtriAvanzati = raccogliFiltriAvanzati();
-    applicaRicercaAvanzata(filtriAvanzati);
-    modal.remove();
-  };
-  
-  const cancelBtn = document.createElement('button');
-  cancelBtn.innerHTML = '❌ Annulla';
-  cancelBtn.type = 'button';
-  cancelBtn.style.cssText = `
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-  `;
-  cancelBtn.onclick = () => modal.remove();
-  
-  leftActions.appendChild(clearBtn);
-  rightActions.appendChild(saveBtn);
-  rightActions.appendChild(cancelBtn);
-  rightActions.appendChild(searchBtn);
-  
-  footer.appendChild(leftActions);
-  footer.appendChild(rightActions);
+  footer.appendChild(footerButtons);
   
   modalContent.appendChild(header);
   modalContent.appendChild(form);
@@ -1407,6 +1637,11 @@ async function modificaStruttura(id) {
     </label>
     
     <label>
+      Indirizzo
+      <input type="text" id="edit-indirizzo" value="${strutturaCorrente.Indirizzo || ''}" placeholder="Via, numero civico, ecc.">
+    </label>
+    
+    <label>
       Provincia
       <select id="edit-prov">
         <option value="">Seleziona provincia</option>
@@ -1447,6 +1682,16 @@ async function modificaStruttura(id) {
         Link Google Maps
         <input type="url" id="edit-google_maps_link" value="${strutturaCorrente.google_maps_link || ''}" placeholder="https://maps.google.com/...">
       </label>
+      
+      <div style="margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 4px;">
+        <button type="button" id="geocodeBtn" 
+                style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; width: 100%;">
+          🔍 Ottieni Coordinate da Indirizzo
+        </button>
+        <small style="display: block; margin-top: 5px; color: var(--text-secondary); font-size: 12px;">
+          Compila Luogo, Indirizzo e Provincia, poi clicca qui per ottenere le coordinate automaticamente
+        </small>
+      </div>
     </fieldset>
     
     <label>
@@ -1486,6 +1731,7 @@ async function salvaModifiche() {
   const formData = {
     Struttura: document.getElementById('edit-struttura').value.trim(),
     Luogo: document.getElementById('edit-luogo').value.trim(),
+    Indirizzo: document.getElementById('edit-indirizzo') ? document.getElementById('edit-indirizzo').value.trim() : (strutturaCorrente.Indirizzo || ''),
     Prov: document.getElementById('edit-prov').value,
     Referente: document.getElementById('edit-referente').value.trim(),
     Contatto: document.getElementById('edit-contatto').value.trim(),
@@ -1541,13 +1787,12 @@ async function salvaModifiche() {
       changes: Object.keys(formData).filter(key => formData[key] !== strutturaCorrente[key])
     });
     
-    // Se sono stati modificati campi di posizione, prova geocoding automatico
-    const campiPosizione = ['Luogo', 'Prov', 'Indirizzo', 'google_maps_link'];
-    const campiModificati = Object.keys(formData).filter(key => formData[key] !== strutturaCorrente[key]);
-    const posizioneModificata = campiPosizione.some(campo => campiModificati.includes(campo));
+    // Se ci sono Luogo + Indirizzo + Prov e mancano le coordinate, prova geocoding automatico
+    const haDatiPosizione = formData.Luogo && formData.Indirizzo && formData.Prov;
+    const mancanoCoordinate = !formData.coordinate_lat || !formData.coordinate_lng;
     
-    if (posizioneModificata && (!formData.coordinate_lat || !formData.coordinate_lng)) {
-      console.log('🔄 Campi di posizione modificati, tentativo geocoding automatico...');
+    if (haDatiPosizione && mancanoCoordinate) {
+      console.log('🔄 Dati posizione completi (Luogo + Indirizzo + Prov), tentativo geocoding automatico...');
       
       // Aggiorna la struttura locale con i nuovi dati
       const strutturaAggiornata = { ...strutturaCorrente, ...formData };
@@ -1560,7 +1805,32 @@ async function salvaModifiche() {
           coordinate_lat: strutturaConCoordinate.coordinate_lat,
           coordinate_lng: strutturaConCoordinate.coordinate_lng
         });
-        console.log('✅ Coordinate ottenute automaticamente e salvate');
+        
+        // Aggiorna anche i campi nel formData per sincronizzazione
+        formData.coordinate = strutturaConCoordinate.coordinate;
+        formData.coordinate_lat = strutturaConCoordinate.coordinate_lat;
+        formData.coordinate_lng = strutturaConCoordinate.coordinate_lng;
+        
+        // Aggiorna i campi nel form visivamente
+        const latInput = document.getElementById('edit-coordinate_lat');
+        const lngInput = document.getElementById('edit-coordinate_lng');
+        if (latInput) latInput.value = strutturaConCoordinate.coordinate_lat || '';
+        if (lngInput) lngInput.value = strutturaConCoordinate.coordinate_lng || '';
+        
+        console.log('✅ Coordinate ottenute automaticamente e salvate:', {
+          lat: strutturaConCoordinate.coordinate_lat,
+          lng: strutturaConCoordinate.coordinate_lng
+        });
+        
+        // Mostra notifica all'utente
+        if (window.showNotification) {
+          window.showNotification('✅ Coordinate ottenute automaticamente', {
+            body: `Lat: ${strutturaConCoordinate.coordinate_lat?.toFixed(6)}, Lng: ${strutturaConCoordinate.coordinate_lng?.toFixed(6)}`,
+            icon: '📍'
+          });
+        }
+      } else {
+        console.warn('⚠️ Impossibile ottenere coordinate automaticamente per questa struttura');
       }
     }
     
@@ -1614,7 +1884,7 @@ async function eliminaStrutturaConConferma(id) {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1830,7 +2100,7 @@ function mostraAiuto() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1955,7 +2225,7 @@ function mostraAbout() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2215,15 +2485,22 @@ function getStatoLabel(stato) {
 // === Gestione Note Personali ===
 // Funzione per caricare note personali per l'elenco personale
 async function loadPersonalNotesForElenco(struttureElenco) {
-  if (!window.utenteCorrente) return;
+  const currentUser = getCurrentUser();
+  if (!currentUser) return;
   
   try {
-    const { collection, query, where, getDocs } = window.firebase.firestore;
-    const db = window.db;
+    // Usa le funzioni Firestore importate direttamente (siamo in script.js)
+    // Non abbiamo bisogno di window.firestore qui perché siamo nello stesso modulo
+    const db = window.db || getFirestore(app);
+    
+    if (!db) {
+      console.error('❌ Firestore db non disponibile');
+      return;
+    }
     
     // Carica tutte le note personali dell'utente
     const notesRef = collection(db, "user_notes");
-    const q = query(notesRef, where("userId", "==", window.utenteCorrente.uid));
+    const q = query(notesRef, where("userId", "==", currentUser.uid));
     const snapshot = await getDocs(q);
     
     const noteMap = {};
@@ -2276,7 +2553,7 @@ async function mostraNotePersonali(strutturaId) {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2546,13 +2823,14 @@ function createResponsiveModal(id, title, content) {
   const modal = document.createElement('div');
   modal.id = id;
   modal.className = 'modal-overlay';
+  // Usa solo variabili CSS, senza fallback hardcoded
   modal.style.cssText = `
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--bg-overlay, rgba(0,0,0,0.5));
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2571,7 +2849,7 @@ function createResponsiveModal(id, title, content) {
     max-width: 100%;
     max-height: 95vh;
     overflow-y: auto;
-    box-shadow: var(--shadow-xl, 0 10px 30px rgba(0,0,0,0.3));
+    box-shadow: var(--shadow-xl);
     position: relative;
     width: 100%;
     box-sizing: border-box;
@@ -2585,22 +2863,23 @@ function createResponsiveModal(id, title, content) {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid var(--primary, #2f6b2f);
+    border-bottom: 2px solid var(--border-light);
   `;
   
   const titleEl = document.createElement('h2');
   titleEl.textContent = title;
   titleEl.style.cssText = `
     margin: 0;
-    color: var(--primary, #2f6b2f);
+    color: var(--text-primary);
     font-size: 1.5rem;
   `;
   
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
+  closeBtn.className = 'modal-close';
   closeBtn.style.cssText = `
-    background: #dc3545;
-    color: white;
+    background: transparent;
+    color: var(--text-tertiary);
     border: none;
     border-radius: 50%;
     width: 30px;
@@ -2610,6 +2889,7 @@ function createResponsiveModal(id, title, content) {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s ease;
   `;
   closeBtn.onclick = () => modal.remove();
   
@@ -2633,8 +2913,8 @@ function createResponsiveModal(id, title, content) {
     if (e.matches) {
       // Mobile: modal a schermo intero
       modalContent.style.cssText = `
-        background: var(--bg-primary, white);
-        color: var(--text-primary, #1a1a1a);
+        background: var(--bg-primary);
+        color: var(--text-primary);
         border-radius: 0;
         padding: 15px;
         max-width: 100%;
@@ -2652,7 +2932,7 @@ function createResponsiveModal(id, title, content) {
         left: 0;
         width: 100%;
         height: 100%;
-        background: var(--bg-primary, white);
+        background: var(--bg-primary);
         display: flex;
         align-items: stretch;
         justify-content: stretch;
@@ -2663,14 +2943,14 @@ function createResponsiveModal(id, title, content) {
     } else {
       // Desktop: modal centrato
       modalContent.style.cssText = `
-        background: var(--bg-primary, white);
-        color: var(--text-primary, #1a1a1a);
+        background: var(--bg-primary);
+        color: var(--text-primary);
         border-radius: 12px;
         padding: 20px;
         max-width: 90%;
         max-height: 95vh;
         overflow-y: auto;
-        box-shadow: var(--shadow-xl, 0 10px 30px rgba(0,0,0,0.3));
+        box-shadow: var(--shadow-xl);
         position: relative;
         width: 100%;
         box-sizing: border-box;
@@ -2681,7 +2961,7 @@ function createResponsiveModal(id, title, content) {
         left: 0;
         width: 100%;
         height: 100%;
-        background: var(--bg-overlay, rgba(0,0,0,0.5));
+        background: var(--bg-overlay);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -2768,7 +3048,10 @@ async function initializeMainMap() {
 function updateMainMap(struttureList) {
   try {
     if (!mainMapInstance || !mainMapInstance.map) {
-      console.warn('⚠️ Mappa principale non inizializzata');
+      // Warning solo se DEBUG è attivo, altrimenti silenzioso
+      if (DEBUG) {
+        console.warn('⚠️ Mappa principale non inizializzata');
+      }
       return;
     }
 
@@ -2784,6 +3067,183 @@ function updateMainMap(struttureList) {
 
 // Gestione pulsanti mappa principale
 function setupMainMapControls() {
+  // Sistema di layer overlay
+  if (!window.mapsManager) {
+    window.mapsManager = { overlayLayers: {} };
+  }
+  
+  // Definizione layer disponibili (solo overlay funzionanti)
+  const layerConfigs = {
+    railway: {
+      name: 'Rete Ferroviaria',
+      url: 'https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png',
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | <a href="https://www.openrailwaymap.org/">OpenRailwayMap</a>',
+      opacity: 0.9, // Aumentata opacità per maggiore contrasto
+      // Applica filtri CSS per aumentare contrasto e saturazione
+      className: 'railway-layer-high-contrast'
+    },
+    hiking: {
+      name: 'Sentieri Escursionistici',
+      url: 'https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png',
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | <a href="https://www.waymarkedtrails.org/">Waymarked Trails</a>',
+      opacity: 0.7
+    },
+    mtb: {
+      name: 'Percorsi MTB',
+      url: 'https://tile.waymarkedtrails.org/mtb/{z}/{x}/{y}.png',
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | <a href="https://www.waymarkedtrails.org/">Waymarked Trails</a>',
+      opacity: 0.7
+    },
+    cycling: {
+      name: 'Piste Ciclabili',
+      url: 'https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png',
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | <a href="https://www.waymarkedtrails.org/">Waymarked Trails</a>',
+      opacity: 0.7
+    }
+  };
+  
+  // Funzione per creare/ottenere un layer
+  const getOrCreateLayer = (layerId) => {
+    if (!window.mapsManager || !window.mapsManager.map) {
+      console.warn('⚠️ Mappa non ancora inizializzata');
+      return null;
+    }
+    
+    const config = layerConfigs[layerId];
+    if (!config) {
+      console.error('❌ Configurazione layer non trovata:', layerId);
+      return null;
+    }
+    
+    // Se il layer esiste già, restituiscilo
+    if (window.mapsManager.overlayLayers && window.mapsManager.overlayLayers[layerId]) {
+      return window.mapsManager.overlayLayers[layerId];
+    }
+    
+    // Crea il nuovo layer
+    try {
+      const layerOptions = {
+        attribution: config.attribution,
+        maxZoom: 19,
+        opacity: config.opacity || 0.7
+      };
+      
+      // Aggiungi classe CSS per filtri se specificata
+      if (config.className) {
+        layerOptions.className = config.className;
+      }
+      
+      const layer = L.tileLayer(config.url, layerOptions);
+      
+      // Applica filtri CSS per aumentare contrasto (solo per layer ferroviario)
+      if (layerId === 'railway' && config.className) {
+        // Aggiungi stile CSS per aumentare contrasto
+        if (!document.getElementById('railway-layer-styles')) {
+          const style = document.createElement('style');
+          style.id = 'railway-layer-styles';
+          style.textContent = `
+            .railway-layer-high-contrast img {
+              filter: contrast(1.4) saturate(1.3) brightness(0.95);
+              -webkit-filter: contrast(1.4) saturate(1.3) brightness(0.95);
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      }
+      
+      if (!window.mapsManager.overlayLayers) {
+        window.mapsManager.overlayLayers = {};
+      }
+      window.mapsManager.overlayLayers[layerId] = layer;
+      console.log(`✅ Layer ${config.name} creato`);
+      return layer;
+    } catch (error) {
+      console.error(`❌ Errore creazione layer ${layerId}:`, error);
+      return null;
+    }
+  };
+  
+  // Menu dropdown layer
+  const layersMenuBtn = document.getElementById('layersMenuBtn');
+  const layersMenu = document.getElementById('layersMenu');
+  
+  if (layersMenuBtn && layersMenu) {
+    // Toggle menu
+    layersMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      layersMenu.classList.toggle('hidden');
+    });
+    
+    // Chiudi menu quando si clicca fuori
+    document.addEventListener('click', (e) => {
+      if (!layersMenu.contains(e.target) && e.target !== layersMenuBtn) {
+        layersMenu.classList.add('hidden');
+      }
+    });
+    
+    // Gestione checkbox layer
+    Object.keys(layerConfigs).forEach(layerId => {
+      const checkbox = document.getElementById(`layer-${layerId}`);
+      if (checkbox) {
+        checkbox.addEventListener('change', (e) => {
+          if (!window.mapsManager || !window.mapsManager.map) {
+            console.warn('⚠️ Mappa non ancora inizializzata');
+            alert('La mappa non è ancora caricata. Attendi qualche secondo e riprova.');
+            e.target.checked = false;
+            return;
+          }
+          
+          const layer = getOrCreateLayer(layerId);
+          if (!layer) {
+            console.error(`❌ Impossibile creare il layer ${layerId}`);
+            e.target.checked = false;
+            return;
+          }
+          
+          if (e.target.checked) {
+            window.mapsManager.map.addLayer(layer);
+            console.log(`✅ Layer ${layerConfigs[layerId].name} attivato`);
+          } else {
+            window.mapsManager.map.removeLayer(layer);
+            console.log(`❌ Layer ${layerConfigs[layerId].name} disattivato`);
+          }
+        });
+      }
+    });
+    
+    // Pulsante rimuovi tutti i layer
+    const clearAllLayersBtn = document.getElementById('clearAllLayersBtn');
+    if (clearAllLayersBtn) {
+      clearAllLayersBtn.addEventListener('click', () => {
+        if (!window.mapsManager || !window.mapsManager.map) {
+          console.warn('⚠️ Mappa non ancora inizializzata');
+          return;
+        }
+        
+        let removedCount = 0;
+        
+        // Rimuovi tutti i layer attivi e deseleziona le checkbox
+        Object.keys(layerConfigs).forEach(layerId => {
+          const checkbox = document.getElementById(`layer-${layerId}`);
+          if (checkbox && checkbox.checked) {
+            const layer = window.mapsManager.overlayLayers && window.mapsManager.overlayLayers[layerId];
+            if (layer && window.mapsManager.map.hasLayer(layer)) {
+              window.mapsManager.map.removeLayer(layer);
+              removedCount++;
+            }
+            checkbox.checked = false;
+          }
+        });
+        
+        if (removedCount > 0) {
+          console.log(`🗑️ Rimossi ${removedCount} layer attivi`);
+        } else {
+          console.log('ℹ️ Nessun layer attivo da rimuovere');
+        }
+      });
+    }
+  }
+
   // Pulsante centro su di me
   const centerMapBtn = document.getElementById('centerMapBtn');
   if (centerMapBtn) {
@@ -2830,7 +3290,7 @@ async function mostraMappa() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2862,7 +3322,7 @@ async function mostraMappa() {
     align-items: center;
     margin-bottom: 15px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #2f6b2f;
+    border-bottom: 2px solid var(--border-light);
   `;
   
   const title = document.createElement('h2');
@@ -3023,7 +3483,7 @@ function mostraModaleSincronizzazione() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3642,7 +4102,7 @@ async function mostraSegnalazione(strutturaId) {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3659,7 +4119,7 @@ async function mostraSegnalazione(strutturaId) {
     width: 500px;
     max-height: 80%;
     overflow-y: auto;
-    box-shadow: var(--shadow-xl, 0 10px 30px rgba(0,0,0,0.3));
+    box-shadow: var(--shadow-xl);
     border: 1px solid var(--border-light);
   `;
   
@@ -4674,28 +5134,54 @@ function inizializzaAuth() {
       
       // Carica strutture dopo l'autenticazione
       try {
-        console.log('📊 Caricamento strutture dopo autenticazione...');
         strutture = await caricaStrutture();
         window.strutture = strutture;
+        
+        if (!strutture || strutture.length === 0) {
+          console.warn('⚠️ Nessuna struttura caricata!');
+          // Mostra empty state invece di non fare nulla
+          const container = document.getElementById("results");
+          const emptyState = document.getElementById("emptyState");
+          if (container) {
+            container.innerHTML = "";
+          }
+          if (emptyState) {
+            emptyState.classList.remove('hidden');
+          }
+          return;
+        }
         
         // Applica filtro provincia preferita se impostata
         const preferredProvince = localStorage.getItem('preferredProvince');
         if (preferredProvince && preferredProvince !== '') {
-          console.log(`🔍 Provincia preferita trovata: ${preferredProvince}`);
           const struttureFiltrate = strutture.filter(s => s.Prov === preferredProvince);
-          console.log(`📊 Strutture filtrate: ${struttureFiltrate.length} su ${strutture.length}`);
           renderStrutture(struttureFiltrate);
         } else {
-          console.log('ℹ️ Nessuna provincia preferita impostata');
           renderStrutture(strutture);
         }
         aggiornaContatoreElenco();
         console.log('✅ Strutture caricate e visualizzate');
         
-        // Inizializza mappa principale dopo caricamento strutture
-        await initializeMainMap();
+        // Inizializza mappa principale dopo caricamento strutture (post-first-paint)
+        const scheduleInit = () => {
+          try { initializeMainMap(); } catch (e) { console.warn('⚠️ Init mappa posticipato:', e?.message); }
+        };
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(scheduleInit, { timeout: 1000 });
+        } else {
+          setTimeout(scheduleInit, 0);
+        }
       } catch (error) {
         console.error('❌ Errore nel caricamento strutture:', error);
+        // Mostra errore anche in UI
+        const container = document.getElementById("results");
+        if (container) {
+          container.innerHTML = `<div class="error" style="padding: 20px; text-align: center;">
+            <h3>⚠️ Errore nel caricamento</h3>
+            <p>Impossibile caricare le strutture. Errore: ${error.message}</p>
+            <button onclick="location.reload()" class="btn-primary">Ricarica pagina</button>
+          </div>`;
+        }
       }
       
       // Carica filtri salvati (con delay per assicurarsi che l'utente sia completamente autenticato)
@@ -4817,7 +5303,7 @@ function mostraSchedaUtente() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4943,6 +5429,54 @@ function mostraSchedaUtente() {
     </div>
     
     <div style="grid-column: 1 / -1;">
+      <h3 style="margin: 20px 0 10px 0; color: #2f6b2f; border-top: 2px solid var(--border-light); padding-top: 20px;">🔐 Cambia Password</h3>
+      <div style="display: grid; gap: 15px; margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-weight: 500; color: var(--text-primary);">Password Attuale *</label>
+          <div style="position: relative;">
+            <input type="password" id="currentPassword" placeholder="Inserisci la password attuale" 
+                   style="width: 100%; padding: 10px 40px 10px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; box-sizing: border-box; background: var(--bg-primary); color: var(--text-primary);">
+            <button type="button" id="toggleCurrentPassword" 
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; color: #666;">
+              👁️
+            </button>
+          </div>
+        </div>
+        
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-weight: 500; color: var(--text-primary);">Nuova Password *</label>
+          <div style="position: relative;">
+            <input type="password" id="newPassword" placeholder="Minimo 6 caratteri" 
+                   style="width: 100%; padding: 10px 40px 10px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; box-sizing: border-box; background: var(--bg-primary); color: var(--text-primary);">
+            <button type="button" id="toggleNewPassword" 
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; color: #666;">
+              👁️
+            </button>
+          </div>
+        </div>
+        
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-weight: 500; color: var(--text-primary);">Conferma Nuova Password *</label>
+          <div style="position: relative;">
+            <input type="password" id="confirmNewPassword" placeholder="Reinserisci la nuova password" 
+                   style="width: 100%; padding: 10px 40px 10px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; box-sizing: border-box; background: var(--bg-primary); color: var(--text-primary);">
+            <button type="button" id="toggleConfirmPassword" 
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; color: #666;">
+              👁️
+            </button>
+          </div>
+        </div>
+        
+        <button id="changePasswordBtn" 
+                style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; width: 100%;">
+          🔄 Cambia Password
+        </button>
+        
+        <div id="passwordChangeMessage" style="display: none; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 14px;"></div>
+      </div>
+    </div>
+    
+    <div style="grid-column: 1 / -1;">
       <h3 style="margin: 20px 0 10px 0; color: #2f6b2f;">🔔 Preferenze Notifiche</h3>
       <div style="display: grid; gap: 10px; grid-template-columns: 1fr 1fr;">
         <label style="display: flex; align-items: center; gap: 8px;">
@@ -5042,6 +5576,148 @@ function mostraSchedaUtente() {
   modalContent.appendChild(footer);
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
+  
+  // Toggle visualizzazione password per cambio password
+  document.getElementById('toggleCurrentPassword').addEventListener('click', () => {
+    const passwordInput = document.getElementById('currentPassword');
+    const toggleBtn = document.getElementById('toggleCurrentPassword');
+    
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      toggleBtn.textContent = '🙈';
+    } else {
+      passwordInput.type = 'password';
+      toggleBtn.textContent = '👁️';
+    }
+  });
+  
+  document.getElementById('toggleNewPassword').addEventListener('click', () => {
+    const passwordInput = document.getElementById('newPassword');
+    const toggleBtn = document.getElementById('toggleNewPassword');
+    
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      toggleBtn.textContent = '🙈';
+    } else {
+      passwordInput.type = 'password';
+      toggleBtn.textContent = '👁️';
+    }
+  });
+  
+  document.getElementById('toggleConfirmPassword').addEventListener('click', () => {
+    const passwordInput = document.getElementById('confirmNewPassword');
+    const toggleBtn = document.getElementById('toggleConfirmPassword');
+    
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      toggleBtn.textContent = '🙈';
+    } else {
+      passwordInput.type = 'password';
+      toggleBtn.textContent = '👁️';
+    }
+  });
+  
+  // Cambio password
+  document.getElementById('changePasswordBtn').onclick = async () => {
+    const messageDiv = document.getElementById('passwordChangeMessage');
+    messageDiv.style.display = 'none';
+    
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmNewPassword').value;
+    
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      messageDiv.textContent = '⚠️ Compila tutti i campi';
+      messageDiv.style.display = 'block';
+      messageDiv.style.background = '#f8d7da';
+      messageDiv.style.color = '#721c24';
+      messageDiv.style.border = '1px solid #f5c6cb';
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      messageDiv.textContent = '⚠️ La nuova password deve essere di almeno 6 caratteri';
+      messageDiv.style.display = 'block';
+      messageDiv.style.background = '#f8d7da';
+      messageDiv.style.color = '#721c24';
+      messageDiv.style.border = '1px solid #f5c6cb';
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      messageDiv.textContent = '⚠️ Le password non corrispondono';
+      messageDiv.style.display = 'block';
+      messageDiv.style.background = '#f8d7da';
+      messageDiv.style.color = '#721c24';
+      messageDiv.style.border = '1px solid #f5c6cb';
+      return;
+    }
+    
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.email) {
+        messageDiv.textContent = '❌ Utente non autenticato';
+        messageDiv.style.display = 'block';
+        messageDiv.style.background = '#f8d7da';
+        messageDiv.style.color = '#721c24';
+        messageDiv.style.border = '1px solid #f5c6cb';
+        return;
+      }
+      
+      // Verifica che l'utente non sia loggato con Google
+      if (currentUser.providerData && currentUser.providerData.some(provider => provider.providerId === 'google.com')) {
+        messageDiv.textContent = '⚠️ Gli utenti loggati con Google non possono cambiare la password qui';
+        messageDiv.style.display = 'block';
+        messageDiv.style.background = '#fff3cd';
+        messageDiv.style.color = '#856404';
+        messageDiv.style.border = '1px solid #ffeeba';
+        return;
+      }
+      
+      // Re-autentica l'utente con la password corrente
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      
+      // Aggiorna la password
+      await updatePassword(currentUser, newPassword);
+      
+      messageDiv.textContent = '✅ Password cambiata con successo!';
+      messageDiv.style.display = 'block';
+      messageDiv.style.background = '#d4edda';
+      messageDiv.style.color = '#155724';
+      messageDiv.style.border = '1px solid #c3e6cb';
+      
+      // Pulisci i campi
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmNewPassword').value = '';
+      
+      console.log('✅ Password cambiata con successo');
+      
+    } catch (error) {
+      console.error('❌ Errore cambio password:', error);
+      let errorMessage = '❌ Errore nel cambio password';
+      
+      switch (error.code) {
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          errorMessage = '⚠️ Password attuale non corretta';
+          break;
+        case 'auth/weak-password':
+          errorMessage = '⚠️ La nuova password è troppo debole';
+          break;
+        case 'auth/requires-recent-login':
+          errorMessage = '⚠️ Per sicurezza, effettua nuovamente il login prima di cambiare la password';
+          break;
+      }
+      
+      messageDiv.textContent = errorMessage;
+      messageDiv.style.display = 'block';
+      messageDiv.style.background = '#f8d7da';
+      messageDiv.style.color = '#721c24';
+      messageDiv.style.border = '1px solid #f5c6cb';
+    }
+  };
   
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
@@ -5182,8 +5858,13 @@ function mostraSchermataLogin() {
       </button>
       
       <button id="showRegisterBtn" 
-              style="background: transparent; color: #666; border: 1px solid #ddd; padding: 15px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%;">
+              style="background: transparent; color: #666; border: 1px solid #ddd; padding: 15px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%; margin-bottom: 10px;">
         📝 Crea Account
+      </button>
+      
+      <button id="forgotPasswordBtn" 
+              style="background: transparent; color: #007bff; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; width: 100%; text-decoration: underline;">
+        🔑 Password dimenticata?
       </button>
     </div>
     
@@ -5247,6 +5928,26 @@ function mostraSchermataLogin() {
       </button>
     </div>
     
+    <div id="resetPasswordForm" style="margin-bottom: 20px; display: none;">
+      <h3 style="color: #2f6b2f; margin-bottom: 15px;">🔑 Recupero Password</h3>
+      <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+        Inserisci la tua email e ti invieremo un link per reimpostare la password.
+      </p>
+      
+      <input type="email" id="resetEmail" placeholder="Email" 
+             style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; margin-bottom: 15px; box-sizing: border-box;">
+      
+      <button id="resetPasswordBtn" 
+              style="background: #007bff; color: white; border: none; padding: 15px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%; margin-bottom: 15px;">
+        📧 Invia Link di Recupero
+      </button>
+      
+      <button id="backToLoginBtn" 
+              style="background: transparent; color: #666; border: 1px solid #ddd; padding: 15px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%;">
+        ← Torna al Login
+      </button>
+    </div>
+    
     <div id="loadingMessage" style="display: none; color: #28a745; font-weight: bold;">
       <div style="display: inline-block; width: 20px; height: 20px; border: 2px solid #28a745; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px;"></div>
       Caricamento...
@@ -5286,6 +5987,15 @@ function setupAuthEventListeners() {
   document.getElementById('showLoginBtn').onclick = () => {
     document.getElementById('registerForm').style.display = 'none';
     document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('resetPasswordForm').style.display = 'none';
+    hideError();
+  };
+  
+  // Password dimenticata
+  document.getElementById('forgotPasswordBtn').onclick = () => {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('resetPasswordForm').style.display = 'block';
     hideError();
   };
   
@@ -5375,6 +6085,66 @@ function setupAuthEventListeners() {
       toggleBtn.textContent = '👁️';
     }
   });
+  
+  // Back to login dal reset password
+  document.getElementById('backToLoginBtn').onclick = () => {
+    document.getElementById('resetPasswordForm').style.display = 'none';
+    document.getElementById('loginForm').style.display = 'block';
+    hideError();
+  };
+  
+  // Reset password
+  document.getElementById('resetPasswordBtn').onclick = async () => {
+    try {
+      const email = InputSanitizer.sanitizeEmail(document.getElementById('resetEmail').value);
+      
+      if (!email) {
+        showError('⚠️ Inserisci un indirizzo email valido');
+        return;
+      }
+      
+      showLoading(true);
+      hideError();
+      
+      await sendPasswordResetEmail(auth, email);
+      
+      // Mostra messaggio di successo
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = '✅ Email di recupero inviata! Controlla la tua casella di posta e segui le istruzioni per reimpostare la password.';
+      errorDiv.style.display = 'block';
+      errorDiv.style.color = '#155724';
+      errorDiv.style.background = '#d4edda';
+      errorDiv.style.border = '1px solid #c3e6cb';
+      
+      // Torna al login dopo 3 secondi
+      setTimeout(() => {
+        document.getElementById('resetPasswordForm').style.display = 'none';
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('resetEmail').value = '';
+        hideError();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Errore recupero password:', error);
+      let errorMessage = '❌ Errore nell\'invio dell\'email di recupero';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = '⚠️ Nessun account trovato con questa email';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = '⚠️ Indirizzo email non valido';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = '⚠️ Troppi tentativi, riprova più tardi';
+          break;
+      }
+      
+      showError(errorMessage);
+    } finally {
+      showLoading(false);
+    }
+  };
 }
 
 async function loginWithEmail(email, password) {
@@ -6013,7 +6783,7 @@ async function mostraGestioneElencoPersonale() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -6043,14 +6813,14 @@ async function mostraGestioneElencoPersonale() {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #2f6b2f;
+    border-bottom: 2px solid var(--border-light);
   `;
   
   const title = document.createElement('h2');
   title.textContent = `📋 Elenco Personale`;
   title.style.cssText = `
     margin: 0;
-    color: #2f6b2f;
+    color: var(--text-primary);
     font-size: 1.5rem;
   `;
   
@@ -6134,9 +6904,9 @@ async function mostraGestioneElencoPersonale() {
           align-items: center;
           padding: 12px;
           margin-bottom: 8px;
-          background: #f8f9fa;
+          background: var(--bg-secondary);
           border-radius: 6px;
-          border: 1px solid #e9ecef;
+          border: 1px solid var(--border-light);
         `;
         
         const infoDiv = document.createElement('div');
@@ -6147,22 +6917,22 @@ async function mostraGestioneElencoPersonale() {
         const latestNote = hasNotes ? struttura.personalNotes[0] : null;
         
         infoDiv.innerHTML = `
-          <div style="font-weight: bold; color: #2f6b2f; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+          <div style="font-weight: bold; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
             ${struttura.Struttura || 'Senza nome'}
-            ${hasNotes ? `<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold;">📝 ${notesCount}</span>` : ''}
+            ${hasNotes ? `<span style="background: var(--accent); color: var(--text-inverse); padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold;">📝 ${notesCount}</span>` : ''}
           </div>
-          <div style="font-size: 0.9rem; color: #666;">
+          <div style="font-size: 0.9rem; color: var(--text-secondary);">
             📍 ${struttura.Luogo || 'N/A'}, ${struttura.Prov || 'N/A'}
             ${struttura.Referente ? ` | 👤 ${struttura.Referente}` : ''}
           </div>
-          <div style="font-size: 0.8rem; color: #888; margin-top: 4px;">
+          <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">
             ${struttura.Casa ? '🏠 Casa' : ''} ${struttura.Terreno ? '🌱 Terreno' : ''}
             ${!struttura.Casa && !struttura.Terreno ? '❓ Senza categoria' : ''}
           </div>
           ${hasNotes && latestNote ? `
-          <div style="font-size: 0.8rem; color: #6c757d; margin-top: 6px; padding: 6px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #28a745;">
-            <strong>📝 Ultima nota:</strong> ${latestNote.nota.length > 80 ? latestNote.nota.substring(0, 80) + '...' : latestNote.nota}
-            <div style="font-size: 0.7rem; color: #999; margin-top: 2px;">
+          <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 6px; padding: 6px; background: var(--bg-tertiary); border-radius: 4px; border-left: 3px solid var(--accent);">
+            <strong style="color: var(--text-primary);">📝 Ultima nota:</strong> ${latestNote.nota.length > 80 ? latestNote.nota.substring(0, 80) + '...' : latestNote.nota}
+            <div style="font-size: 0.7rem; color: var(--text-tertiary); margin-top: 2px;">
               ${latestNote.createdAt.toLocaleDateString('it-IT')} alle ${latestNote.createdAt.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}
             </div>
           </div>` : ''}
@@ -6180,8 +6950,8 @@ async function mostraGestioneElencoPersonale() {
         viewBtn.innerHTML = '👁️';
         viewBtn.title = 'Visualizza scheda completa';
         viewBtn.style.cssText = `
-          background: #007bff;
-          color: white;
+          background: var(--primary);
+          color: var(--text-inverse);
           border: none;
           border-radius: 4px;
           padding: 6px 10px;
@@ -6197,8 +6967,8 @@ async function mostraGestioneElencoPersonale() {
         notesBtn.innerHTML = '📝';
         notesBtn.title = 'Note personali';
         notesBtn.style.cssText = `
-          background: #28a745;
-          color: white;
+          background: var(--accent);
+          color: var(--text-inverse);
           border: none;
           border-radius: 4px;
           padding: 6px 10px;
@@ -6213,8 +6983,8 @@ async function mostraGestioneElencoPersonale() {
         removeBtn.innerHTML = '🗑️';
         removeBtn.title = 'Rimuovi dall\'elenco';
         removeBtn.style.cssText = `
-          background: #dc3545;
-          color: white;
+          background: var(--danger);
+          color: var(--text-inverse);
           border: none;
           border-radius: 4px;
           padding: 6px 10px;
@@ -6241,10 +7011,10 @@ async function mostraGestioneElencoPersonale() {
           flex-direction: column;
           padding: 16px;
           margin-bottom: 12px;
-          background: #f8f9fa;
+          background: var(--bg-secondary);
           border-radius: 8px;
-          border: 1px solid #e9ecef;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+          border: 1px solid var(--border-light);
+          box-shadow: var(--shadow-sm);
         `;
         
         const headerDiv = document.createElement('div');
@@ -6258,7 +7028,7 @@ async function mostraGestioneElencoPersonale() {
         const titleDiv = document.createElement('div');
         titleDiv.style.cssText = `
           font-weight: bold;
-          color: #2f6b2f;
+          color: var(--text-primary);
           font-size: 1.1rem;
           cursor: pointer;
         `;
@@ -6278,8 +7048,8 @@ async function mostraGestioneElencoPersonale() {
         viewBtn.innerHTML = '👁️ Visualizza';
         viewBtn.title = 'Visualizza scheda completa';
         viewBtn.style.cssText = `
-          background: #007bff;
-          color: white;
+          background: var(--primary);
+          color: var(--text-inverse);
           border: none;
           border-radius: 6px;
           padding: 8px 12px;
@@ -6295,8 +7065,8 @@ async function mostraGestioneElencoPersonale() {
         notesBtn.innerHTML = '📝 Note';
         notesBtn.title = 'Note personali';
         notesBtn.style.cssText = `
-          background: #6f42c1;
-          color: white;
+          background: var(--accent);
+          color: var(--text-inverse);
           border: none;
           border-radius: 6px;
           padding: 8px 12px;
@@ -6312,8 +7082,8 @@ async function mostraGestioneElencoPersonale() {
         removeBtn.innerHTML = '🗑️ Rimuovi';
         removeBtn.title = 'Rimuovi dall\'elenco';
         removeBtn.style.cssText = `
-          background: #dc3545;
-          color: white;
+          background: var(--danger);
+          color: var(--text-inverse);
           border: none;
           border-radius: 6px;
           padding: 8px 12px;
@@ -6340,32 +7110,32 @@ async function mostraGestioneElencoPersonale() {
         
         const contentDiv = document.createElement('div');
         contentDiv.innerHTML = `
-          <div style="margin-bottom: 8px; color: #666;">
+          <div style="margin-bottom: 8px; color: var(--text-secondary);">
             📍 ${struttura.Luogo || 'N/A'}, ${struttura.Prov || 'N/A'}
-            ${hasNotes ? `<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-left: 8px;">📝 ${notesCount} note</span>` : ''}
+            ${hasNotes ? `<span style="background: var(--accent); color: var(--text-inverse); padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-left: 8px;">📝 ${notesCount} note</span>` : ''}
           </div>
-          ${struttura.Referente ? `<div style="margin-bottom: 8px; color: #666;">
-            👤 <strong>Referente:</strong> ${struttura.Referente}
+          ${struttura.Referente ? `<div style="margin-bottom: 8px; color: var(--text-secondary);">
+            👤 <strong style="color: var(--text-primary);">Referente:</strong> ${struttura.Referente}
           </div>` : ''}
-          ${struttura.Contatto ? `<div style="margin-bottom: 8px; color: #666;">
-            📞 <strong>Contatto:</strong> ${struttura.Contatto}
+          ${struttura.Contatto ? `<div style="margin-bottom: 8px; color: var(--text-secondary);">
+            📞 <strong style="color: var(--text-primary);">Contatto:</strong> ${struttura.Contatto}
           </div>` : ''}
           <div style="margin-bottom: 8px;">
-            ${struttura.Casa ? '<span style="background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-right: 8px;">🏠 Casa</span>' : ''}
-            ${struttura.Terreno ? '<span style="background: #e8f5e8; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 12px;">🌱 Terreno</span>' : ''}
+            ${struttura.Casa ? '<span style="background: var(--primary-light); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-right: 8px;">🏠 Casa</span>' : ''}
+            ${struttura.Terreno ? '<span style="background: var(--primary-light); color: var(--accent); padding: 4px 8px; border-radius: 4px; font-size: 12px;">🌱 Terreno</span>' : ''}
           </div>
           ${hasNotes && latestNote ? `
-          <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #28a745;">
-            <div style="font-size: 12px; font-weight: bold; color: #28a745; margin-bottom: 4px;">📝 Ultima nota personale:</div>
-            <div style="font-size: 13px; color: #495057; margin-bottom: 4px;">
+          <div style="margin-bottom: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 6px; border-left: 4px solid var(--accent);">
+            <div style="font-size: 12px; font-weight: bold; color: var(--accent); margin-bottom: 4px;">📝 Ultima nota personale:</div>
+            <div style="font-size: 13px; color: var(--text-primary); margin-bottom: 4px;">
               ${latestNote.nota.length > 120 ? latestNote.nota.substring(0, 120) + '...' : latestNote.nota}
             </div>
-            <div style="font-size: 11px; color: #6c757d;">
+            <div style="font-size: 11px; color: var(--text-tertiary);">
               ${latestNote.createdAt.toLocaleDateString('it-IT')} alle ${latestNote.createdAt.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}
               ${notesCount > 1 ? ` • ${notesCount - 1} altre note` : ''}
             </div>
           </div>` : ''}
-          ${struttura.Info ? `<div style="font-size: 13px; color: #888; margin-top: 8px;">
+          ${struttura.Info ? `<div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px;">
             ${struttura.Info.length > 150 ? struttura.Info.substring(0, 150) + '...' : struttura.Info}
           </div>` : ''}
         `;
@@ -6423,7 +7193,7 @@ async function mostraGestioneElencoPersonale() {
     justify-content: space-between;
     align-items: center;
     padding-top: 15px;
-    border-top: 1px solid #e9ecef;
+    border-top: 1px solid var(--border-light);
     gap: 10px;
   `;
   
@@ -6526,83 +7296,13 @@ async function mostraMenuEsportazione(struttureElenco) {
   console.log('📋 Apertura menu esportazione...');
   console.log('📊 Strutture ricevute:', struttureElenco.length);
   
-  // Carica le note personali per tutte le strutture
-  await loadPersonalNotesForElenco(struttureElenco);
-  
-  const menu = document.createElement('div');
-  menu.className = 'export-menu';
-  menu.innerHTML = `
-    <div class="export-options">
-      <h3>Esporta Elenco Personale (${struttureElenco.length} elementi)</h3>
-      <button onclick="esportaJSON()">📄 JSON</button>
-      <button onclick="esportaCSV()">📊 CSV</button>
-      <button onclick="mostraOpzioniEsportazioneAvanzata()">📊 Export Avanzato</button>
-      <button onclick="chiudiMenu()">❌ Chiudi</button>
-    </div>
-  `;
-  
-  console.log('✅ Menu creato, aggiungo al DOM');
-  document.body.appendChild(menu);
-  console.log('✅ Menu aggiunto al DOM');
-  
-  // Funzioni di esportazione
-  window.esportaJSON = () => {
-    const dataStr = JSON.stringify(struttureElenco, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'elenco-personale.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    chiudiMenu();
-  };
-  
-  window.esportaCSV = () => {
-    const headers = ['Struttura', 'Luogo', 'Provincia', 'Casa', 'Terreno', 'Referente', 'Contatto', 'Info'];
-    const csvContent = [
-      headers.join(','),
-      ...struttureElenco.map(s => [
-        `"${s.Struttura || ''}"`,
-        `"${s.Luogo || ''}"`,
-        `"${s.Prov || ''}"`,
-        s.Casa ? 'Sì' : 'No',
-        s.Terreno ? 'Sì' : 'No',
-        `"${s.Referente || ''}"`,
-        `"${s.Contatto || s.Email || ''}"`,
-        `"${s.Info || ''}"`
-      ].join(','))
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'elenco-personale.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    chiudiMenu();
-  };
-  
-  window.chiudiMenu = () => {
-    document.body.removeChild(menu);
-  };
-  
-  // Wrapper per export avanzato
-  window.mostraOpzioniEsportazioneAvanzata = () => {
-    // Chiudi il menu corrente
-    chiudiMenu();
-    // Mostra le opzioni di export avanzato con i dati dell'elenco personale
-    if (typeof window.mostraOpzioniEsportazione === 'function') {
-      window.mostraOpzioniEsportazione(struttureElenco);
-    } else {
-      console.error('Funzione mostraOpzioniEsportazione non trovata');
-      alert('Funzione di export avanzato non disponibile');
-    }
-  };
-  
-  // Salva le strutture dell'elenco in una variabile globale per accesso
-  window.struttureElencoPersonale = struttureElenco;
+  // Usa direttamente la funzione unificata, passando l'elenco personale
+  if (typeof window.mostraOpzioniEsportazione === 'function') {
+    window.mostraOpzioniEsportazione(struttureElenco, { forcePersonalList: true });
+  } else {
+    console.error('Funzione mostraOpzioniEsportazione non trovata');
+    alert('Funzione di export non disponibile');
+  }
 }
 
 // Funzione per export generale (tutte le strutture) - definita più sotto
@@ -6709,7 +7409,7 @@ async function mostraSchedaCompleta(strutturaId) {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -6727,7 +7427,7 @@ async function mostraSchedaCompleta(strutturaId) {
     min-width: 320px;
     width: 100%;
     overflow-y: auto;
-    box-shadow: var(--shadow-xl, 0 10px 30px rgba(0,0,0,0.3));
+    box-shadow: var(--shadow-xl);
     position: relative;
     border: 1px solid var(--border-light);
   `;
@@ -6740,7 +7440,7 @@ async function mostraSchedaCompleta(strutturaId) {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid var(--accent-color, #2f6b2f);
+    border-bottom: 2px solid var(--border-light);
   `;
   
   const title = document.createElement('h2');
@@ -6891,19 +7591,19 @@ async function mostraSchedaCompleta(strutturaId) {
   // Funzione per creare la galleria immagini
   async function creaGalleriaImmagini() {
     galleryContainer.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 12px; background: #f8f9fa; border-radius: 8px;">
-        <h3 style="margin: 0; color: #2f6b2f; font-size: 1.1rem;">📸 Galleria Immagini</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+        <h3 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">📸 Galleria Immagini</h3>
         ${isEditMode ? `
           <div style="display: flex; gap: 8px;">
             <input type="file" id="imageUpload" accept="image/*" multiple style="display: none;">
-            <button onclick="document.getElementById('imageUpload').click()" style="background: #2f6b2f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+            <button onclick="document.getElementById('imageUpload').click()" style="background: var(--primary); color: var(--text-inverse); border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
               📷 Aggiungi Foto
             </button>
           </div>
         ` : ''}
       </div>
-      <div id="galleryGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; min-height: 60px; padding: 12px; background: #f8f9fa; border-radius: 8px;">
-        <div style="display: flex; align-items: center; justify-content: center; color: #666; font-size: 0.9rem;">
+      <div id="galleryGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; min-height: 60px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+        <div style="display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.9rem;">
           Caricamento immagini...
         </div>
       </div>
@@ -6933,7 +7633,7 @@ async function mostraSchedaCompleta(strutturaId) {
       
       if (images.length === 0) {
         galleryGrid.innerHTML = `
-          <div style="grid-column: 1/-1; display: flex; align-items: center; justify-content: center; color: #666; font-size: 0.9rem; padding: 20px;">
+          <div style="grid-column: 1/-1; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.9rem; padding: 20px;">
             ${isEditMode ? 'Nessuna immagine. Clicca "Aggiungi Foto" per iniziare.' : 'Nessuna immagine disponibile.'}
           </div>
         `;
@@ -6945,6 +7645,7 @@ async function mostraSchedaCompleta(strutturaId) {
           <img src="${img.thumbnailUrl || img.url}" 
                alt="${img.name || 'Immagine struttura'}" 
                loading="lazy"
+               width="300" height="300"
                style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s;"
                onmouseover="this.style.transform='scale(1.05)'"
                onmouseout="this.style.transform='scale(1)'"
@@ -6967,7 +7668,7 @@ async function mostraSchedaCompleta(strutturaId) {
       console.error('❌ Errore caricamento galleria:', error);
       if (galleryGrid) {
         galleryGrid.innerHTML = `
-          <div style="grid-column: 1/-1; display: flex; align-items: center; justify-content: center; color: #dc3545; font-size: 0.9rem; padding: 20px;">
+          <div style="grid-column: 1/-1; display: flex; align-items: center; justify-content: center; color: var(--danger); font-size: 0.9rem; padding: 20px;">
             Errore nel caricamento delle immagini
           </div>
         `;
@@ -6988,7 +7689,7 @@ async function mostraSchedaCompleta(strutturaId) {
       display: flex; 
       align-items: center; 
       justify-content: center; 
-      color: #2f6b2f; 
+      color: var(--text-primary); 
       font-size: 0.9rem; 
       padding: 20px;
     `;
@@ -7139,7 +7840,7 @@ async function mostraSchedaCompleta(strutturaId) {
         background: var(--bg-secondary);
         border-radius: 8px;
         padding: 15px;
-        border-left: 4px solid var(--accent-color, #2f6b2f);
+        border-left: 4px solid var(--primary);
         border: 1px solid var(--border-light);
       `;
       
@@ -7147,7 +7848,7 @@ async function mostraSchedaCompleta(strutturaId) {
       categoriaTitle.textContent = nomeCategoria;
       categoriaTitle.style.cssText = `
         margin: 0 0 15px 0;
-        color: var(--accent-color, #2f6b2f);
+        color: var(--text-primary);
         font-size: 1.1rem;
       `;
       if (categoriaDiv && categoriaTitle) {
@@ -9369,6 +10070,7 @@ async function pulisciCacheOffline_DISABLED() {
 
 // === Inizializzazione pagina ===
 window.addEventListener("DOMContentLoaded", async () => {
+  try {
   mostraCaricamento();
   
   // 🔒 Inizializza sistema di sicurezza
@@ -9631,6 +10333,24 @@ window.addEventListener("DOMContentLoaded", async () => {
   setupLazyLoading();
   
   // Inizializza gestione temi - RIMOSSO: già gestito in initializeNewUI()
+  } catch (error) {
+    console.error('❌ Errore durante il bootstrap dell\'app:', error);
+    if (window && window.errorHandler) {
+      window.errorHandler.handleGenericError(error, 'bootstrap');
+    }
+    try {
+      const container = document.getElementById("results");
+      if (container) {
+        container.innerHTML = `
+          <div class="error">
+            <h3>⚠️ Errore di avvio</h3>
+            <p>Si è verificato un problema nell\'inizializzazione. Riprova a ricaricare.</p>
+            <button onclick="location.reload()">🔄 Ricarica pagina</button>
+          </div>
+        `;
+      }
+    } catch (_) {}
+  }
 });
 
 // === Gestione Filtri Salvati Dropdown ===
@@ -9671,359 +10391,11 @@ function mostraOpzioniEsportazioneGenerale() {
   // Chiudi il menu automaticamente
   closeMenu();
   
-  // Rimuovi modal esistente se presente
-  const existingModal = document.getElementById('exportOptionsModal');
-  if (existingModal) {
-    existingModal.remove();
-  }
-  
-  const modal = document.createElement('div');
-  modal.id = 'exportOptionsModal';
-  modal.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-  `;
-  
-  const modalContent = document.createElement('div');
-  modalContent.style.cssText = `
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    border-radius: 12px;
-    padding: 20px;
-    max-width: 90%;
-    max-height: 90%;
-    overflow-y: auto;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    position: relative;
-    min-width: 400px;
-    width: 100%;
-  `;
-  
-  // Header
-  const header = document.createElement('div');
-  header.style.cssText = `
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #2f6b2f;
-  `;
-  
-  const title = document.createElement('h2');
-  title.textContent = '📊 Opzioni Esportazione';
-  title.style.cssText = `
-    margin: 0;
-    color: #2f6b2f;
-    font-size: 1.5rem;
-  `;
-  
-  const closeBtn = document.createElement('button');
-  closeBtn.innerHTML = '✕';
-  closeBtn.style.cssText = `
-    background: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    cursor: pointer;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
-  closeBtn.onclick = () => modal.remove();
-  
-  header.appendChild(title);
-  header.appendChild(closeBtn);
-  
-  // Form opzioni
-  const form = document.createElement('form');
-  form.style.cssText = `
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
-    margin-bottom: 20px;
-  `;
-  
-  // Tipo di esportazione
-  const tipoDiv = document.createElement('div');
-  tipoDiv.style.cssText = `
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    border-left: 4px solid #2f6b2f;
-  `;
-  
-  const tipoTitle = document.createElement('h3');
-  tipoTitle.textContent = 'Tipo di Esportazione';
-  tipoTitle.style.cssText = `
-    margin: 0 0 15px 0;
-    color: #2f6b2f;
-    font-size: 1.1rem;
-  `;
-  tipoDiv.appendChild(tipoTitle);
-  
-  const tipoOptions = document.createElement('div');
-  tipoOptions.style.cssText = `
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-  `;
-  
-  const excelOption = document.createElement('label');
-  excelOption.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    padding: 10px;
-    border: 2px solid #e9ecef;
-    border-radius: 8px;
-    flex: 1;
-    min-width: 150px;
-  `;
-  excelOption.innerHTML = `
-    <input type="radio" name="exportType" value="excel" checked>
-    <span>📊 Excel</span>
-  `;
-  
-  const pdfOption = document.createElement('label');
-  pdfOption.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    padding: 10px;
-    border: 2px solid #e9ecef;
-    border-radius: 8px;
-    flex: 1;
-    min-width: 150px;
-  `;
-  pdfOption.innerHTML = `
-    <input type="radio" name="exportType" value="pdf">
-    <span>📄 PDF</span>
-  `;
-  
-  tipoOptions.appendChild(excelOption);
-  tipoOptions.appendChild(pdfOption);
-  tipoDiv.appendChild(tipoOptions);
-  
-  // Layout
-  const layoutDiv = document.createElement('div');
-  layoutDiv.style.cssText = `
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    border-left: 4px solid #17a2b8;
-  `;
-  
-  const layoutTitle = document.createElement('h3');
-  layoutTitle.textContent = 'Layout';
-  layoutTitle.style.cssText = `
-    margin: 0 0 15px 0;
-    color: #17a2b8;
-    font-size: 1.1rem;
-  `;
-  layoutDiv.appendChild(layoutTitle);
-  
-  const layoutSelect = document.createElement('select');
-  layoutSelect.id = 'exportLayout';
-  layoutSelect.style.cssText = `
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-  `;
-  
-  const layoutOptions = [
-    { value: 'completo', text: 'Completo - Tutti i campi' },
-    { value: 'compatto', text: 'Compatto - Campi essenziali' },
-    { value: 'contatti', text: 'Solo Contatti' },
-    { value: 'categorie', text: 'Per Categorie (Excel)' }
-  ];
-  
-  layoutOptions.forEach(option => {
-    const optionElement = document.createElement('option');
-    optionElement.value = option.value;
-    optionElement.textContent = option.text;
-    layoutSelect.appendChild(optionElement);
-  });
-  
-  layoutDiv.appendChild(layoutSelect);
-  
-  // Opzioni aggiuntive
-  const optionsDiv = document.createElement('div');
-  optionsDiv.style.cssText = `
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 15px;
-    border-left: 4px solid #28a745;
-  `;
-  
-  const optionsTitle = document.createElement('h3');
-  optionsTitle.textContent = 'Opzioni Aggiuntive';
-  optionsTitle.style.cssText = `
-    margin: 0 0 15px 0;
-    color: #28a745;
-    font-size: 1.1rem;
-  `;
-  optionsDiv.appendChild(optionsTitle);
-  
-  const checkboxes = [
-    { id: 'includeImages', label: 'Includi immagini', description: 'Aggiungi link alle immagini' },
-    { id: 'includeNotes', label: 'Includi note', description: 'Note generali delle strutture' },
-    { id: 'includePersonalNotes', label: 'Includi note personali', description: 'Le tue note personali' },
-    { id: 'onlyPersonalList', label: 'Solo elenco personale', description: 'Esporta solo le strutture nell\'elenco personale' }
-  ];
-  
-  checkboxes.forEach(checkbox => {
-    const checkboxDiv = document.createElement('div');
-    checkboxDiv.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-    `;
-    
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.id = checkbox.id;
-    input.style.cssText = `
-      transform: scale(1.1);
-    `;
-    
-    const label = document.createElement('label');
-    label.htmlFor = checkbox.id;
-    label.style.cssText = `
-      cursor: pointer;
-      flex: 1;
-    `;
-    label.innerHTML = `
-      <strong>${checkbox.label}</strong><br>
-      <small style="color: #666;">${checkbox.description}</small>
-    `;
-    
-    checkboxDiv.appendChild(input);
-    checkboxDiv.appendChild(label);
-    optionsDiv.appendChild(checkboxDiv);
-  });
-  
-  // Footer con pulsanti
-  const footer = document.createElement('div');
-  footer.style.cssText = `
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 15px;
-    border-top: 1px solid #e9ecef;
-    gap: 10px;
-  `;
-  
-  const cancelBtn = document.createElement('button');
-  cancelBtn.innerHTML = '❌ Annulla';
-  cancelBtn.type = 'button';
-  cancelBtn.style.cssText = `
-    background: #6c757d;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-  `;
-  cancelBtn.onclick = () => modal.remove();
-  
-  const exportBtn = document.createElement('button');
-  exportBtn.innerHTML = '📊 Esporta';
-  exportBtn.type = 'button';
-  exportBtn.style.cssText = `
-    background: #28a745;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-  `;
-  exportBtn.onclick = () => {
-    eseguiEsportazione();
-    modal.remove();
-  };
-  
-  footer.appendChild(cancelBtn);
-  footer.appendChild(exportBtn);
-  
-  // Assembla il modal
-  form.appendChild(tipoDiv);
-  form.appendChild(layoutDiv);
-  form.appendChild(optionsDiv);
-  
-  modalContent.appendChild(header);
-  modalContent.appendChild(form);
-  modalContent.appendChild(footer);
-  modal.appendChild(modalContent);
-  document.body.appendChild(modal);
-  
-  // Chiudi cliccando fuori
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.remove();
-    }
-  });
-}
-
-function eseguiEsportazione() {
-  const exportType = document.querySelector('input[name="exportType"]:checked').value;
-  const layout = document.getElementById('exportLayout').value;
-  // Raccogli opzioni esportazione (con controlli di sicurezza)
-  const includeImagesEl = document.getElementById('includeImages');
-  const includeNotesEl = document.getElementById('includeNotes');
-  const includePersonalNotesEl = document.getElementById('includePersonalNotes');
-  const onlyPersonalListEl = document.getElementById('onlyPersonalList');
-  
-  const includeImages = includeImagesEl ? includeImagesEl.checked : false;
-  const includeNotes = includeNotesEl ? includeNotesEl.checked : false;
-  const includePersonalNotes = includePersonalNotesEl ? includePersonalNotesEl.checked : false;
-  const onlyPersonalList = onlyPersonalListEl ? onlyPersonalListEl.checked : false;
-  
-  const options = {
-    layout,
-    includeImages,
-    includeNotes,
-    includePersonalNotes,
-    onlyPersonalList
-  };
-  
-  try {
-    if (exportType === 'excel') {
-      if (typeof esportaExcel === 'function') {
-        esportaExcel(strutture, options);
-      } else {
-        alert('Funzione esportazione Excel non disponibile');
-      }
-    } else if (exportType === 'pdf') {
-      if (typeof esportaPDF === 'function') {
-        esportaPDF(strutture, options);
-      } else {
-        alert('Funzione esportazione PDF non disponibile');
-      }
-    }
-  } catch (error) {
-    console.error('Errore durante esportazione:', error);
-    alert('Errore durante l\'esportazione: ' + error.message);
+  // Usa la stessa funzione unificata, passando tutte le strutture
+  if (typeof window.mostraOpzioniEsportazione === 'function') {
+    window.mostraOpzioniEsportazione(strutture, { forcePersonalList: false });
+  } else {
+    alert('Funzione di esportazione non disponibile');
   }
 }
 
@@ -10046,7 +10418,7 @@ async function mostraFeedAttivita() {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -10076,7 +10448,7 @@ async function mostraFeedAttivita() {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #2f6b2f;
+    border-bottom: 2px solid var(--border-light);
   `;
   
   const title = document.createElement('h2');
@@ -10676,7 +11048,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: var(--bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -10706,7 +11078,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #2f6b2f;
+    border-bottom: 2px solid var(--border-light);
   `;
   
   const title = document.createElement('h2');
@@ -10773,7 +11145,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
   footer.style.cssText = `
     margin-top: 20px;
     padding-top: 15px;
-    border-top: 1px solid #e9ecef;
+    border-top: 1px solid var(--border-light);
     text-align: center;
   `;
   
@@ -10820,7 +11192,20 @@ function initializeUIEventListeners() {
   
   // Search functionality
   const searchInput = document.getElementById('search');
+  const clearSearchBtn = document.getElementById('clearSearch');
+  
   if (searchInput) {
+    // Funzione per aggiornare la visibilità del pulsante clear
+    const updateClearButton = () => {
+      if (clearSearchBtn) {
+        if (searchInput.value.trim().length > 0) {
+          clearSearchBtn.style.display = 'flex';
+        } else {
+          clearSearchBtn.style.display = 'none';
+        }
+      }
+    };
+    
     searchInput.addEventListener('input', (e) => {
       const query = e.target.value.toLowerCase();
       const filtered = strutture.filter(s => 
@@ -10829,6 +11214,24 @@ function initializeUIEventListeners() {
         s.Provincia?.toLowerCase().includes(query)
       );
       renderStrutture(filtered);
+      updateClearButton();
+    });
+    
+    // Inizializza visibilità pulsante clear
+    updateClearButton();
+  }
+  
+  // Funzionalità pulsante clear
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+      if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+        // Trigger evento input per aggiornare i risultati
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        // Mostra tutte le strutture
+        renderStrutture(filtra(strutture));
+      }
     });
   }
   

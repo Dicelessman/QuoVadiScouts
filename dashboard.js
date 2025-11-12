@@ -318,11 +318,45 @@ function initMap() {
     // Inizializza la mappa Leaflet
     map = L.map('map').setView([41.9028, 12.4964], 6); // Centro Italia
     
-    // Aggiungi layer OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Aggiungi layer OpenStreetMap base
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19
     }).addTo(map);
+    
+    // Aggiungi layer overlay per rete ferroviaria (OpenRailwayMap)
+    // Aumentato contrasto: opacità più alta e filtri CSS
+    const railwayLayer = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | <a href="https://www.openrailwaymap.org/">OpenRailwayMap</a>',
+      maxZoom: 19,
+      opacity: 0.9,
+      className: 'railway-layer-high-contrast'
+    });
+    
+    // Aggiungi stile CSS per aumentare contrasto
+    if (!document.getElementById('railway-layer-styles')) {
+      const style = document.createElement('style');
+      style.id = 'railway-layer-styles';
+      style.textContent = `
+        .railway-layer-high-contrast img {
+          filter: contrast(1.4) saturate(1.3) brightness(0.95);
+          -webkit-filter: contrast(1.4) saturate(1.3) brightness(0.95);
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    // Crea layer control per base maps e overlay
+    const baseMaps = {
+      'OpenStreetMap': osmLayer
+    };
+    
+    const overlayMaps = {
+      'Rete Ferroviaria': railwayLayer
+    };
+    
+    // Salva il layer ferroviario in una variabile globale per accesso da pulsanti
+    window.dashboardRailwayLayer = railwayLayer;
     
     console.log('✅ Mappa Leaflet creata');
     

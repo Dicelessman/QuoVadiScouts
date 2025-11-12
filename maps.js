@@ -27,6 +27,8 @@ class MapsManager {
     this.userLocation = null;
     this.isInitialized = false;
     this.routingControl = null;
+    this.railwayLayer = null;
+    this.overlayLayers = {};
   }
 
   async initialize(containerId = 'map') {
@@ -50,11 +52,42 @@ class MapsManager {
       // Inizializza la mappa
       this.map = L.map(containerId).setView([41.9028, 12.4964], 6); // Centra sull'Italia
 
-      // Aggiungi layer OpenStreetMap
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // Aggiungi layer OpenStreetMap base
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       }).addTo(this.map);
+
+      // Aggiungi layer overlay per rete ferroviaria (OpenRailwayMap)
+      // Aumentato contrasto: opacità più alta e filtri CSS
+      this.railwayLayer = L.tileLayer('https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | <a href="https://www.openrailwaymap.org/">OpenRailwayMap</a>',
+        maxZoom: 19,
+        opacity: 0.9,
+        className: 'railway-layer-high-contrast'
+      });
+      
+      // Aggiungi stile CSS per aumentare contrasto
+      if (!document.getElementById('railway-layer-styles')) {
+        const style = document.createElement('style');
+        style.id = 'railway-layer-styles';
+        style.textContent = `
+          .railway-layer-high-contrast img {
+            filter: contrast(1.4) saturate(1.3) brightness(0.95);
+            -webkit-filter: contrast(1.4) saturate(1.3) brightness(0.95);
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Crea layer control per base maps e overlay
+      const baseMaps = {
+        'OpenStreetMap': osmLayer
+      };
+
+      const overlayMaps = {
+        'Rete Ferroviaria': this.railwayLayer
+      };
 
       // Inizializza cluster di markers
       this.markerCluster = L.markerClusterGroup({
@@ -65,6 +98,9 @@ class MapsManager {
 
       this.isInitialized = true;
       console.log('✅ Mappa inizializzata');
+      if (this.railwayLayer) {
+        console.log('✅ Layer ferroviario creato e pronto');
+      }
       return true;
     } catch (error) {
       console.error('❌ Errore inizializzazione mappa:', error);
@@ -687,6 +723,19 @@ class MapsManager {
   destroy() {
     if (this.map) {
       this.clearRoute();
+      
+      // Rimuovi layer control se presente
+      if (this.railwayLayerControl) {
+        this.map.removeControl(this.railwayLayerControl);
+        this.railwayLayerControl = null;
+      }
+      
+      // Rimuovi layer ferroviario se presente
+      if (this.railwayLayer) {
+        this.map.removeLayer(this.railwayLayer);
+        this.railwayLayer = null;
+      }
+      
       this.map.remove();
       this.map = null;
       this.markers = [];

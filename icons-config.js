@@ -113,7 +113,6 @@ function updateElementIcon(selector, iconKey, className = '') {
 function updateMenuIcons() {
   // Ricerca & Filtri
   updateElementIcon('[onclick="mostraRicercaAvanzata()"] .menu-icon', 'search');
-  updateElementIcon('[onclick="mostraMappa()"] .menu-icon', 'map');
   updateElementIcon('#sortMenuBtn .menu-icon', 'sort');
   updateElementIcon('#savedFiltersBtn .menu-icon', 'saved');
   
@@ -127,7 +126,6 @@ function updateMenuIcons() {
   
   // Gestione Dati
   updateElementIcon('[onclick="mostraModaleSincronizzazione()"] .menu-icon', 'sync');
-  updateElementIcon('[onclick="mostraOpzioniEsportazioneGenerale()"] .menu-icon', 'export');
   updateElementIcon('[onclick="mostraFeedAttivita()"] .menu-icon', 'activity');
   updateElementIcon('[onclick="location.href=\'dashboard.html\'"] .menu-icon', 'dashboard');
   updateElementIcon('[onclick="mostraGestioneBackup()"] .menu-icon', 'backup');
