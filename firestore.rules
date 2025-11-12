@@ -9,13 +9,17 @@ service cloud.firestore {
     match /strutture/{structureId} {
       // Lettura: Accesso pubblico per visualizzazione
       allow read: if true;
-
-      // Scrittura: Solo utenti autenticati
-      allow write: if request.auth != null;
-      
-      // Documento specifico
       allow get: if true;
       allow list: if true;
+
+      // Creazione: Solo utenti autenticati
+      allow create: if request.auth != null;
+      
+      // Aggiornamento: Solo utenti autenticati
+      allow update: if request.auth != null;
+      
+      // Eliminazione: Solo utenti autenticati (esplicito per sicurezza)
+      allow delete: if request.auth != null;
     }
 
     // ============================================
