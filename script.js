@@ -5279,7 +5279,7 @@ async function caricaProfiloUtente(uid) {
 }
 
 // === Scheda Utente ===
-function mostraSchedaUtente() {
+async function mostraSchedaUtente() {
   // Chiudi il menu automaticamente
   closeMenu();
   
@@ -5287,6 +5287,34 @@ function mostraSchedaUtente() {
   const elencoModal = document.getElementById('elencoPersonaleModal');
   if (elencoModal) {
     elencoModal.remove();
+  }
+  
+  // Verifica e ricarica il profilo se necessario
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    alert('❌ Errore: utente non autenticato');
+    return;
+  }
+  
+  let userProfile = getUserProfile();
+  
+  // Se il profilo non è disponibile, ricaricalo da Firestore
+  if (!userProfile) {
+    console.log('🔄 Profilo non disponibile, ricarico da Firestore...');
+    try {
+      await caricaProfiloUtente(currentUser.uid);
+      userProfile = getUserProfile();
+      
+      if (!userProfile) {
+        console.warn('⚠️ Impossibile caricare il profilo utente');
+        alert('⚠️ Impossibile caricare il profilo utente. Riprova più tardi.');
+        return;
+      }
+    } catch (error) {
+      console.error('❌ Errore nel caricamento del profilo:', error);
+      alert('❌ Errore nel caricamento del profilo utente');
+      return;
+    }
   }
   
   // Rimuovi modal esistente se presente
@@ -5730,9 +5758,8 @@ function mostraSchedaUtente() {
 async function salvaProfiloUtente() {
   try {
     const currentUser = getCurrentUser();
-    const userProfile = getUserProfile();
     
-    if (!currentUser || !userProfile) {
+    if (!currentUser) {
       alert('❌ Errore: utente non autenticato');
       return;
     }
@@ -5754,6 +5781,38 @@ async function salvaProfiloUtente() {
       return;
     }
     
+    // Ottieni il profilo corrente (o creane uno nuovo se non esiste)
+    let userProfile = getUserProfile();
+    
+    // Se il profilo non esiste, caricalo da Firestore o creane uno nuovo
+    if (!userProfile) {
+      console.log('🔄 Profilo non disponibile, ricarico da Firestore...');
+      await caricaProfiloUtente(currentUser.uid);
+      userProfile = getUserProfile();
+      
+      // Se ancora non esiste, crea un profilo base
+      if (!userProfile) {
+        userProfile = {
+          nome: currentUser.displayName || currentUser.email.split('@')[0],
+          cognome: '',
+          email: currentUser.email,
+          telefono: '',
+          gruppo: '',
+          ruolo: '',
+          dataCreazione: new Date().toISOString(),
+          elencoPersonale: [],
+          preferenzeNotifiche: {
+            newStructures: true,
+            structureUpdates: true,
+            personalListUpdates: true,
+            nearbyStructures: false,
+            reports: true,
+            distance: 10
+          }
+        };
+      }
+    }
+    
     // Crea nuovo profilo aggiornato
     const updatedProfile = {
       ...userProfile,
@@ -5762,28 +5821,44 @@ async function salvaProfiloUtente() {
       telefono: telefono,
       gruppo: gruppo,
       ruolo: ruolo,
+      email: currentUser.email, // Mantieni sempre l'email corrente
       preferenzeNotifiche: {
-        newStructures: document.getElementById('notifNewStructures')?.checked ?? true,
-        structureUpdates: document.getElementById('notifStructureUpdates')?.checked ?? true,
-        personalListUpdates: document.getElementById('notifPersonalList')?.checked ?? true,
-        nearbyStructures: document.getElementById('notifNearby')?.checked ?? false,
-        reports: document.getElementById('notifReports')?.checked ?? true,
-        distance: parseInt(document.getElementById('notifDistance')?.value) || 10
-      }
+        newStructures: document.getElementById('notifNewStructures')?.checked ?? (userProfile.preferenzeNotifiche?.newStructures ?? true),
+        structureUpdates: document.getElementById('notifStructureUpdates')?.checked ?? (userProfile.preferenzeNotifiche?.structureUpdates ?? true),
+        personalListUpdates: document.getElementById('notifPersonalList')?.checked ?? (userProfile.preferenzeNotifiche?.personalListUpdates ?? true),
+        nearbyStructures: document.getElementById('notifNearby')?.checked ?? (userProfile.preferenzeNotifiche?.nearbyStructures ?? false),
+        reports: document.getElementById('notifReports')?.checked ?? (userProfile.preferenzeNotifiche?.reports ?? true),
+        distance: parseInt(document.getElementById('notifDistance')?.value) || (userProfile.preferenzeNotifiche?.distance ?? 10)
+      },
+      ultimoAggiornamento: new Date().toISOString()
     };
     
-    // Aggiorna lo stato locale
+    // Salva in Firestore PRIMA di aggiornare lo stato locale
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    await secureFirestoreOperation(setDoc, userDocRef, updatedProfile);
+    
+    console.log('✅ Profilo utente salvato su Firestore:', updatedProfile);
+    
+    // Aggiorna lo stato locale DOPO il salvataggio
     updateAuthState(currentUser, updatedProfile);
     
-    // Salva in Firestore
-    await secureFirestoreOperation(setDoc, doc(db, 'users', currentUser.uid), updatedProfile);
-    
-    console.log('✅ Profilo utente aggiornato');
+    console.log('✅ Profilo utente aggiornato nello stato locale');
     alert('✅ Profilo salvato con successo!');
+    
+    // Chiudi il modale dopo il salvataggio
+    const modal = document.getElementById('userProfileModal');
+    if (modal) {
+      modal.remove();
+    }
     
   } catch (error) {
     console.error('❌ Errore salvataggio profilo:', error);
-    alert('❌ Errore nel salvataggio del profilo');
+    console.error('Dettagli errore:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    alert('❌ Errore nel salvataggio del profilo: ' + error.message);
   }
 }
 
