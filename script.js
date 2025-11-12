@@ -7468,7 +7468,9 @@ async function mostraSchedaCompleta(strutturaId) {
     detail: { structureId: strutturaId }
   }));
   
-  const isNewStructure = strutturaId.startsWith('new_');
+  // Determina se è una nuova struttura: solo se l'ID inizia con 'new_'
+  // Se la struttura ha già un ID Firestore valido, è una struttura esistente
+  const isNewStructure = strutturaId.startsWith('new_') && (!struttura.id || struttura.id.startsWith('new_'));
   
   // Rimuovi modal esistente se presente
   if (modalScheda) {
