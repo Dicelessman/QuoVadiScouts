@@ -2072,14 +2072,13 @@ async function aggiungiStruttura() {
     version: 1
   };
   
-  // Aggiungi la struttura temporanea all'array
-  strutture.push(nuovaStruttura);
+  // NON aggiungere la struttura temporanea all'array globale
+  // Verrà aggiunta solo dopo il salvataggio su Firestore
+  // Questo evita duplicati nella visualizzazione
   
-  // Aggiorna le strutture globali
-  window.strutture = strutture;
-  
-  // Apri la scheda in modalità creazione
-  mostraSchedaCompleta(nuovaStruttura.id);
+  // Apri la scheda in modalità creazione passando la struttura direttamente
+  // La scheda userà questa struttura temporanea senza aggiungerla all'array
+  mostraSchedaCompletaConStruttura(nuovaStruttura);
 }
 
 // === Sezione Aiuto ===
@@ -8962,10 +8961,22 @@ async function mostraSchedaCompleta(strutturaId) {
         struttura.createdBy = getCurrentUser()?.uid || null;
         struttura.version = 1;
         
-        // Rimuovi la struttura temporanea dall'array PRIMA di crearla su Firestore
-        const indexTemp = strutture.findIndex(s => s.id === strutturaId);
-        if (indexTemp !== -1) {
-          strutture.splice(indexTemp, 1);
+        // Rimuovi la struttura temporanea dalla mappa se presente
+        struttureTemporanee.delete(strutturaId);
+        
+        // Verifica che non esista già una struttura con lo stesso contenuto
+        // (per evitare duplicati se l'utente clicca più volte su "Crea")
+        const strutturaEsistente = strutture.find(s => 
+          s.Struttura === struttura.Struttura && 
+          s.Luogo === struttura.Luogo && 
+          s.Prov === struttura.Prov &&
+          s.id && !s.id.startsWith('new_') // Solo strutture già salvate
+        );
+        
+        if (strutturaEsistente) {
+          alert('⚠️ Una struttura identica esiste già!');
+          modalScheda.remove();
+          return;
         }
         
         // Crea nuova struttura in Firestore
@@ -8974,11 +8985,22 @@ async function mostraSchedaCompleta(strutturaId) {
         // Aggiorna l'ID con quello di Firestore
         struttura.id = docRef.id;
         
-        // Aggiungi la struttura con l'ID corretto all'array
-        strutture.push({ ...struttura });
-        
-        // Aggiorna le strutture globali
-        window.strutture = strutture;
+        // Verifica che non esista già nell'array prima di aggiungerla
+        const giaPresente = strutture.find(s => s.id === docRef.id);
+        if (!giaPresente) {
+          // Aggiungi la struttura con l'ID corretto all'array
+          strutture.push({ ...struttura });
+          
+          // Aggiorna le strutture globali
+          window.strutture = strutture;
+        } else {
+          console.warn('⚠️ Struttura già presente nell\'array, aggiorno invece di duplicare');
+          const index = strutture.findIndex(s => s.id === docRef.id);
+          if (index !== -1) {
+            strutture[index] = { ...struttura };
+            window.strutture = strutture;
+          }
+        }
         
         // Log attività
         await logActivity('structure_created', docRef.id, getCurrentUser()?.uid, {
