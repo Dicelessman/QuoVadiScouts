@@ -8968,14 +8968,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       // I dati del form vengono già aggiornati direttamente nell'oggetto struttura
       // tramite gli event handler onchange dei campi, quindi non serve leggerli dal form
       
-      // Verifica che non sia già stata salvata (controlla se l'ID è ancora temporaneo)
-      if (isNewStructure && !strutturaId.startsWith('new_')) {
-        console.warn('⚠️ Struttura già salvata, aggiorno invece di creare');
-        // Tratta come aggiornamento invece di creazione
-        isNewStructure = false;
-      }
+      // Determina se è una nuova struttura basandosi sull'ID corrente (non sulla variabile locale)
+      // Se l'ID inizia con 'new_', è una nuova struttura, altrimenti è un aggiornamento
+      const isNuovaStruttura = strutturaId.startsWith('new_');
       
-      if (isNewStructure) {
+      if (isNuovaStruttura) {
         // Aggiorna metadati per nuova struttura
         struttura.lastModified = new Date();
         struttura.lastModifiedBy = getCurrentUser()?.uid || null;
