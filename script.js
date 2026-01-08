@@ -11242,8 +11242,26 @@ async function geocodificaStruttura(struttura) {
       return null;
     }
 
+    // Funzione interna per pulire la query da "rumore"
+    const pulisciQuery = (text) => {
+      if (!text) return '';
+      // Parole da rimuovere se sono all'inizio o isolate
+      const noise = [
+        /^\s*presso\s+/i, /^\s*vicino\s+/i, /^\s*frazione\s+/i, /^\s*fraz\.\s+/i,
+        /^\s*località\s+/i, /^\s*loc\.\s+/i, /^\s*rifugio\s+/i, /^\s*baita\s+/i,
+        /^\s*casa\s+scout\s+/i, /^\s*base\s+scout\s+/i
+      ];
+      let cleaned = text;
+      noise.forEach(regex => {
+        cleaned = cleaned.replace(regex, '');
+      });
+      return cleaned.trim();
+    };
+
     // Costruisci query di ricerca intelligente
     let query = '';
+    const indirizzoPulito = pulisciQuery(struttura.Indirizzo);
+    const luogoPulito = pulisciQuery(struttura.Luogo);
 
     // Se Indirizzo contiene già Luogo o "Italia", usalo come query principale
     if (struttura.Indirizzo && (
@@ -11251,16 +11269,17 @@ async function geocodificaStruttura(struttura) {
       (struttura.Luogo && struttura.Indirizzo.toLowerCase().includes(struttura.Luogo.toLowerCase()))
     )) {
       query = struttura.Indirizzo;
-    } else if (struttura.Indirizzo) {
+    } else if (indirizzoPulito) {
       // Altrimenti combina i campi normalmente
-      query = `${struttura.Indirizzo}, ${struttura.Luogo || ''}, ${struttura.Prov || ''}, Italia`;
-    } else if (struttura.Luogo) {
+      query = `${indirizzoPulito}, ${luogoPulito || ''}, ${struttura.Prov || ''}, Italia`;
+    } else if (luogoPulito) {
       // Solo luogo e provincia
-      query = `${struttura.Luogo}, ${struttura.Prov || ''}, Italia`;
+      query = `${luogoPulito}, ${struttura.Prov || ''}, Italia`;
     }
 
     // Pulisci virgole extra e spazi
-    query = query.replace(/,\s*,/g, ',').replace(/,\s*Italia,\s*Italia/gi, ', Italia').replace(/,$/, '').trim();
+    const formattaQuery = (q) => q.replace(/,\s*,/g, ',').replace(/,\s*Italia,\s*Italia/gi, ', Italia').replace(/,$/, '').trim();
+    query = formattaQuery(query);
 
     // Controlla cache
     if (geocodingCache.has(query)) {
@@ -11305,27 +11324,41 @@ async function geocodificaStruttura(struttura) {
     const data = await response.json();
 
     if (data && data.length > 0) {
-      const result = data[0];
-      const coordinates = {
-        lat: parseFloat(result.lat),
-        lng: parseFloat(result.lon)
+      const result = {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+        address: data[0].display_name
       };
 
-      // Valida coordinate
-      if (isNaN(coordinates.lat) || isNaN(coordinates.lng) ||
-        coordinates.lat < -90 || coordinates.lat > 90 ||
-        coordinates.lng < -180 || coordinates.lng > 180) {
-        console.warn('⚠️ Coordinate non valide per:', query);
-        geocodingCache.set(query, null);
-        return null;
+      // Salva in cache
+      geocodingCache.set(query, result);
+
+      console.log(`✅ Coordinate trovate: ${result.lat}, ${result.lng}`);
+      return result;
+    } else {
+      // --- RETRY STRATEGY ---
+      // Se abbiamo provato l'indirizzo e non ha funzionato, prova solo Città + Provincia
+      const cityOnlyQuery = formattaQuery(`${luogoPulito}, ${struttura.Prov || ''}, Italia`);
+      if (query !== cityOnlyQuery && luogoPulito) {
+        console.log(`🔄 Tentativo fallback geocoding con solo città: ${cityOnlyQuery}`);
+        try {
+          const fallbackResponse = await fetch(proxyUrl + encodeURIComponent(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityOnlyQuery)}&limit=1&countrycodes=it`));
+          const fallbackData = await fallbackResponse.json();
+          if (fallbackData && fallbackData.length > 0) {
+            const result = {
+              lat: parseFloat(fallbackData[0].lat),
+              lng: parseFloat(fallbackData[0].lon),
+              address: fallbackData[0].display_name,
+              isApproximate: true
+            };
+            geocodingCache.set(query, result); // Cache la query originale col risultato approssimato
+            return result;
+          }
+        } catch (e) {
+          console.warn('Errore fallback geocoding:', e);
+        }
       }
 
-      // Salva in cache
-      geocodingCache.set(query, coordinates);
-
-      console.log(`✅ Coordinate trovate: ${coordinates.lat}, ${coordinates.lng}`);
-      return coordinates;
-    } else {
       console.log('❌ Nessun risultato trovato per:', query);
       // Salva fallimento in cache per evitare richieste ripetute
       geocodingCache.set(query, null);
