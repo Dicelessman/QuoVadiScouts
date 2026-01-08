@@ -14,7 +14,7 @@ const routingCSS = document.createElement('link');
 routingCSS.rel = 'stylesheet';
 routingCSS.href = 'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css';
 document.head.appendChild(routingCSS);
-// Maps integration for QuoVadiScout
+// Maps integration for QuoVadiScout a
 // Leaflet + OpenStreetMap implementation
 
 console.log('🗺️ Maps.js caricato correttamente');
@@ -39,7 +39,7 @@ class MapsManager {
         console.log('🔍 Debug: typeof L =', typeof L);
         console.log('🔍 Debug: window.L =', typeof window.L);
         console.log('🔍 Debug: Leaflet disponibile dopo 1s:', typeof L);
-        
+
         // Aspetta un po' e riprova
         await new Promise(resolve => setTimeout(resolve, 1000));
         if (typeof L === 'undefined') {
@@ -66,7 +66,7 @@ class MapsManager {
         opacity: 0.9,
         className: 'railway-layer-high-contrast'
       });
-      
+
       // Aggiungi stile CSS per aumentare contrasto
       if (!document.getElementById('railway-layer-styles')) {
         const style = document.createElement('style');
@@ -266,7 +266,7 @@ class MapsManager {
 
     const provincia = struttura.Prov || 'TO'; // Default Torino
     const fallbackCoords = provinceCoordinates[provincia] || [45.0703, 7.6869]; // Default Torino
-    
+
     // Aggiungi un piccolo offset casuale basato sull'ID per evitare che tutte finiscano nello stesso punto
     // ma mantieni lo stesso punto per lo stessa struttura
     const seed = struttura.id ? struttura.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) : Math.random();
@@ -435,14 +435,14 @@ class MapsManager {
       console.warn('⚠️ MapsManager: Mappa non inizializzata, salto aggiornamento marker');
       return;
     }
-    
+
     this.clearMarkers();
-    
+
     // Processa ogni struttura per ottenere coordinate
     for (const struttura of strutture) {
       // Se ha coordinate precise, mostra direttamente
       if ((struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng) ||
-          (struttura.coordinate_lat && struttura.coordinate_lng)) {
+        (struttura.coordinate_lat && struttura.coordinate_lng)) {
         this.addStructureMarker(struttura);
       } else {
         // Fallback: usa coordinate di provincia (senza geocoding automatico)
@@ -451,14 +451,14 @@ class MapsManager {
     }
     console.log(`📍 ${strutture.length} marker aggiornati sulla mappa`);
   }
-  
+
   // Funzione rimossa: tentaGeocodingAutomatico
   // Il geocoding automatico è stato disabilitato per evitare loop infiniti
   // Usa solo coordinate manuali o fallback di provincia
-  
+
   estraiCoordinateDaGoogleMaps(googleMapsLink) {
     if (!googleMapsLink) return null;
-    
+
     try {
       // Pattern per diversi formati di link Google Maps
       const patterns = [
@@ -471,13 +471,13 @@ class MapsManager {
         // https://maps.google.com/maps/place/.../@lat,lng
         /@(-?\d+\.?\d*),(-?\d+\.?\d*),\d+\.?\d*z/
       ];
-      
+
       for (const pattern of patterns) {
         const match = googleMapsLink.match(pattern);
         if (match) {
           const lat = parseFloat(match[1]);
           const lng = parseFloat(match[2]);
-          
+
           // Valida coordinate
           if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
             console.log(`🗺️ Coordinate estratte da Google Maps: ${lat}, ${lng}`);
@@ -485,7 +485,7 @@ class MapsManager {
           }
         }
       }
-      
+
       console.log('⚠️ Nessuna coordinate valida trovata nel link Google Maps');
       return null;
     } catch (error) {
@@ -549,7 +549,7 @@ class MapsManager {
   centerOnUserLocation() {
     if (this.userLocation) {
       this.map.setView([this.userLocation.lat, this.userLocation.lng], 13);
-      
+
       // Aggiungi marker per la posizione utente
       L.marker([this.userLocation.lat, this.userLocation.lng], {
         icon: L.divIcon({
@@ -559,7 +559,7 @@ class MapsManager {
           iconAnchor: [10, 10]
         })
       }).addTo(this.map).bindPopup('La tua posizione').openPopup();
-      
+
       console.log('📍 Mappa centrata sulla tua posizione');
     }
   }
@@ -613,17 +613,17 @@ class MapsManager {
     const R = 6371; // Raggio della Terra in km
     const dLat = this.deg2rad(lat2 - lat1);
     const dLon = this.deg2rad(lon2 - lon1);
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const d = R * c;
     return d;
   }
 
   deg2rad(deg) {
-    return deg * (Math.PI/180);
+    return deg * (Math.PI / 180);
   }
 
   // Calcola percorso tra due punti
@@ -649,8 +649,8 @@ class MapsManager {
           serviceUrl: 'https://router.project-osrm.org/route/v1'
         }),
         lineOptions: {
-          styles: [{ 
-            color: '#2f6b2f', 
+          styles: [{
+            color: '#2f6b2f',
             weight: 4,
             opacity: 0.8
           }]
@@ -659,7 +659,7 @@ class MapsManager {
         addWaypoints: false,
         routeWhileDragging: false,
         fitSelectedRoutes: true,
-        createMarker: function() { return null; }, // Nessun marker sui waypoints
+        createMarker: function () { return null; }, // Nessun marker sui waypoints
         ...options
       });
 
@@ -670,9 +670,9 @@ class MapsManager {
       this.routingControl.on('routesfound', (e) => {
         const routes = e.routes;
         const summary = routes[0].summary;
-        
+
         console.log(`Percorso trovato: ${(summary.totalDistance / 1000).toFixed(1)}km, ${Math.round(summary.totalTime / 60)}min`);
-        
+
         // Dispatches evento custom
         document.dispatchEvent(new CustomEvent('routeFound', {
           detail: {
@@ -728,19 +728,19 @@ class MapsManager {
   destroy() {
     if (this.map) {
       this.clearRoute();
-      
+
       // Rimuovi layer control se presente
       if (this.railwayLayerControl) {
         this.map.removeControl(this.railwayLayerControl);
         this.railwayLayerControl = null;
       }
-      
+
       // Rimuovi layer ferroviario se presente
       if (this.railwayLayer) {
         this.map.removeLayer(this.railwayLayer);
         this.railwayLayer = null;
       }
-      
+
       this.map.remove();
       this.map = null;
       this.markers = [];
@@ -776,9 +776,9 @@ class DraggableMarkerMapManager {
         container.innerHTML = '';
       }
 
-      this.currentCoords = { 
-        lat: parseFloat(initialLat) || 45.0703, 
-        lng: parseFloat(initialLng) || 7.6869 
+      this.currentCoords = {
+        lat: parseFloat(initialLat) || 45.0703,
+        lng: parseFloat(initialLng) || 7.6869
       };
 
       this.map = L.map(containerId).setView([this.currentCoords.lat, this.currentCoords.lng], initialLat && initialLng ? 15 : 10);
@@ -804,7 +804,7 @@ class DraggableMarkerMapManager {
         const position = event.target.getLatLng();
         this.currentCoords = { lat: position.lat, lng: position.lng };
         console.log('📍 Marker trascinato a:', this.currentCoords);
-        
+
         if (typeof this.onPositionChange === 'function') {
           this.onPositionChange(this.currentCoords.lat, this.currentCoords.lng);
         }
@@ -814,7 +814,7 @@ class DraggableMarkerMapManager {
       this.map.on('click', (e) => {
         const { lat, lng } = e.latlng;
         this.updateMarkerPosition(lat, lng);
-        
+
         if (typeof this.onPositionChange === 'function') {
           this.onPositionChange(lat, lng);
         }
@@ -838,11 +838,11 @@ class DraggableMarkerMapManager {
 
   updateMarkerPosition(lat, lng, zoom = null) {
     if (!this.map || !this.marker) return;
-    
+
     const newLatLng = L.latLng(lat, lng);
     this.marker.setLatLng(newLatLng);
     this.currentCoords = { lat, lng };
-    
+
     if (zoom !== null) {
       this.map.setView(newLatLng, zoom);
     } else {
@@ -878,7 +878,7 @@ window.showStructuresOnMap = (strutture) => {
     mapsManager.updateMarkers(strutture);
   } catch (error) {
     console.error('❌ Errore aggiornamento marker mappa:', error);
-    
+
     // Utilizza il gestore errori centralizzato
     if (window.errorHandler) {
       window.errorHandler.handleMapError(error, 'showStructuresOnMap');
