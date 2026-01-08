@@ -55,7 +55,7 @@ import {
 
 // Assicura che esista la funzione di validazione
 if (typeof window.validateFirebaseConfig !== 'function') {
-  window.validateFirebaseConfig = function(config) {
+  window.validateFirebaseConfig = function (config) {
     return true;
   };
 }
@@ -82,7 +82,7 @@ if (typeof FirebaseConfig === 'undefined') {
     }
   };
   // Funzione di validazione minimale
-  window.validateFirebaseConfig = function(config) {
+  window.validateFirebaseConfig = function (config) {
     console.warn('⚠️ Configurazione Firebase vuota in fallback');
     return true;
   };
@@ -97,22 +97,22 @@ try {
     apiKey: FirebaseConfig.apiKey.substring(0, 10) + '...',
     appId: FirebaseConfig.appId
   });
-  
+
   // Verifica che le credenziali non siano demo
   if (FirebaseConfig.apiKey === "demo-api-key") {
     console.warn('⚠️ ATTENZIONE: Stai usando credenziali demo!');
   } else {
     console.log('✅ Credenziali Firebase reali caricate');
   }
-  
+
   // Verifica che tutte le credenziali siano presenti
   const requiredFields = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
   const missingFields = requiredFields.filter(field => !FirebaseConfig[field] || FirebaseConfig[field].includes('YOUR_'));
-  
+
   if (missingFields.length > 0) {
     console.error('❌ Credenziali Firebase incomplete:', missingFields);
   }
-  
+
   // Verifica se il Service Worker potrebbe interferire
   if ('serviceWorker' in navigator) {
     console.log('⚠️ Service Worker attivo - potrebbe interferire con Firebase');
@@ -159,51 +159,51 @@ window.firestore = {
 // === Caricamento dati da Firestore ===
 async function caricaStrutture() {
   // 🔒 SICUREZZA: Verifica autenticazione PRIMA di caricare dati
-  
+
   if (!auth || !auth.currentUser) {
     console.log('🔒 Accesso negato: autenticazione richiesta');
     mostraSchermataLogin();
     return [];
   }
-  
+
   const cacheKey = 'strutture_cache';
   const cacheTimestamp = 'strutture_cache_timestamp';
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minuti
-  
+
   try {
     // Controlla cache prima di fare la query
     const cached = localStorage.getItem(cacheKey);
     const timestamp = localStorage.getItem(cacheTimestamp);
-    
+
     if (cached && timestamp && (Date.now() - parseInt(timestamp)) < CACHE_DURATION) {
       console.log('📦 Carico strutture da cache');
       const dati = JSON.parse(cached);
       console.log(`✅ Caricate ${dati.length} strutture da cache (${Math.round((Date.now() - parseInt(timestamp)) / 1000)}s fa)`);
       return dati;
     }
-    
+
     console.log('🔗 Connessione a Firestore...');
     console.log('📊 Progetto:', firebaseConfig.projectId);
     console.log('📁 Collezione: strutture');
-    
+
     const snapshot = await getDocs(colRef);
     console.log('✅ Connessione Firestore riuscita');
     console.log('📄 Documenti trovati:', snapshot.docs.length);
-    
+
     const dati = snapshot.docs.map((d) => {
       const docData = d.data();
       console.log(`📋 Documento ${d.id}:`, docData);
-      
+
       // Sincronizza formato coordinate per compatibilità
       const struttura = { id: d.id, ...docData };
       if (struttura.coordinate_lat && struttura.coordinate_lng && !struttura.coordinate) {
         struttura.coordinate = { lat: struttura.coordinate_lat, lng: struttura.coordinate_lng };
-      } else if (struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng && 
-                 !struttura.coordinate_lat && !struttura.coordinate_lng) {
+      } else if (struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng &&
+        !struttura.coordinate_lat && !struttura.coordinate_lng) {
         struttura.coordinate_lat = struttura.coordinate.lat;
         struttura.coordinate_lng = struttura.coordinate.lng;
       }
-      
+
       // Prova a ottenere coordinate da Google Maps se non ci sono coordinate precise
       if (!struttura.coordinate && !struttura.coordinate_lat && struttura.google_maps_link) {
         const coordinate = estraiCoordinateDaGoogleMaps(struttura.google_maps_link);
@@ -214,23 +214,23 @@ async function caricaStrutture() {
           console.log(`🗺️ Coordinate estratte da Google Maps per: ${struttura.Struttura}`);
         }
       }
-      
+
       return struttura;
     });
-    
+
     console.log(`✅ Caricate ${dati.length} strutture da Firestore`);
-    
+
     // Salva in cache
     localStorage.setItem(cacheKey, JSON.stringify(dati));
     localStorage.setItem(cacheTimestamp, Date.now().toString());
     console.log('💾 Strutture salvate in cache');
-    
+
     // Se Firestore è vuoto, prova con i dati locali
     if (dati.length === 0) {
       console.log('⚠️ Firestore vuoto, tentativo di caricamento da file locale...');
       return await caricaStruttureLocali();
     }
-    
+
     return dati;
   } catch (error) {
     console.error('❌ Errore nel caricamento da Firestore:', error);
@@ -291,30 +291,30 @@ function renderStrutture(lista) {
   if (DEBUG) {
     console.log('🎨 renderStrutture chiamato con', lista.length, 'strutture');
   }
-  
+
   const container = document.getElementById("results");
   const loadingIndicator = document.getElementById("loadingIndicator");
   const emptyState = document.getElementById("emptyState");
   const resultsCount = document.getElementById("resultsCount");
-  
+
   if (!container) {
     console.error('❌ Container results non trovato!');
     return;
   }
-  
+
   // Nascondi loading indicator
   if (loadingIndicator) {
     loadingIndicator.classList.add('hidden');
   }
-  
+
   // Aggiorna contatore risultati
   if (resultsCount) {
     resultsCount.textContent = `${lista.length} strutture`;
   }
-  
+
   // Aggiorna mappa principale con le strutture filtrate
   updateMainMap(lista);
-  
+
   if (container) {
     container.innerHTML = "";
     // Assicurati che il container mantenga sempre la classe CSS per il grid layout
@@ -539,7 +539,7 @@ function renderStrutture(lista) {
             <span class="card-field-icon">ℹ️</span>
             <span class="card-field-value">${s.Info.length > 100 ? s.Info.substring(0, 100) + '...' : s.Info}</span>
           </div>` : ''}
-          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx===0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
+          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx === 0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
         </div>
       `;
     } else {
@@ -601,7 +601,7 @@ function renderStrutture(lista) {
             <span class="card-field-icon">🌐</span>
             <span class="card-field-value">${s.Sito}</span>
           </div>` : ''}
-          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx===0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
+          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx === 0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
           
           ${s.Contatto ? `<div class="card-field">
             <span class="card-field-icon">📞</span>
@@ -615,7 +615,7 @@ function renderStrutture(lista) {
         </div>
       `;
     }
-    
+
     container.appendChild(card);
   });
 
@@ -625,7 +625,7 @@ function renderStrutture(lista) {
       mostraSchedaCompleta(title.dataset.id);
     });
   });
-  
+
   document.querySelectorAll(".toggle-elenco").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
@@ -642,9 +642,9 @@ function renderStrutture(lista) {
   });
 
   // Aggiungi controlli di paginazione
-    const paginazione = document.createElement('div');
-    paginazione.className = 'paginazione';
-  
+  const paginazione = document.createElement('div');
+  paginazione.className = 'paginazione';
+
   // Selettore elementi per pagina
   const itemsPerPageSelector = `
     <div class="pagination-items-per-page">
@@ -657,7 +657,7 @@ function renderStrutture(lista) {
       </select>
     </div>
   `;
-  
+
   // Controlli di paginazione (solo se ci sono più pagine)
   const paginationControls = totalePagine > 1 ? `
       <div class="pagination-info">
@@ -675,9 +675,9 @@ function renderStrutture(lista) {
       Mostrando tutte le ${lista.length} strutture
     </div>
     `;
-  
+
   paginazione.innerHTML = itemsPerPageSelector + paginationControls;
-    container.appendChild(paginazione);
+  container.appendChild(paginazione);
 }
 
 function cambiaPagina(nuovaPagina) {
@@ -696,7 +696,7 @@ function cambiaElementiPerPagina(nuovoValore) {
 function generaNumeriPagina(totalePagine, paginaCorrente) {
   const numeri = [];
   const maxNumeri = 5; // Numero massimo di numeri da mostrare
-  
+
   if (totalePagine <= maxNumeri) {
     // Se ci sono poche pagine, mostra tutte
     for (let i = 1; i <= totalePagine; i++) {
@@ -706,12 +706,12 @@ function generaNumeriPagina(totalePagine, paginaCorrente) {
     // Logica per pagine multiple
     let inizio = Math.max(1, paginaCorrente - 2);
     let fine = Math.min(totalePagine, inizio + maxNumeri - 1);
-    
+
     // Aggiusta l'inizio se siamo vicini alla fine
     if (fine - inizio < maxNumeri - 1) {
       inizio = Math.max(1, fine - maxNumeri + 1);
     }
-    
+
     // Aggiungi "..." se necessario
     if (inizio > 1) {
       numeri.push(`<button onclick="cambiaPagina(1)">1</button>`);
@@ -719,12 +719,12 @@ function generaNumeriPagina(totalePagine, paginaCorrente) {
         numeri.push(`<span class="pagination-dots">...</span>`);
       }
     }
-    
+
     // Aggiungi i numeri centrali
     for (let i = inizio; i <= fine; i++) {
       numeri.push(`<button class="${i === paginaCorrente ? 'active' : ''}" onclick="cambiaPagina(${i})">${i}</button>`);
     }
-    
+
     // Aggiungi "..." se necessario
     if (fine < totalePagine) {
       if (fine < totalePagine - 1) {
@@ -733,7 +733,7 @@ function generaNumeriPagina(totalePagine, paginaCorrente) {
       numeri.push(`<button onclick="cambiaPagina(${totalePagine})">${totalePagine}</button>`);
     }
   }
-  
+
   return numeri.join('');
 }
 
@@ -741,16 +741,16 @@ function generaNumeriPagina(totalePagine, paginaCorrente) {
 // === Ricerca Avanzata ===
 function mostraRicercaAvanzata() {
   console.log('🔍 Apertura ricerca avanzata...');
-  
+
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('ricercaAvanzataModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'ricercaAvanzataModal';
   modal.className = 'modal-overlay'; // Usa classe per ereditare tema
@@ -766,7 +766,7 @@ function mostraRicercaAvanzata() {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.className = 'modal-content'; // Usa classe per ereditare tema
   modalContent.style.cssText = `
@@ -782,7 +782,7 @@ function mostraRicercaAvanzata() {
     min-width: 320px;
     width: 100%;
   `;
-  
+
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
@@ -793,7 +793,7 @@ function mostraRicercaAvanzata() {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
   `;
-  
+
   const title = document.createElement('h2');
   title.textContent = '🔍 Ricerca Avanzata';
   title.style.cssText = `
@@ -801,7 +801,7 @@ function mostraRicercaAvanzata() {
     color: var(--primary, #2f6b2f);
     font-size: 1.5rem;
   `;
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.style.cssText = `
@@ -818,15 +818,15 @@ function mostraRicercaAvanzata() {
     justify-content: center;
   `;
   closeBtn.onclick = () => modal.remove();
-  
+
   // Funzione helper per creare i pulsanti (per evitar duplicazione)
   const createActionButtons = () => {
     const buttonContainer = document.createElement('div');
     buttonContainer.style.cssText = `display: flex; gap: 10px; flex-wrap: wrap;`;
-    
+
     const leftActions = document.createElement('div');
     leftActions.style.cssText = `display: flex; gap: 10px;`;
-    
+
     const clearBtn = document.createElement('button');
     clearBtn.innerHTML = '🧹 Pulisci';
     clearBtn.type = 'button';
@@ -846,18 +846,18 @@ function mostraRicercaAvanzata() {
       document.getElementById('search').value = '';
       const provEl = document.getElementById('filter-prov');
       if (provEl) provEl.value = '';
-      
+
       // Reset filtri avanzati
       window.filtriAvanzatiAttivi = null;
       const indicator = document.getElementById('indicatore-ricerca-avanzata');
       if (indicator) indicator.remove();
-      
+
       renderStrutture(filtra(strutture));
     };
-    
+
     const rightActions = document.createElement('div');
     rightActions.style.cssText = `display: flex; gap: 10px;`;
-    
+
     const saveBtn = document.createElement('button');
     saveBtn.innerHTML = '💾 Salva Filtri';
     saveBtn.type = 'button';
@@ -874,7 +874,7 @@ function mostraRicercaAvanzata() {
     saveBtn.onclick = () => {
       salvaFiltriAvanzati();
     };
-    
+
     const cancelBtn = document.createElement('button');
     cancelBtn.innerHTML = '❌ Annulla';
     cancelBtn.type = 'button';
@@ -889,7 +889,7 @@ function mostraRicercaAvanzata() {
       font-weight: 500;
     `;
     cancelBtn.onclick = () => modal.remove();
-    
+
     const searchBtn = document.createElement('button');
     searchBtn.innerHTML = '🔍 Cerca';
     searchBtn.type = 'button';
@@ -908,18 +908,18 @@ function mostraRicercaAvanzata() {
       applicaRicercaAvanzata(filtriAvanzati);
       modal.remove();
     };
-    
+
     leftActions.appendChild(clearBtn);
     rightActions.appendChild(saveBtn);
     rightActions.appendChild(cancelBtn);
     rightActions.appendChild(searchBtn);
-    
+
     buttonContainer.appendChild(leftActions);
     buttonContainer.appendChild(rightActions);
-    
+
     return buttonContainer;
   };
-  
+
   // Pulsanti in header (in cima)
   const headerButtons = createActionButtons();
   headerButtons.style.cssText = `
@@ -931,15 +931,15 @@ function mostraRicercaAvanzata() {
     padding-top: 15px;
     border-top: 1px solid var(--border-light);
   `;
-  
+
   const headerContent = document.createElement('div');
   headerContent.style.cssText = `width: 100%;`;
   headerContent.appendChild(title);
   headerContent.appendChild(headerButtons);
-  
+
   header.appendChild(headerContent);
   header.appendChild(closeBtn);
-  
+
   // Form di ricerca
   const form = document.createElement('form');
   form.style.cssText = `
@@ -948,7 +948,7 @@ function mostraRicercaAvanzata() {
     gap: 20px;
     margin-bottom: 20px;
   `;
-  
+
   // Campi di ricerca organizzati per categoria
   const categorie = {
     'Informazioni Principali': [
@@ -1003,12 +1003,14 @@ function mostraRicercaAvanzata() {
     'Gestione': [
       { campo: 'Ultimo controllo', tipo: 'date', placeholder: 'Data ultimo controllo' },
       { campo: 'Da chi', tipo: 'text', placeholder: 'Chi ha controllato' },
-            { campo: 'stato', tipo: 'select', placeholder: 'Stato struttura', options: [
-        { value: '', label: 'Tutti gli stati' },
-        { value: 'attiva', label: '🟢 Attiva' },
-        { value: 'temporaneamente_non_attiva', label: '🟡 Temporaneamente non attiva' },
-        { value: 'non_piu_attiva', label: '🔴 Non più attiva' }
-      ]},
+      {
+        campo: 'stato', tipo: 'select', placeholder: 'Stato struttura', options: [
+          { value: '', label: 'Tutti gli stati' },
+          { value: 'attiva', label: '🟢 Attiva' },
+          { value: 'temporaneamente_non_attiva', label: '🟡 Temporaneamente non attiva' },
+          { value: 'non_piu_attiva', label: '🔴 Non più attiva' }
+        ]
+      },
       { campo: 'rating_min', tipo: 'number', placeholder: 'Rating minimo (1-5)' },
       { campo: 'rating_max', tipo: 'number', placeholder: 'Rating massimo (1-5)' },
       { campo: 'has_images', tipo: 'checkbox', placeholder: 'Ha immagini' },
@@ -1029,7 +1031,7 @@ function mostraRicercaAvanzata() {
       { campo: 'modified_before', tipo: 'date', placeholder: 'Modificata prima' }
     ]
   };
-  
+
   Object.entries(categorie).forEach(([nomeCategoria, campi]) => {
     const categoriaDiv = document.createElement('div');
     categoriaDiv.className = 'categoria-div';
@@ -1040,7 +1042,7 @@ function mostraRicercaAvanzata() {
       padding: 15px;
       border-left: 4px solid #2f6b2f;
     `;
-    
+
     const categoriaTitle = document.createElement('h3');
     categoriaTitle.className = 'categoria-title';
     categoriaTitle.textContent = nomeCategoria;
@@ -1052,14 +1054,14 @@ function mostraRicercaAvanzata() {
     if (categoriaDiv && categoriaTitle) {
       categoriaDiv.appendChild(categoriaTitle);
     }
-    
+
     campi.forEach(({ campo, tipo, placeholder, options }) => {
       const campoDiv = document.createElement('div');
       campoDiv.className = 'campo-div';
       campoDiv.style.cssText = `
         margin-bottom: 12px;
       `;
-      
+
       const label = document.createElement('label');
       label.textContent = campo;
       label.style.cssText = `
@@ -1069,7 +1071,7 @@ function mostraRicercaAvanzata() {
         margin-bottom: 4px;
         font-size: 14px;
       `;
-      
+
       let input;
       if (tipo === 'checkbox') {
         input = document.createElement('input');
@@ -1079,7 +1081,7 @@ function mostraRicercaAvanzata() {
           margin-right: 8px;
           transform: scale(1.1);
         `;
-        
+
         const checkboxDiv = document.createElement('div');
         checkboxDiv.className = 'checkbox-div';
         checkboxDiv.style.cssText = `
@@ -1099,7 +1101,7 @@ function mostraRicercaAvanzata() {
           border-radius: 4px;
           font-size: 14px;
         `;
-        
+
         // Aggiungi opzioni
         if (options) {
           options.forEach(option => {
@@ -1109,7 +1111,7 @@ function mostraRicercaAvanzata() {
             input.appendChild(optionElement);
           });
         }
-        
+
         campoDiv.appendChild(label);
         campoDiv.appendChild(input);
       } else if (tipo === 'textarea') {
@@ -1126,7 +1128,7 @@ function mostraRicercaAvanzata() {
           font-family: inherit;
           resize: vertical;
         `;
-        
+
         campoDiv.appendChild(label);
         campoDiv.appendChild(input);
       } else if (tipo === 'number') {
@@ -1141,14 +1143,14 @@ function mostraRicercaAvanzata() {
           border-radius: 4px;
           font-size: 14px;
         `;
-        
+
         // Aggiungi min/max per rating
         if (campo.includes('rating')) {
           input.min = 1;
           input.max = 5;
           input.step = 0.1;
         }
-        
+
         campoDiv.appendChild(label);
         campoDiv.appendChild(input);
       } else {
@@ -1163,17 +1165,17 @@ function mostraRicercaAvanzata() {
           border-radius: 4px;
           font-size: 14px;
         `;
-        
+
         campoDiv.appendChild(label);
         campoDiv.appendChild(input);
       }
-      
+
       categoriaDiv.appendChild(campoDiv);
     });
-    
+
     form.appendChild(categoriaDiv);
   });
-  
+
   // Footer con pulsanti (duplicati in fondo)
   const footer = document.createElement('div');
   footer.style.cssText = `
@@ -1184,7 +1186,7 @@ function mostraRicercaAvanzata() {
     border-top: 1px solid var(--border-light);
     gap: 10px;
   `;
-  
+
   // Riutilizza la funzione helper per creare i pulsanti del footer
   const footerButtons = createActionButtons();
   footerButtons.style.cssText = `
@@ -1194,15 +1196,15 @@ function mostraRicercaAvanzata() {
     gap: 10px;
     width: 100%;
   `;
-  
+
   footer.appendChild(footerButtons);
-  
+
   modalContent.appendChild(header);
   modalContent.appendChild(form);
   modalContent.appendChild(footer);
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -1213,11 +1215,11 @@ function mostraRicercaAvanzata() {
 
 function raccogliFiltriAvanzati() {
   const filtri = {};
-  
+
   // Raccogli tutti i valori dai campi di ricerca avanzata
   document.querySelectorAll('#ricercaAvanzataModal input, #ricercaAvanzataModal textarea, #ricercaAvanzataModal select').forEach(input => {
     const campo = input.id.replace('search-', '').replace(/-/g, ' ');
-    
+
     if (input.type === 'checkbox') {
       if (input.checked) {
         filtri[campo] = true;
@@ -1235,21 +1237,21 @@ function raccogliFiltriAvanzati() {
       filtri[campo] = input.value.trim();
     }
   });
-  
+
   return filtri;
 }
 
 function applicaRicercaAvanzata(filtriAvanzati) {
   // Salva i filtri avanzati per usarli nella funzione filtra
   window.filtriAvanzatiAttivi = filtriAvanzati;
-  
+
   // Reset paginazione
   paginaCorrente = 1;
-  
+
   // Applica i filtri
   const listaFiltrata = filtra(strutture);
   renderStrutture(listaFiltrata);
-  
+
   // Mostra indicatore di ricerca avanzata attiva
   mostraIndicatoreRicercaAvanzata(Object.keys(filtriAvanzati).length);
 }
@@ -1257,30 +1259,30 @@ function applicaRicercaAvanzata(filtriAvanzati) {
 // === Gestione Filtri Salvati ===
 async function salvaFiltriAvanzati() {
   const filtri = raccogliFiltriAvanzati();
-  
+
   if (Object.keys(filtri).length === 0) {
     alert('Non ci sono filtri da salvare!');
     return;
   }
-  
+
   const nomeFiltro = prompt('Inserisci un nome per questi filtri:');
   if (!nomeFiltro || nomeFiltro.trim() === '') {
     return;
   }
-  
+
   try {
     const currentUser = getCurrentUser();
     if (!currentUser) {
       alert('Devi essere loggato per salvare i filtri!');
       return;
     }
-    
+
     // 🔒 Validazione server-side
     if (!await validateServerAuth()) {
       alert('❌ Sessione non valida. Effettua nuovamente il login.');
       return;
     }
-    
+
     const filtroData = {
       userId: currentUser.uid,
       nome: nomeFiltro.trim(),
@@ -1288,14 +1290,14 @@ async function salvaFiltriAvanzati() {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
+
     await secureFirestoreOperation(addDoc, collection(db, "user_filters"), filtroData);
-    
+
     // Log attività
     await logActivity('filter_saved', nomeFiltro, currentUser.uid, {
       filterCount: Object.keys(filtri).length
     });
-    
+
     alert('✅ Filtri salvati con successo!');
     console.log('✅ Filtri salvati:', nomeFiltro);
   } catch (error) {
@@ -1311,9 +1313,9 @@ async function caricaFiltriSalvati() {
       console.log('⚠️ Utente non autenticato, non posso caricare filtri salvati');
       return [];
     }
-    
+
     console.log('🔍 Caricamento filtri salvati per utente:', currentUser.uid);
-    
+
     // Verifica se l'utente ha permessi di lettura
     try {
       // 🔒 Validazione server-side
@@ -1321,10 +1323,10 @@ async function caricaFiltriSalvati() {
         console.warn('🔒 Sessione non valida per caricamento filtri');
         return [];
       }
-      
+
       const filtersRef = collection(db, "user_filters");
       const q = query(
-        filtersRef, 
+        filtersRef,
         where("userId", "==", currentUser.uid)
       );
       const snapshot = await secureFirestoreOperation(getDocs, q);
@@ -1332,9 +1334,9 @@ async function caricaFiltriSalvati() {
         id: doc.id,
         ...doc.data()
       }));
-      
+
       console.log('✅ Filtri salvati caricati:', filtri.length);
-      
+
       // Ordina localmente per evitare problemi di indice
       return filtri.sort((a, b) => {
         const dateA = a.updatedAt?.toDate ? a.updatedAt.toDate() : new Date(a.updatedAt || 0);
@@ -1362,23 +1364,23 @@ async function applicaFiltriSalvati(filtroId) {
       alert('Filtro non trovato!');
       return;
     }
-    
+
     const filtroData = filtroDoc.data();
     window.filtriAvanzatiAttivi = filtroData.filtri;
-    
+
     // Reset paginazione
     paginaCorrente = 1;
-    
+
     // Applica i filtri
     const listaFiltrata = filtra(strutture);
     renderStrutture(listaFiltrata);
-    
+
     // Mostra indicatore
     mostraIndicatoreRicercaAvanzata(Object.keys(filtroData.filtri).length);
-    
+
     // Chiudi il menu automaticamente dopo aver applicato i filtri
     closeMenu();
-    
+
     console.log('✅ Filtri applicati:', filtroData.nome);
   } catch (error) {
     console.error('Errore nell\'applicazione filtri salvati:', error);
@@ -1388,13 +1390,13 @@ async function applicaFiltriSalvati(filtroId) {
 
 function mostraIndicatoreRicercaAvanzata(numeroFiltri) {
   console.log('🔍 Mostra indicatore ricerca avanzata:', numeroFiltri);
-  
+
   // Rimuovi indicatore esistente
   const existingIndicator = document.getElementById('indicatore-ricerca-avanzata');
   if (existingIndicator) {
     existingIndicator.remove();
   }
-  
+
   if (numeroFiltri > 0) {
     const indicator = document.createElement('div');
     indicator.id = 'indicatore-ricerca-avanzata';
@@ -1416,15 +1418,15 @@ function mostraIndicatoreRicercaAvanzata(numeroFiltri) {
       🔍 Ricerca avanzata attiva (${numeroFiltri} filtri)
       <button onclick="rimuoviRicercaAvanzata()" style="background:none;border:none;color:white;cursor:pointer;font-size:14px;margin-left:4px;">✕</button>
     `;
-    
+
     // Trova un elemento appropriato nella nuova UI per mostrare l'indicatore
     const searchSection = document.querySelector('.search-section');
     const resultsHeader = document.querySelector('.results-header');
     const mainContent = document.querySelector('.main-content');
-    
+
     // Prova diversi elementi in ordine di priorità
     let targetElement = null;
-    
+
     if (searchSection) {
       // Aggiungi dopo la search section
       targetElement = searchSection.parentNode;
@@ -1442,7 +1444,7 @@ function mostraIndicatoreRicercaAvanzata(numeroFiltri) {
       indicator.style.transform = 'translateX(-50%)';
       indicator.style.zIndex = '999';
     }
-    
+
     if (targetElement) {
       try {
         if (searchSection && targetElement === searchSection.parentNode) {
@@ -1466,12 +1468,12 @@ function mostraIndicatoreRicercaAvanzata(numeroFiltri) {
 
 function rimuoviRicercaAvanzata() {
   window.filtriAvanzatiAttivi = null;
-  
+
   const indicator = document.getElementById('indicatore-ricerca-avanzata');
   if (indicator) {
     indicator.remove();
   }
-  
+
   // Ricarica i risultati senza filtri avanzati
   const listaFiltrata = filtra(strutture);
   renderStrutture(listaFiltrata);
@@ -1486,7 +1488,7 @@ function filtra(lista) {
   const casaEl = document.getElementById("filter-casa");
   const terrenoEl = document.getElementById("filter-terreno");
   const statoEl = document.getElementById("filter-stato");
-  
+
   const q = searchEl ? searchEl.value.toLowerCase() : "";
   const prov = provEl ? provEl.value : "";
   const casa = casaEl ? casaEl.checked : false;
@@ -1504,7 +1506,7 @@ function filtra(lista) {
     const matchCasa = !casa || s.Casa === true;
     const matchTerreno = !terreno || s.Terreno === true;
     const matchStato = !stato || s.stato === stato;
-    
+
     // Filtri avanzati
     let matchAvanzati = true;
     if (window.filtriAvanzatiAttivi) {
@@ -1519,11 +1521,11 @@ function filtra(lista) {
           matchAvanzati = matchAvanzati && s.Casa && s.Terreno;
         }
       }
-      
+
       if (window.filtriAvanzatiAttivi.provincia) {
         matchAvanzati = matchAvanzati && s.Prov === window.filtriAvanzatiAttivi.provincia;
       }
-      
+
       // Gestisci altri filtri avanzati
       for (const [campo, valore] of Object.entries(window.filtriAvanzatiAttivi)) {
         // Salta tipo e provincia che sono già gestiti sopra
@@ -1546,9 +1548,9 @@ function filtra(lista) {
           if (campo.endsWith('_dettaglio')) {
             campoOriginale = campo.replace('_dettaglio', '');
           }
-          
-          matchAvanzati = matchAvanzati && 
-            s[campoOriginale] && 
+
+          matchAvanzati = matchAvanzati &&
+            s[campoOriginale] &&
             s[campoOriginale].toString().toLowerCase().includes(valore.toLowerCase());
         } else if (typeof valore === 'number') {
           // Per numeri (rating, coordinate, etc.)
@@ -1579,7 +1581,7 @@ function filtra(lista) {
             matchAvanzati = matchAvanzati && s.lastModified && new Date(s.lastModified) <= valore;
           }
         }
-        
+
         // Filtri speciali
         if (campo === 'has_images') {
           matchAvanzati = matchAvanzati && s.immagini && s.immagini.length > 0;
@@ -1591,7 +1593,7 @@ function filtra(lista) {
         }
       }
     }
-    
+
     return matchTesto && matchProv && matchCasa && matchTerreno && matchStato && matchAvanzati;
   });
 
@@ -1620,10 +1622,10 @@ let strutturaCorrente = null;
 async function modificaStruttura(id) {
   strutturaCorrente = strutture.find(s => s.id === id);
   if (!strutturaCorrente) return;
-  
+
   const modal = document.getElementById('modal');
   const form = document.getElementById('editForm');
-  
+
   // Popola il form
   form.innerHTML = `
     <label>
@@ -1645,9 +1647,9 @@ async function modificaStruttura(id) {
       Provincia
       <select id="edit-prov">
         <option value="">Seleziona provincia</option>
-        ${[...new Set(strutture.map(s => s.Prov).filter(Boolean))].sort().map(prov => 
-          `<option value="${prov}" ${strutturaCorrente.Prov === prov ? 'selected' : ''}>${prov}</option>`
-        ).join('')}
+        ${[...new Set(strutture.map(s => s.Prov).filter(Boolean))].sort().map(prov =>
+    `<option value="${prov}" ${strutturaCorrente.Prov === prov ? 'selected' : ''}>${prov}</option>`
+  ).join('')}
       </select>
     </label>
     
@@ -1717,17 +1719,95 @@ async function modificaStruttura(id) {
       Informazioni aggiuntive
       <textarea id="edit-info" rows="3" placeholder="Informazioni dettagliate sulla struttura...">${strutturaCorrente.Info || ''}</textarea>
     </label>
+
+    <div id="editMapContainer" style="grid-column: 1 / -1; margin-top: 15px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-medium);">
+      <div style="padding: 10px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-medium); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 500; font-size: 14px;">📍 Posiziona sulla mappa</span>
+        <small style="color: var(--text-secondary);">Trascina il segnaposto per correggere la posizione</small>
+      </div>
+      <div id="editMap" style="height: 250px; width: 100%;"></div>
+    </div>
   `;
-  
+
   modal.classList.remove('hidden');
+
+  // Inizializza la mappa nel form
+  setTimeout(async () => {
+    if (window.initializeDraggableMap) {
+      await window.initializeDraggableMap('editMap', strutturaCorrente.coordinate_lat, strutturaCorrente.coordinate_lng, {
+        onPositionChange: (lat, lng) => {
+          const latInput = document.getElementById('edit-coordinate_lat');
+          const lngInput = document.getElementById('edit-coordinate_lng');
+          if (latInput) latInput.value = lat.toFixed(6);
+          if (lngInput) lngInput.value = lng.toFixed(6);
+        }
+      });
+    }
+  }, 100);
+
+  // Aggiungi listener per aggiornare la mappa quando si cambiano i campi manuali
+  setTimeout(() => {
+    const latInput = document.getElementById('edit-coordinate_lat');
+    const lngInput = document.getElementById('edit-coordinate_lng');
+
+    const updateMarker = () => {
+      const lat = parseFloat(latInput.value);
+      const lng = parseFloat(lngInput.value);
+      if (!isNaN(lat) && !isNaN(lng) && window.updateDraggableMarker) {
+        window.updateDraggableMarker(lat, lng);
+      }
+    };
+
+    if (latInput) latInput.addEventListener('change', updateMarker);
+    if (lngInput) lngInput.addEventListener('change', updateMarker);
+
+    // Gestione geocodeBtn
+    const geocodeBtn = document.getElementById('geocodeBtn');
+    if (geocodeBtn) {
+      geocodeBtn.onclick = async () => {
+        const luogo = document.getElementById('edit-luogo').value.trim();
+        const indirizzo = document.getElementById('edit-indirizzo').value.trim();
+        const prov = document.getElementById('edit-prov').value;
+
+        if (!luogo && !indirizzo) {
+          alert('Inserisci almeno un luogo o un indirizzo per la geocodifica.');
+          return;
+        }
+
+        geocodeBtn.disabled = true;
+        geocodeBtn.innerHTML = '🔄 Geocodifica in corso...';
+
+        try {
+          const query = `${indirizzo ? indirizzo + ', ' : ''}${luogo}, ${prov}, Italia`;
+          const result = await geocodificaStruttura({ ...strutturaCorrente, Indirizzo: query });
+
+          if (result) {
+            latInput.value = result.lat;
+            lngInput.value = result.lng;
+            if (window.updateDraggableMarker) {
+              window.updateDraggableMarker(result.lat, result.lng, 16);
+            }
+          } else {
+            alert('Impossibile trovare le coordinate per questo indirizzo.');
+          }
+        } catch (error) {
+          console.error('Errore geocodifica:', error);
+          alert('Errore durante la geocodifica.');
+        } finally {
+          geocodeBtn.disabled = false;
+          geocodeBtn.innerHTML = '🔍 Ottieni Coordinate da Indirizzo';
+        }
+      };
+    }
+  }, 200);
 }
 
 async function salvaModifiche() {
   if (!strutturaCorrente) return;
-  
+
   const coordinate_lat = document.getElementById('edit-coordinate_lat').value ? parseFloat(document.getElementById('edit-coordinate_lat').value) : null;
   const coordinate_lng = document.getElementById('edit-coordinate_lng').value ? parseFloat(document.getElementById('edit-coordinate_lng').value) : null;
-  
+
   const formData = {
     Struttura: document.getElementById('edit-struttura').value.trim(),
     Luogo: document.getElementById('edit-luogo').value.trim(),
@@ -1750,13 +1830,13 @@ async function salvaModifiche() {
     lastModifiedBy: getCurrentUser()?.uid || null,
     version: (strutturaCorrente.version || 1) + 1
   };
-  
+
   // Validazione
   if (!formData.Struttura) {
     alert('Il nome della struttura è obbligatorio!');
     return;
   }
-  
+
   try {
     // Salva versione precedente prima di modificare
     // 🔒 SICUREZZA: Verifica autenticazione
@@ -1765,75 +1845,82 @@ async function salvaModifiche() {
       mostraSchermataLogin();
       return;
     }
-    
+
     await salvaVersione(strutturaCorrente, getCurrentUser()?.uid);
-    
+
     // 🔒 Validazione server-side per operazioni critiche
     if (!await validateServerAuth()) {
       alert('❌ Sessione non valida. Effettua nuovamente il login.');
       return;
     }
-    
+
     // Aggiorna struttura
     await secureFirestoreOperation(updateDoc, doc(db, "strutture", strutturaCorrente.id), formData);
-    
+
     // INVALIDARE CACHE LOCALE per forzare ricaricamento
     localStorage.removeItem('strutture_cache');
     localStorage.removeItem('strutture_cache_timestamp');
     console.log('🗑️ Cache invalidata dopo modifica struttura');
-    
+
     // Log attività
     await logActivity('structure_updated', strutturaCorrente.id, getCurrentUser()?.uid, {
       changes: Object.keys(formData).filter(key => formData[key] !== strutturaCorrente[key])
     });
-    
-    // Se ci sono Luogo + Indirizzo + Prov e mancano le coordinate, prova geocoding automatico
-    const haDatiPosizione = formData.Luogo && formData.Indirizzo && formData.Prov;
+
+    // Se mancano le coordinate, prova geocoding prioritario (Indirizzo -> Luogo)
     const mancanoCoordinate = !formData.coordinate_lat || !formData.coordinate_lng;
-    
-    if (haDatiPosizione && mancanoCoordinate) {
-      console.log('🔄 Dati posizione completi (Luogo + Indirizzo + Prov), tentativo geocoding automatico...');
-      
-      // Aggiorna la struttura locale con i nuovi dati
+
+    if (mancanoCoordinate) {
+      console.log('🔄 Coordinate mancanti, tentativo geocoding prioritario...');
+
       const strutturaAggiornata = { ...strutturaCorrente, ...formData };
-      const strutturaConCoordinate = await geocodificaStrutturaAutomatico(strutturaAggiornata);
-      
-      if (strutturaConCoordinate.coordinate || strutturaConCoordinate.coordinate_lat) {
+      let strutturaConCoordinate = null;
+
+      // 1. Tenta con Indirizzo completo
+      if (formData.Indirizzo && formData.Luogo && formData.Prov) {
+        strutturaConCoordinate = await geocodificaStrutturaAutomatico(strutturaAggiornata);
+      }
+
+      // 2. Tenta con solo Luogo (Città) se il primo fallisce o non era possibile
+      if ((!strutturaConCoordinate || !strutturaConCoordinate.coordinate) && formData.Luogo && formData.Prov) {
+        console.log('📍 Tentativo geocoding solo Luogo (città)...');
+        const cityQuery = `${formData.Luogo}, ${formData.Prov}, Italia`;
+        const coord = await geocodificaStruttura({ ...strutturaAggiornata, Indirizzo: cityQuery });
+        if (coord) {
+          strutturaConCoordinate = {
+            ...strutturaAggiornata,
+            coordinate: coord,
+            coordinate_lat: coord.lat,
+            coordinate_lng: coord.lng
+          };
+        }
+      }
+
+      if (strutturaConCoordinate && (strutturaConCoordinate.coordinate || strutturaConCoordinate.coordinate_lat)) {
         // Salva le coordinate ottenute automaticamente
         await updateDoc(doc(db, "strutture", strutturaCorrente.id), {
           coordinate: strutturaConCoordinate.coordinate,
           coordinate_lat: strutturaConCoordinate.coordinate_lat,
           coordinate_lng: strutturaConCoordinate.coordinate_lng
         });
-        
-        // Aggiorna anche i campi nel formData per sincronizzazione
-        formData.coordinate = strutturaConCoordinate.coordinate;
-        formData.coordinate_lat = strutturaConCoordinate.coordinate_lat;
-        formData.coordinate_lng = strutturaConCoordinate.coordinate_lng;
-        
-        // Aggiorna i campi nel form visivamente
-        const latInput = document.getElementById('edit-coordinate_lat');
-        const lngInput = document.getElementById('edit-coordinate_lng');
-        if (latInput) latInput.value = strutturaConCoordinate.coordinate_lat || '';
-        if (lngInput) lngInput.value = strutturaConCoordinate.coordinate_lng || '';
-        
+
         console.log('✅ Coordinate ottenute automaticamente e salvate:', {
           lat: strutturaConCoordinate.coordinate_lat,
           lng: strutturaConCoordinate.coordinate_lng
         });
-        
+
         // Mostra notifica all'utente
         if (window.showNotification) {
-          window.showNotification('✅ Coordinate ottenute automaticamente', {
-            body: `Lat: ${strutturaConCoordinate.coordinate_lat?.toFixed(6)}, Lng: ${strutturaConCoordinate.coordinate_lng?.toFixed(6)}`,
+          window.showNotification('✅ Posizionata automaticamente', {
+            body: `In base a: ${formData.Luogo}`,
             icon: '📍'
           });
         }
       } else {
-        console.warn('⚠️ Impossibile ottenere coordinate automaticamente per questa struttura');
+        console.warn('⚠️ Impossibile ottenere coordinate per questa struttura (neanche per città)');
       }
     }
-    
+
     chiudiModale();
     // Forza ricaricamento completo da Firestore
     await aggiornaLista();
@@ -1856,14 +1943,14 @@ async function eliminaStruttura(id) {
     mostraSchermataLogin();
     return;
   }
-  
+
   if (confirm("Vuoi davvero eliminare questa struttura?")) {
     try {
       // Invalidiamo la cache locale PRIMA dell'eliminazione
       localStorage.removeItem('strutture_cache');
       localStorage.removeItem('strutture_cache_timestamp');
       console.log('🗑️ Cache invalidata prima dell\'eliminazione');
-      
+
       // Rimuovi la struttura dall'array locale immediatamente per feedback visivo
       const index = strutture.findIndex(s => s.id === id);
       if (index !== -1) {
@@ -1873,17 +1960,17 @@ async function eliminaStruttura(id) {
         renderStrutture(filtra(strutture));
         console.log('✅ Struttura rimossa dall\'array locale');
       }
-      
+
       // Elimina da Firestore
       const strutturaRef = doc(db, "strutture", id);
       await deleteDoc(strutturaRef);
       console.log('✅ Struttura eliminata da Firestore');
-      
+
       // Ricarica da Firestore per sincronizzazione completa
       setTimeout(async () => {
         await aggiornaLista();
       }, 500);
-      
+
     } catch (error) {
       console.error('❌ Errore nell\'eliminazione:', error);
       alert('❌ Errore nell\'eliminazione: ' + error.message);
@@ -1899,13 +1986,13 @@ async function eliminaStrutturaConConferma(id) {
     console.error('Struttura non trovata:', id);
     return;
   }
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('confirmDeleteModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'confirmDeleteModal';
   modal.style.cssText = `
@@ -1920,7 +2007,7 @@ async function eliminaStrutturaConConferma(id) {
     justify-content: center;
     z-index: 10003;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -1933,7 +2020,7 @@ async function eliminaStrutturaConConferma(id) {
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     text-align: center;
   `;
-  
+
   modalContent.innerHTML = `
     <div style="margin-bottom: 20px;">
       <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
@@ -1968,15 +2055,15 @@ async function eliminaStrutturaConConferma(id) {
       </button>
     </div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Event listeners
   document.getElementById('cancelDeleteBtn').onclick = () => {
     modal.remove();
   };
-  
+
   document.getElementById('confirmDeleteBtn').onclick = async () => {
     try {
       modal.remove();
@@ -1984,12 +2071,12 @@ async function eliminaStrutturaConConferma(id) {
       if (modalScheda) {
         modalScheda.remove();
       }
-      
+
       // Invalidiamo la cache locale PRIMA dell'eliminazione
       localStorage.removeItem('strutture_cache');
       localStorage.removeItem('strutture_cache_timestamp');
       console.log('🗑️ Cache invalidata prima dell\'eliminazione');
-      
+
       // Rimuovi la struttura dall'array locale immediatamente per feedback visivo
       const index = strutture.findIndex(s => s.id === id);
       if (index !== -1) {
@@ -1999,12 +2086,12 @@ async function eliminaStrutturaConConferma(id) {
         renderStrutture(filtra(strutture));
         console.log('✅ Struttura rimossa dall\'array locale');
       }
-      
+
       // Elimina da Firestore
       const strutturaRef = doc(db, "strutture", id);
       await deleteDoc(strutturaRef);
       console.log('✅ Struttura eliminata da Firestore');
-      
+
       // Mostra messaggio di successo
       const successModal = document.createElement('div');
       successModal.style.cssText = `
@@ -2020,7 +2107,7 @@ async function eliminaStrutturaConConferma(id) {
         animation: slideIn 0.3s ease-out;
       `;
       successModal.innerHTML = '✅ Struttura eliminata con successo!';
-      
+
       // Aggiungi CSS per animazione
       if (!document.getElementById('deleteSuccessStyles')) {
         const style = document.createElement('style');
@@ -2033,21 +2120,21 @@ async function eliminaStrutturaConConferma(id) {
         `;
         document.head.appendChild(style);
       }
-      
+
       document.body.appendChild(successModal);
-      
+
       // Rimuovi messaggio dopo 3 secondi
       setTimeout(() => {
         if (successModal.parentNode) {
           successModal.remove();
         }
       }, 3000);
-      
+
       // Ricarica da Firestore per sincronizzazione completa (dopo un breve delay)
       setTimeout(async () => {
         await aggiornaLista();
       }, 500);
-      
+
     } catch (error) {
       console.error('❌ Errore nell\'eliminazione:', error);
       alert('❌ Errore nell\'eliminazione: ' + error.message);
@@ -2055,7 +2142,7 @@ async function eliminaStrutturaConConferma(id) {
       await aggiornaLista();
     }
   };
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -2126,11 +2213,11 @@ async function aggiungiStruttura() {
     createdBy: auth.currentUser?.uid || null,
     version: 1
   };
-  
+
   // NON aggiungere la struttura temporanea all'array globale
   // Verrà aggiunta solo dopo il salvataggio su Firestore
   // Questo evita duplicati nella visualizzazione
-  
+
   // Apri la scheda in modalità creazione passando la struttura direttamente
   // La scheda userà questa struttura temporanea senza aggiungerla all'array
   mostraSchedaCompletaConStruttura(nuovaStruttura);
@@ -2139,13 +2226,13 @@ async function aggiungiStruttura() {
 // === Sezione Aiuto ===
 function mostraAiuto() {
   console.log('📚 Apertura sezione Aiuto...');
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('aiutoModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'aiutoModal';
   modal.style.cssText = `
@@ -2160,7 +2247,7 @@ function mostraAiuto() {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -2175,7 +2262,7 @@ function mostraAiuto() {
     min-width: 320px;
     width: 100%;
   `;
-  
+
   modalContent.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #2f6b2f;">
       <h2 style="margin: 0; color: #2f6b2f; font-size: 1.5rem;">📚 Guida Rapida</h2>
@@ -2256,7 +2343,7 @@ function mostraAiuto() {
       </button>
     </div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
 }
@@ -2264,13 +2351,13 @@ function mostraAiuto() {
 // === Sezione About ===
 function mostraAbout() {
   console.log('ℹ️ Apertura sezione About...');
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('aboutModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'aboutModal';
   modal.style.cssText = `
@@ -2285,7 +2372,7 @@ function mostraAbout() {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -2300,7 +2387,7 @@ function mostraAbout() {
     min-width: 320px;
     width: 100%;
   `;
-  
+
   modalContent.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #2f6b2f;">
       <h2 style="margin: 0; color: #2f6b2f; font-size: 1.5rem;">ℹ️ Informazioni</h2>
@@ -2389,20 +2476,20 @@ function mostraAbout() {
       </button>
     </div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Carica statistiche
   setTimeout(() => {
     const totalStructures = strutture ? strutture.length : 0;
     const totalUsers = localStorage.getItem('totalUsers') || 'N/A';
     const totalExports = localStorage.getItem('totalExports') || '0';
-    
+
     const totalStructuresEl = document.getElementById('totalStructuresAbout');
     const totalUsersEl = document.getElementById('totalUsersAbout');
     const totalExportsEl = document.getElementById('totalExportsAbout');
-    
+
     if (totalStructuresEl) totalStructuresEl.textContent = totalStructures;
     if (totalUsersEl) totalUsersEl.textContent = totalUsers;
     if (totalExportsEl) totalExportsEl.textContent = totalExports;
@@ -2423,7 +2510,7 @@ async function salvaVersione(struttura, userId) {
       savedAt: new Date(),
       savedBy: userId
     };
-    
+
     await addDoc(collection(db, "structure_versions"), versionData);
     console.log(`✅ Versione ${struttura.version} salvata per struttura ${struttura.id}`);
   } catch (error) {
@@ -2436,7 +2523,7 @@ async function getVersionHistory(strutturaId) {
     const versionsRef = collection(db, "structure_versions");
     const q = query(versionsRef, where("strutturaId", "==", strutturaId), orderBy("savedAt", "desc"));
     const snapshot = await getDocs(q);
-    
+
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -2452,14 +2539,14 @@ async function ripristinaVersione(strutturaId, version) {
     const versionsRef = collection(db, "structure_versions");
     const q = query(versionsRef, where("strutturaId", "==", strutturaId), where("version", "==", version));
     const snapshot = await getDocs(q);
-    
+
     if (snapshot.empty) {
       throw new Error('Versione non trovata');
     }
-    
+
     const versionData = snapshot.docs[0].data();
     const docRef = doc(db, "strutture", strutturaId);
-    
+
     // Aggiorna la struttura con i dati della versione
     await updateDoc(docRef, {
       ...versionData.data,
@@ -2467,7 +2554,7 @@ async function ripristinaVersione(strutturaId, version) {
       lastModifiedBy: getCurrentUser()?.uid || null,
       version: versionData.version + 1
     });
-    
+
     console.log(`✅ Struttura ${strutturaId} ripristinata alla versione ${version}`);
     return true;
   } catch (error) {
@@ -2487,7 +2574,7 @@ async function logActivity(action, entity, userId, details = {}) {
       userName: 'Utente sconosciuto',
       userEmail: 'N/A'
     };
-    
+
     const activityData = {
       action,
       entity,
@@ -2498,7 +2585,7 @@ async function logActivity(action, entity, userId, details = {}) {
       userAgent: navigator.userAgent,
       ip: await getClientIP() // Funzione helper per IP
     };
-    
+
     await addDoc(collection(db, "activity_log"), activityData);
     console.log(`📝 Attività loggata: ${action} su ${entity}`);
   } catch (error) {
@@ -2541,22 +2628,22 @@ function getStatoLabel(stato) {
 async function loadPersonalNotesForElenco(struttureElenco) {
   const currentUser = getCurrentUser();
   if (!currentUser) return;
-  
+
   try {
     // Usa le funzioni Firestore importate direttamente (siamo in script.js)
     // Non abbiamo bisogno di window.firestore qui perché siamo nello stesso modulo
     const db = window.db || getFirestore(app);
-    
+
     if (!db) {
       console.error('❌ Firestore db non disponibile');
       return;
     }
-    
+
     // Carica tutte le note personali dell'utente
     const notesRef = collection(db, "user_notes");
     const q = query(notesRef, where("userId", "==", currentUser.uid));
     const snapshot = await getDocs(q);
-    
+
     const noteMap = {};
     snapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -2570,7 +2657,7 @@ async function loadPersonalNotesForElenco(struttureElenco) {
         updatedAt: data.updatedAt ? (data.updatedAt.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt)) : new Date()
       });
     });
-    
+
     // Aggiungi le note alle strutture
     struttureElenco.forEach(struttura => {
       if (noteMap[struttura.id]) {
@@ -2582,7 +2669,7 @@ async function loadPersonalNotesForElenco(struttureElenco) {
         struttura.personalNotes = [];
       }
     });
-    
+
   } catch (error) {
     console.error('Errore nel caricamento note personali per elenco:', error);
   }
@@ -2591,13 +2678,13 @@ async function loadPersonalNotesForElenco(struttureElenco) {
 async function mostraNotePersonali(strutturaId) {
   const struttura = strutture.find(s => s.id === strutturaId);
   if (!struttura) return;
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('noteModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'noteModal';
   modal.setAttribute('data-struttura-id', strutturaId);
@@ -2613,7 +2700,7 @@ async function mostraNotePersonali(strutturaId) {
     justify-content: center;
     z-index: 10001;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -2626,10 +2713,10 @@ async function mostraNotePersonali(strutturaId) {
     overflow-y: auto;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
   `;
-  
+
   // Carica note esistenti
   const noteEsistenti = await caricaNotePersonali(strutturaId);
-  
+
   modalContent.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h3 style="margin: 0; color: #2f6b2f;">📝 Note Personali</h3>
@@ -2657,8 +2744,8 @@ async function mostraNotePersonali(strutturaId) {
     </div>
     
     <div id="noteEsistenti" style="max-height: 300px; overflow-y: auto;">
-      ${noteEsistenti.length > 0 ? 
-        noteEsistenti.map(nota => `
+      ${noteEsistenti.length > 0 ?
+      noteEsistenti.map(nota => `
           <div style="background: var(--bg-secondary); color: var(--text-primary); border-left: 4px solid #28a745; padding: 10px; margin-bottom: 10px; border-radius: 4px;">
             <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
               📅 ${new Date(nota.createdAt).toLocaleString('it-IT')}
@@ -2668,28 +2755,28 @@ async function mostraNotePersonali(strutturaId) {
               🗑️ Elimina
             </button>
           </div>
-        `).join('') : 
-        '<div style="text-align: center; color: #666; padding: 20px;">Nessuna nota personale salvata</div>'
-      }
+        `).join('') :
+      '<div style="text-align: center; color: #666; padding: 20px;">Nessuna nota personale salvata</div>'
+    }
     </div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Event listeners
   document.getElementById('closeNoteModal').onclick = () => modal.remove();
   document.getElementById('cancellaNota').onclick = () => {
     document.getElementById('nuovaNota').value = '';
   };
-  
+
   document.getElementById('salvaNota').onclick = async () => {
     const testoNota = document.getElementById('nuovaNota').value.trim();
     if (!testoNota) {
       alert('Inserisci una nota prima di salvarla!');
       return;
     }
-    
+
     try {
       await salvaNotaPersonale(strutturaId, testoNota);
       document.getElementById('nuovaNota').value = '';
@@ -2700,7 +2787,7 @@ async function mostraNotePersonali(strutturaId) {
       alert('Errore nel salvataggio della nota');
     }
   };
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -2713,21 +2800,21 @@ async function caricaNotePersonali(strutturaId) {
   try {
     const currentUser = getCurrentUser();
     if (!currentUser) return [];
-    
+
     // 🔒 Validazione server-side
     if (!await validateServerAuth()) {
       console.warn('🔒 Sessione non valida per caricamento note');
       return [];
     }
-    
+
     const notesRef = collection(db, "user_notes");
     const q = query(
-      notesRef, 
+      notesRef,
       where("userId", "==", currentUser.uid),
       where("strutturaId", "==", strutturaId)
     );
     const snapshot = await secureFirestoreOperation(getDocs, q);
-    
+
     const note = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
@@ -2738,12 +2825,12 @@ async function caricaNotePersonali(strutturaId) {
         updatedAt: data.updatedAt ? (data.updatedAt.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt)) : new Date()
       };
     });
-    
+
     // Ordina localmente per data di creazione (più recenti prima)
     note.sort((a, b) => {
       return b.createdAt - a.createdAt;
     });
-    
+
     return note;
   } catch (error) {
     console.error('Errore nel caricamento note:', error);
@@ -2758,13 +2845,13 @@ async function salvaNotaPersonale(strutturaId, nota) {
       alert('Devi essere loggato per salvare note personali');
       return;
     }
-    
+
     // 🔒 Validazione server-side
     if (!await validateServerAuth()) {
       alert('❌ Sessione non valida. Effettua nuovamente il login.');
       return;
     }
-    
+
     const noteData = {
       userId: currentUser.uid,
       strutturaId: strutturaId,
@@ -2772,14 +2859,14 @@ async function salvaNotaPersonale(strutturaId, nota) {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
+
     await secureFirestoreOperation(addDoc, collection(db, "user_notes"), noteData);
-    
+
     // Log attività
     await logActivity('note_created', strutturaId, currentUser.uid, {
       noteLength: nota.length
     });
-    
+
     console.log('✅ Nota personale salvata');
   } catch (error) {
     console.error('Errore nel salvataggio nota:', error);
@@ -2794,22 +2881,22 @@ async function eliminaNota(notaId) {
       alert('Devi essere loggato per eliminare note');
       return;
     }
-    
+
     // 🔒 Validazione server-side
     if (!await validateServerAuth()) {
       alert('❌ Sessione non valida. Effettua nuovamente il login.');
       return;
     }
-    
+
     if (!confirm('Sei sicuro di voler eliminare questa nota?')) {
       return;
     }
-    
+
     await secureFirestoreOperation(deleteDoc, doc(db, "user_notes", notaId));
-    
+
     // Log attività
     await logActivity('note_deleted', notaId, currentUser.uid);
-    
+
     // Ricarica il modal delle note
     const modal = document.getElementById('noteModal');
     if (modal) {
@@ -2820,7 +2907,7 @@ async function eliminaNota(notaId) {
         const noteEsistenti = await caricaNotePersonali(strutturaId);
         const noteContainer = document.getElementById('noteEsistenti');
         if (noteContainer) {
-          noteContainer.innerHTML = noteEsistenti.length > 0 ? 
+          noteContainer.innerHTML = noteEsistenti.length > 0 ?
             noteEsistenti.map(nota => `
               <div style="background: var(--bg-secondary); color: var(--text-primary); border-left: 4px solid #28a745; padding: 10px; margin-bottom: 10px; border-radius: 4px;">
                 <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
@@ -2831,12 +2918,12 @@ async function eliminaNota(notaId) {
                   🗑️ Elimina
                 </button>
               </div>
-            `).join('') : 
+            `).join('') :
             '<div style="text-align: center; color: #666; padding: 20px;">Nessuna nota personale salvata</div>';
         }
       }
     }
-    
+
     console.log('✅ Nota eliminata con successo');
   } catch (error) {
     console.error('Errore nell\'eliminazione nota:', error);
@@ -2873,7 +2960,7 @@ function createResponsiveModal(id, title, content) {
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = id;
   modal.className = 'modal-overlay';
@@ -2892,7 +2979,7 @@ function createResponsiveModal(id, title, content) {
     padding: 10px;
     box-sizing: border-box;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.className = 'modal-content';
   modalContent.style.cssText = `
@@ -2908,7 +2995,7 @@ function createResponsiveModal(id, title, content) {
     width: 100%;
     box-sizing: border-box;
   `;
-  
+
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
@@ -2919,7 +3006,7 @@ function createResponsiveModal(id, title, content) {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
   `;
-  
+
   const titleEl = document.createElement('h2');
   titleEl.textContent = title;
   titleEl.style.cssText = `
@@ -2927,7 +3014,7 @@ function createResponsiveModal(id, title, content) {
     color: var(--text-primary);
     font-size: 1.5rem;
   `;
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.className = 'modal-close';
@@ -2946,21 +3033,21 @@ function createResponsiveModal(id, title, content) {
     transition: all 0.2s ease;
   `;
   closeBtn.onclick = () => modal.remove();
-  
+
   header.appendChild(titleEl);
   header.appendChild(closeBtn);
-  
+
   modalContent.appendChild(header);
   modalContent.appendChild(content);
   modal.appendChild(modalContent);
-  
+
   // Chiudi modal cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.remove();
     }
   });
-  
+
   // Media query per mobile
   const mediaQuery = window.matchMedia('(max-width: 768px)');
   function handleMobileView(e) {
@@ -3025,13 +3112,13 @@ function createResponsiveModal(id, title, content) {
       `;
     }
   }
-  
+
   // Applica stili iniziali
   handleMobileView(mediaQuery);
-  
+
   // Ascolta cambiamenti di viewport
   mediaQuery.addListener(handleMobileView);
-  
+
   // Pulisci listener quando il modal viene rimosso
   const observer = new MutationObserver(() => {
     if (!document.getElementById(id)) {
@@ -3040,7 +3127,7 @@ function createResponsiveModal(id, title, content) {
     }
   });
   observer.observe(document.body, { childList: true, subtree: true });
-  
+
   document.body.appendChild(modal);
   return modal;
 }
@@ -3079,7 +3166,7 @@ async function initializeMainMap() {
       await window.mapsManager.initialize('mainMap');
       mainMapInstance = window.mapsManager;
     }
-    
+
     // Centra la mappa sul Piemonte (Torino)
     if (mainMapInstance.map) {
       mainMapInstance.map.setView([45.0703, 7.6869], 8.5);
@@ -3125,7 +3212,7 @@ function setupMainMapControls() {
   if (!window.mapsManager) {
     window.mapsManager = { overlayLayers: {} };
   }
-  
+
   // Definizione layer disponibili (solo overlay funzionanti)
   const layerConfigs = {
     railway: {
@@ -3155,25 +3242,25 @@ function setupMainMapControls() {
       opacity: 0.7
     }
   };
-  
+
   // Funzione per creare/ottenere un layer
   const getOrCreateLayer = (layerId) => {
     if (!window.mapsManager || !window.mapsManager.map) {
       console.warn('⚠️ Mappa non ancora inizializzata');
       return null;
     }
-    
+
     const config = layerConfigs[layerId];
     if (!config) {
       console.error('❌ Configurazione layer non trovata:', layerId);
       return null;
     }
-    
+
     // Se il layer esiste già, restituiscilo
     if (window.mapsManager.overlayLayers && window.mapsManager.overlayLayers[layerId]) {
       return window.mapsManager.overlayLayers[layerId];
     }
-    
+
     // Crea il nuovo layer
     try {
       const layerOptions = {
@@ -3181,14 +3268,14 @@ function setupMainMapControls() {
         maxZoom: 19,
         opacity: config.opacity || 0.7
       };
-      
+
       // Aggiungi classe CSS per filtri se specificata
       if (config.className) {
         layerOptions.className = config.className;
       }
-      
+
       const layer = L.tileLayer(config.url, layerOptions);
-      
+
       // Applica filtri CSS per aumentare contrasto (solo per layer ferroviario)
       if (layerId === 'railway' && config.className) {
         // Aggiungi stile CSS per aumentare contrasto
@@ -3204,7 +3291,7 @@ function setupMainMapControls() {
           document.head.appendChild(style);
         }
       }
-      
+
       if (!window.mapsManager.overlayLayers) {
         window.mapsManager.overlayLayers = {};
       }
@@ -3216,25 +3303,25 @@ function setupMainMapControls() {
       return null;
     }
   };
-  
+
   // Menu dropdown layer
   const layersMenuBtn = document.getElementById('layersMenuBtn');
   const layersMenu = document.getElementById('layersMenu');
-  
+
   if (layersMenuBtn && layersMenu) {
     // Toggle menu
     layersMenuBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       layersMenu.classList.toggle('hidden');
     });
-    
+
     // Chiudi menu quando si clicca fuori
     document.addEventListener('click', (e) => {
       if (!layersMenu.contains(e.target) && e.target !== layersMenuBtn) {
         layersMenu.classList.add('hidden');
       }
     });
-    
+
     // Gestione checkbox layer
     Object.keys(layerConfigs).forEach(layerId => {
       const checkbox = document.getElementById(`layer-${layerId}`);
@@ -3246,14 +3333,14 @@ function setupMainMapControls() {
             e.target.checked = false;
             return;
           }
-          
+
           const layer = getOrCreateLayer(layerId);
           if (!layer) {
             console.error(`❌ Impossibile creare il layer ${layerId}`);
             e.target.checked = false;
             return;
           }
-          
+
           if (e.target.checked) {
             window.mapsManager.map.addLayer(layer);
             console.log(`✅ Layer ${layerConfigs[layerId].name} attivato`);
@@ -3264,7 +3351,7 @@ function setupMainMapControls() {
         });
       }
     });
-    
+
     // Pulsante rimuovi tutti i layer
     const clearAllLayersBtn = document.getElementById('clearAllLayersBtn');
     if (clearAllLayersBtn) {
@@ -3273,9 +3360,9 @@ function setupMainMapControls() {
           console.warn('⚠️ Mappa non ancora inizializzata');
           return;
         }
-        
+
         let removedCount = 0;
-        
+
         // Rimuovi tutti i layer attivi e deseleziona le checkbox
         Object.keys(layerConfigs).forEach(layerId => {
           const checkbox = document.getElementById(`layer-${layerId}`);
@@ -3288,7 +3375,7 @@ function setupMainMapControls() {
             checkbox.checked = false;
           }
         });
-        
+
         if (removedCount > 0) {
           console.log(`🗑️ Rimossi ${removedCount} layer attivi`);
         } else {
@@ -3329,13 +3416,13 @@ function setupMainMapControls() {
 async function mostraMappa() {
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('mapModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'mapModal';
   modal.style.cssText = `
@@ -3350,7 +3437,7 @@ async function mostraMappa() {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -3367,7 +3454,7 @@ async function mostraMappa() {
     display: flex;
     flex-direction: column;
   `;
-  
+
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
@@ -3378,7 +3465,7 @@ async function mostraMappa() {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
   `;
-  
+
   const title = document.createElement('h2');
   title.textContent = '🗺️ Mappa Strutture';
   title.style.cssText = `
@@ -3386,14 +3473,14 @@ async function mostraMappa() {
     color: #2f6b2f;
     font-size: 1.5rem;
   `;
-  
+
   const controls = document.createElement('div');
   controls.style.cssText = `
     display: flex;
     gap: 10px;
     align-items: center;
   `;
-  
+
   const centerBtn = document.createElement('button');
   centerBtn.innerHTML = '📍 Centro su di me';
   centerBtn.style.cssText = `
@@ -3412,7 +3499,7 @@ async function mostraMappa() {
       alert('Impossibile ottenere la tua posizione');
     }
   };
-  
+
   const syncBtn = document.createElement('button');
   syncBtn.innerHTML = '🔄 Sincronizza';
   syncBtn.style.cssText = `
@@ -3427,7 +3514,7 @@ async function mostraMappa() {
   syncBtn.onclick = () => {
     mostraModaleSincronizzazione();
   };
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.style.cssText = `
@@ -3444,14 +3531,14 @@ async function mostraMappa() {
     justify-content: center;
   `;
   closeBtn.onclick = () => modal.remove();
-  
+
   controls.appendChild(centerBtn);
   controls.appendChild(syncBtn);
   controls.appendChild(closeBtn);
-  
+
   header.appendChild(title);
   header.appendChild(controls);
-  
+
   // Container mappa
   const mapContainer = document.createElement('div');
   mapContainer.id = 'map';
@@ -3461,12 +3548,12 @@ async function mostraMappa() {
     border-radius: 8px;
     overflow: hidden;
   `;
-  
+
   modalContent.appendChild(header);
   modalContent.appendChild(mapContainer);
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Inizializza mappa
   try {
     // Debug: verifica se la funzione esiste
@@ -3477,16 +3564,16 @@ async function mostraMappa() {
       console.log('🔍 Leaflet disponibile:', typeof L !== 'undefined');
       throw new Error('Funzione initializeMap non disponibile');
     }
-    
+
     // Debug: verifica Leaflet prima dell'inizializzazione
     console.log('🗺️ Debug: Leaflet disponibile prima init:', typeof L !== 'undefined');
     if (typeof L === 'undefined') {
       console.error('❌ Leaflet non disponibile durante inizializzazione mappa');
       throw new Error('Leaflet non disponibile');
     }
-    
+
     await window.initializeMap('map');
-    
+
     // Assicurati che i dati locali siano caricati
     if (!window.strutture || window.strutture.length === 0) {
       console.log('📦 Caricamento dati locali...');
@@ -3504,10 +3591,10 @@ async function mostraMappa() {
         window.strutture = [];
       }
     }
-    
+
     const struttureLocali = window.strutture || [];
     console.log('🗺️ Dati locali disponibili:', struttureLocali.length, 'strutture');
-    
+
     // Inizializza la mappa con i dati locali
     if (window.showStructuresOnMap && typeof window.showStructuresOnMap === 'function') {
       window.showStructuresOnMap(struttureLocali);
@@ -3519,7 +3606,7 @@ async function mostraMappa() {
     console.error('❌ Errore inizializzazione mappa:', error);
     mapContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Errore nel caricamento della mappa</div>';
   }
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -3543,7 +3630,7 @@ function mostraModaleSincronizzazione() {
     justify-content: center;
     z-index: 10001;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -3555,7 +3642,7 @@ function mostraModaleSincronizzazione() {
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     text-align: center;
   `;
-  
+
   modalContent.innerHTML = `
     <div style="font-size: 48px; margin-bottom: 20px;">🔄</div>
     <h2 style="margin: 0 0 15px 0; color: #2f6b2f;">Sincronizzazione con Firestore</h2>
@@ -3591,20 +3678,20 @@ function mostraModaleSincronizzazione() {
       ">🚀 Procedi</button>
     </div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Event listeners
   document.getElementById('rimandaSync').onclick = () => {
     modal.remove();
   };
-  
+
   document.getElementById('procediSync').onclick = async () => {
     modal.remove();
     await eseguiSincronizzazione();
   };
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -3623,9 +3710,9 @@ async function eseguiSincronizzazione() {
     console.log('⚠️ Sincronizzazione già in corso, ignoro richiesta');
     return;
   }
-  
+
   sincronizzazioneInCorso = true;
-  
+
   try {
     // Mostra indicatore di caricamento
     const loadingModal = document.createElement('div');
@@ -3641,7 +3728,7 @@ async function eseguiSincronizzazione() {
       justify-content: center;
       z-index: 10002;
     `;
-    
+
     loadingModal.innerHTML = `
       <div style="background: var(--bg-primary); color: var(--text-primary); border-radius: 12px; padding: 30px; text-align: center; max-width: 400px;">
         <div style="font-size: 48px; margin-bottom: 20px;">🔄</div>
@@ -3661,21 +3748,21 @@ async function eseguiSincronizzazione() {
         ">❌ Annulla</button>
       </div>
     `;
-    
+
     document.body.appendChild(loadingModal);
-    
+
     // Pulsante annulla
     document.getElementById('annullaSync').onclick = () => {
       loadingModal.remove();
       return;
     };
-    
+
     // Esegui sincronizzazione
     console.log('🔄 Inizio sincronizzazione con Firestore...');
     const struttureFresche = await aggiornaMappaConDatiFreschi();
-    
+
     console.log('✅ Sincronizzazione dati completata:', struttureFresche.length, 'strutture');
-    
+
     // Aggiorna la mappa se è aperta (solo se diversa dai dati attuali)
     if (window.showStructuresOnMap && typeof window.showStructuresOnMap === 'function') {
       const struttureAttuali = window.strutture || [];
@@ -3686,7 +3773,7 @@ async function eseguiSincronizzazione() {
         console.log('ℹ️ Mappa già aggiornata, nessun cambiamento necessario');
       }
     }
-    
+
     // Aggiorna la lista principale solo se necessario
     const struttureAttuali = window.strutture || [];
     if (struttureFresche.length !== struttureAttuali.length) {
@@ -3695,7 +3782,7 @@ async function eseguiSincronizzazione() {
     } else {
       console.log('ℹ️ Lista già aggiornata, nessun cambiamento necessario');
     }
-    
+
     // Mostra messaggio di successo solo dopo aver completato tutto
     const successModal = document.createElement('div');
     successModal.style.cssText = `
@@ -3719,30 +3806,30 @@ async function eseguiSincronizzazione() {
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(successModal);
-    
+
     // Rimuovi il loading modal
     loadingModal.remove();
-    
+
     // Rimuovi messaggio dopo 5 secondi
     setTimeout(() => {
       if (successModal.parentNode) {
         successModal.remove();
       }
     }, 5000);
-    
+
     console.log('✅ Sincronizzazione completata con successo');
-    
+
   } catch (error) {
     console.error('❌ Errore durante sincronizzazione:', error);
-    
+
     // Rimuovi loading modal se esiste
     const loadingModal = document.querySelector('[style*="z-index: 10002"]');
     if (loadingModal) {
       loadingModal.remove();
     }
-    
+
     // Mostra messaggio di errore
     alert('❌ Errore durante la sincronizzazione. Riprova più tardi.');
   } finally {
@@ -3757,11 +3844,11 @@ async function aggiornaMappaConDatiFreschi() {
     // Invalida cache e ricarica dati
     localStorage.removeItem('strutture_cache');
     localStorage.removeItem('strutture_cache_timestamp');
-    
+
     // Ricarica strutture da Firestore
     const struttureFresche = await caricaStrutture();
     window.strutture = struttureFresche;
-    
+
     console.log('🔄 Mappa aggiornata con dati freschi da Firestore');
     return struttureFresche;
   } catch (error) {
@@ -3773,7 +3860,7 @@ async function aggiornaMappaConDatiFreschi() {
 // Funzione per estrarre coordinate da link Google Maps
 function estraiCoordinateDaGoogleMaps(googleMapsLink) {
   if (!googleMapsLink) return null;
-  
+
   try {
     // Pattern per diversi formati di link Google Maps
     const patterns = [
@@ -3786,13 +3873,13 @@ function estraiCoordinateDaGoogleMaps(googleMapsLink) {
       // https://maps.google.com/maps/place/.../@lat,lng
       /@(-?\d+\.?\d*),(-?\d+\.?\d*),\d+\.?\d*z/
     ];
-    
+
     for (const pattern of patterns) {
       const match = googleMapsLink.match(pattern);
       if (match) {
         const lat = parseFloat(match[1]);
         const lng = parseFloat(match[2]);
-        
+
         // Valida coordinate
         if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
           console.log(`🗺️ Coordinate estratte da Google Maps: ${lat}, ${lng}`);
@@ -3800,7 +3887,7 @@ function estraiCoordinateDaGoogleMaps(googleMapsLink) {
         }
       }
     }
-    
+
     console.log('⚠️ Nessuna coordinate valida trovata nel link Google Maps');
     return null;
   } catch (error) {
@@ -3813,10 +3900,10 @@ function estraiCoordinateDaGoogleMaps(googleMapsLink) {
 async function geocodificaStrutturaAutomatico(struttura) {
   // Se ha già coordinate precise, non fare nulla
   if ((struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng) ||
-      (struttura.coordinate_lat && struttura.coordinate_lng)) {
+    (struttura.coordinate_lat && struttura.coordinate_lng)) {
     return struttura;
   }
-  
+
   // Prova prima a estrarre da Google Maps
   if (struttura.google_maps_link) {
     const coordinate = estraiCoordinateDaGoogleMaps(struttura.google_maps_link);
@@ -3828,7 +3915,7 @@ async function geocodificaStrutturaAutomatico(struttura) {
       return struttura;
     }
   }
-  
+
   // Prova geocoding per indirizzo completo
   if (struttura.Indirizzo && struttura.Luogo && struttura.Prov) {
     const address = `${struttura.Indirizzo}, ${struttura.Luogo}, ${struttura.Prov}, Italia`;
@@ -3845,7 +3932,7 @@ async function geocodificaStrutturaAutomatico(struttura) {
       console.warn(`⚠️ Geocoding fallito per ${struttura.Struttura}:`, error.message);
     }
   }
-  
+
   // Prova geocoding per luogo + provincia
   if (struttura.Luogo && struttura.Prov) {
     const address = `${struttura.Luogo}, ${struttura.Prov}, Italia`;
@@ -3862,7 +3949,7 @@ async function geocodificaStrutturaAutomatico(struttura) {
       console.warn(`⚠️ Geocoding luogo fallito per ${struttura.Struttura}:`, error.message);
     }
   }
-  
+
   console.log(`⚠️ Nessuna coordinate ottenuta per: ${struttura.Struttura}`);
   return struttura;
 }
@@ -3871,11 +3958,11 @@ async function geocodificaStrutturaAutomatico(struttura) {
 function debugCoordinateStrutture() {
   const strutture = window.strutture || [];
   console.log('🔍 Debug coordinate strutture:');
-  
+
   strutture.forEach(struttura => {
     const hasCoordinateObj = struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng;
     const hasCoordinateFields = struttura.coordinate_lat && struttura.coordinate_lng;
-    
+
     console.log(`📍 ${struttura.Struttura}:`, {
       coordinate: struttura.coordinate,
       coordinate_lat: struttura.coordinate_lat,
@@ -3893,21 +3980,21 @@ function debugCoordinateStrutture() {
 // Funzione per processare tutte le strutture senza coordinate
 async function processaStruttureSenzaCoordinate() {
   console.log('🔄 Avvio processamento strutture senza coordinate...');
-  
+
   const strutture = window.strutture || [];
   let processate = 0;
   let coordinateOttenute = 0;
-  
+
   for (const struttura of strutture) {
     // Salta se già ha coordinate precise
     if ((struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng) ||
-        (struttura.coordinate_lat && struttura.coordinate_lng)) {
+      (struttura.coordinate_lat && struttura.coordinate_lng)) {
       continue;
     }
-    
+
     // Prova a ottenere coordinate automaticamente
     const strutturaConCoordinate = await geocodificaStrutturaAutomatico(struttura);
-    
+
     if (strutturaConCoordinate.coordinate || strutturaConCoordinate.coordinate_lat) {
       try {
         // Salva su Firestore
@@ -3918,31 +4005,31 @@ async function processaStruttureSenzaCoordinate() {
           lastModified: new Date(),
           lastModifiedBy: getCurrentUser()?.uid || null
         });
-        
+
         // Aggiorna struttura locale
         struttura.coordinate = strutturaConCoordinate.coordinate;
         struttura.coordinate_lat = strutturaConCoordinate.coordinate_lat;
         struttura.coordinate_lng = strutturaConCoordinate.coordinate_lng;
-        
+
         coordinateOttenute++;
         console.log(`✅ Coordinate ottenute per: ${struttura.Struttura}`);
       } catch (error) {
         console.error(`❌ Errore salvataggio coordinate per ${struttura.Struttura}:`, error);
       }
     }
-    
+
     processate++;
-    
+
     // Pausa per evitare rate limiting
     await new Promise(resolve => setTimeout(resolve, 500));
   }
-  
+
   // Invalida cache per forzare ricaricamento
   localStorage.removeItem('strutture_cache');
   localStorage.removeItem('strutture_cache_timestamp');
-  
+
   console.log(`🏁 Processamento completato: ${coordinateOttenute} coordinate ottenute su ${processate} strutture processate`);
-  
+
   if (coordinateOttenute > 0) {
     alert(`✅ Processamento completato!\n${coordinateOttenute} strutture ora hanno coordinate GPS`);
     // Ricarica la lista
@@ -3955,20 +4042,20 @@ async function processaStruttureSenzaCoordinate() {
 // Funzione per centrare la mappa su una struttura specifica
 function centerMapOnStructure(strutturaId, retryCount = 0) {
   console.log('🎯 Tentativo di centrare mappa su struttura:', strutturaId, '(retry:', retryCount, ')');
-  
+
   const struttureLocali = window.strutture || [];
   const struttura = struttureLocali.find(s => s.id === strutturaId);
-  
+
   if (!struttura) {
     console.warn('❌ Struttura non trovata:', strutturaId);
     return;
   }
-  
+
   console.log('📍 Struttura trovata:', struttura.Struttura);
-  
+
   // Cerca coordinate in diversi formati
   let lat, lng;
-  
+
   // Formato 1: coordinate_lat e coordinate_lng
   if (struttura.coordinate_lat && struttura.coordinate_lng) {
     lat = parseFloat(struttura.coordinate_lat);
@@ -3990,7 +4077,7 @@ function centerMapOnStructure(strutturaId, retryCount = 0) {
       console.log('📍 Coordinate trovate (stringa):', lat, lng);
     }
   }
-  
+
   // Verifica che le coordinate siano valide
   if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
     console.warn('❌ Coordinate non valide per struttura:', struttura.Struttura);
@@ -4002,12 +4089,12 @@ function centerMapOnStructure(strutturaId, retryCount = 0) {
     });
     return;
   }
-  
+
   // Se la mappa è già inizializzata, centra su questa struttura
   if (window.mapsManager && window.mapsManager.map) {
     console.log('🗺️ Centrando mappa su:', lat, lng);
     window.mapsManager.map.setView([lat, lng], 15);
-    
+
     // Evidenzia il marker se esiste
     if (window.mapsManager.markers) {
       const marker = window.mapsManager.markers.find(m => m.structureId === strutturaId);
@@ -4018,7 +4105,7 @@ function centerMapOnStructure(strutturaId, retryCount = 0) {
         console.log('⚠️ Marker non trovato per struttura:', strutturaId);
       }
     }
-    
+
     console.log('✅ Mappa centrata con successo');
   } else {
     if (retryCount < 5) {
@@ -4051,7 +4138,7 @@ async function voteStructure(strutturaId, rating) {
       alert('Devi essere loggato per votare una struttura');
       return;
     }
-    
+
     // 🔒 Validazione server-side
     if (!await validateServerAuth()) {
       alert('❌ Sessione non valida. Effettua nuovamente il login.');
@@ -4114,7 +4201,7 @@ async function voteStructure(strutturaId, rating) {
     renderStrutture(listaFiltrata);
 
     console.log(`✅ Voto ${rating}/5 registrato per ${struttura.Struttura}`);
-    
+
     // Mostra notifica
     if (window.showNotification) {
       window.showNotification(
@@ -4141,13 +4228,13 @@ async function mostraSegnalazione(strutturaId) {
     console.error('Struttura non trovata:', strutturaId);
     return;
   }
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('reportModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'reportModal';
   modal.style.cssText = `
@@ -4162,7 +4249,7 @@ async function mostraSegnalazione(strutturaId) {
     justify-content: center;
     z-index: 10001;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -4176,7 +4263,7 @@ async function mostraSegnalazione(strutturaId) {
     box-shadow: var(--shadow-xl);
     border: 1px solid var(--border-light);
   `;
-  
+
   modalContent.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h3 style="margin: 0; color: var(--danger-color, #dc3545);">⚠️ Segnala Problema</h3>
@@ -4215,23 +4302,23 @@ async function mostraSegnalazione(strutturaId) {
       </button>
     </div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Event listeners
   document.getElementById('closeReportModal').onclick = () => modal.remove();
   document.getElementById('cancelReport').onclick = () => modal.remove();
-  
+
   document.getElementById('submitReport').onclick = async () => {
     const reportType = document.getElementById('reportType').value;
     const description = document.getElementById('reportDescription').value.trim();
-    
+
     if (!description) {
       alert('Inserisci una descrizione del problema!');
       return;
     }
-    
+
     try {
       await inviaSegnalazione(strutturaId, reportType, description);
       modal.remove();
@@ -4240,7 +4327,7 @@ async function mostraSegnalazione(strutturaId) {
       alert('Errore nell\'invio della segnalazione');
     }
   };
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -4278,7 +4365,7 @@ async function inviaSegnalazione(strutturaId, tipo, descrizione) {
     if (!struttura.segnalazioni) {
       struttura.segnalazioni = [];
     }
-    
+
     struttura.segnalazioni.push({
       tipo: tipo,
       descrizione: descrizione,
@@ -4300,7 +4387,7 @@ async function inviaSegnalazione(strutturaId, tipo, descrizione) {
     });
 
     console.log('✅ Segnalazione inviata per:', struttura.Struttura);
-    
+
     // Mostra notifica
     if (window.showNotification) {
       window.showNotification(
@@ -4311,7 +4398,7 @@ async function inviaSegnalazione(strutturaId, tipo, descrizione) {
         }
       );
     }
-    
+
     alert('✅ Segnalazione inviata con successo! Grazie per il tuo contributo.');
   } catch (error) {
     console.error('❌ Errore nell\'invio segnalazione:', error);
@@ -4335,14 +4422,14 @@ function setupLazyLoading() {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         const img = entry.target;
-        
+
         // Carica l'immagine
         if (img.dataset.src) {
           img.src = img.dataset.src;
           img.classList.remove('lazy');
           img.classList.add('loaded');
         }
-        
+
         // Rimuovi l'observer per questa immagine
         imageObserver.unobserve(img);
       }
@@ -4368,7 +4455,7 @@ function createLazyImage(src, alt = '', className = '') {
   img.alt = alt;
   img.className = `lazy ${className}`;
   img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjZjhmOWZhIi8+Cjx0ZXh0IHg9IjE1MCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7wn5GvIENhcmljYW1lbnRvLi4uPC90ZXh0Pgo8L3N2Zz4='; // Placeholder SVG
-  
+
   // Stili per il placeholder
   img.style.cssText = `
     background: #f8f9fa;
@@ -4376,11 +4463,11 @@ function createLazyImage(src, alt = '', className = '') {
     border-radius: 4px;
     transition: opacity 0.3s ease;
   `;
-  
+
   img.onload = () => {
     img.style.opacity = '1';
   };
-  
+
   return img;
 }
 
@@ -4401,13 +4488,13 @@ class DataCache {
   get(key) {
     const item = this.cache.get(key);
     if (!item) return null;
-    
+
     // Verifica se è scaduto
     if (Date.now() - item.timestamp > this.ttl) {
       this.cache.delete(key);
       return null;
     }
-    
+
     return item.data;
   }
 
@@ -4418,12 +4505,12 @@ class DataCache {
   has(key) {
     const item = this.cache.get(key);
     if (!item) return false;
-    
+
     if (Date.now() - item.timestamp > this.ttl) {
       this.cache.delete(key);
       return false;
     }
-    
+
     return true;
   }
 }
@@ -4442,10 +4529,10 @@ async function loadDataWithCache(key, loaderFunction) {
   // Carica dati
   console.log(`🌐 Caricamento dati da server: ${key}`);
   const data = await loaderFunction();
-  
+
   // Salva in cache
   window.dataCache.set(key, data);
-  
+
   return data;
 }
 
@@ -4453,12 +4540,12 @@ async function loadDataWithCache(key, loaderFunction) {
 function setupVirtualScrolling(container, items, itemsPerPage = 20) {
   let currentPage = 1;
   const totalPages = Math.ceil(items.length / itemsPerPage);
-  
+
   function renderPage(page) {
     const start = (page - 1) * itemsPerPage;
     const end = start + itemsPerPage;
     const pageItems = items.slice(start, end);
-    
+
     container.innerHTML = '';
     pageItems.forEach(item => {
       // Renderizza l'item
@@ -4468,24 +4555,24 @@ function setupVirtualScrolling(container, items, itemsPerPage = 20) {
       container.appendChild(itemElement);
     });
   }
-  
+
   function nextPage() {
     if (currentPage < totalPages) {
       currentPage++;
       renderPage(currentPage);
     }
   }
-  
+
   function prevPage() {
     if (currentPage > 1) {
       currentPage--;
       renderPage(currentPage);
     }
   }
-  
+
   // Inizializza prima pagina
   renderPage(1);
-  
+
   return {
     nextPage,
     prevPage,
@@ -4517,7 +4604,7 @@ function showSkeletonScreen(container, type = 'cards') {
       </div>
     `
   };
-  
+
   container.innerHTML = skeletonHTML[type].repeat(5);
 }
 
@@ -4554,10 +4641,10 @@ class ThemeManager {
     document.documentElement.setAttribute('data-theme', theme);
     this.currentTheme = theme;
     this.storeTheme(theme);
-    
+
     // Aggiorna l'icona del toggle
     this.updateToggleIcon(theme);
-    
+
     console.log(`🎨 Tema applicato: ${theme}`);
   }
 
@@ -4574,12 +4661,12 @@ class ThemeManager {
   toggleTheme() {
     const newTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
     this.applyTheme(newTheme);
-    
+
     // Chiudi il menu automaticamente
     if (typeof window.closeMenu === 'function') {
       window.closeMenu();
     }
-    
+
     // Mostra notifica
     if (window.showNotification) {
       window.showNotification(
@@ -4624,7 +4711,7 @@ function getCurrentUser() {
   if (!_authState.isAuthenticated || !_authState.user) {
     return null;
   }
-  
+
   // Verifica che il token di sessione sia ancora valido
   if (!_authState.sessionToken || Date.now() - _authState.lastValidation > 300000) { // 5 minuti
     console.warn('🔒 Token di sessione scaduto o non valido');
@@ -4634,7 +4721,7 @@ function getCurrentUser() {
     _authState.sessionToken = null;
     return null;
   }
-  
+
   return _authState.user;
 }
 
@@ -4645,7 +4732,7 @@ function getUserProfile() {
   if (!_authState.isAuthenticated || !_authState.profile) {
     return null;
   }
-  
+
   // Verifica che il token di sessione sia ancora valido
   if (!_authState.sessionToken || Date.now() - _authState.lastValidation > 300000) { // 5 minuti
     console.warn('🔒 Token di sessione scaduto o non valido');
@@ -4655,7 +4742,7 @@ function getUserProfile() {
     _authState.sessionToken = null;
     return null;
   }
-  
+
   return _authState.profile;
 }
 
@@ -4691,25 +4778,25 @@ function generateSessionToken() {
 // 🔒 SICUREZZA: Valida token di sessione
 function validateSessionToken(token) {
   if (!token) return false;
-  
+
   try {
     const decoded = atob(token);
     const parts = decoded.split('-');
     if (parts.length !== 3) return false;
-    
+
     const timestamp = parseInt(parts[0]);
     const userAgent = parts[2];
-    
+
     // Verifica che il token non sia più vecchio di 30 minuti
     if (Date.now() - timestamp > 1800000) { // 30 minuti
       return false;
     }
-    
+
     // Verifica che l'user agent sia lo stesso
     if (userAgent !== navigator.userAgent.substring(0, 20)) {
       return false;
     }
-    
+
     return true;
   } catch (error) {
     return false;
@@ -4720,14 +4807,14 @@ function validateSessionToken(token) {
 function forceLogout() {
   console.log('🔒 Forzando logout per sicurezza');
   updateAuthState(null);
-  
+
   // Pulisci localStorage
   localStorage.removeItem('userSession');
   localStorage.removeItem('loginAttempts');
-  
+
   // Mostra schermata di login
   mostraSchermataLogin();
-  
+
   // Disconnetti da Firebase
   if (auth.currentUser) {
     signOut(auth).catch(console.error);
@@ -4756,7 +4843,7 @@ function requireAuth(callback) {
     mostraSchermataLogin();
     return;
   }
-  
+
   if (typeof callback === 'function') {
     callback();
   }
@@ -4769,21 +4856,21 @@ async function validateServerAuth() {
     if (!currentUser) {
       throw new Error('Utente non autenticato');
     }
-    
+
     // Verifica che l'utente sia ancora valido su Firebase
     const idToken = await currentUser.getIdToken(true); // Forza refresh del token
-    
+
     // Verifica che il token sia valido
     if (!idToken) {
       throw new Error('Token non valido');
     }
-    
+
     // Verifica che l'email sia verificata
     if (!currentUser.emailVerified) {
       console.warn('🔒 Email non verificata, accesso limitato');
       // Non bloccare completamente, ma limitare le operazioni
     }
-    
+
     return true;
   } catch (error) {
     console.error('🔒 Validazione server-side fallita:', error);
@@ -4797,7 +4884,7 @@ async function secureFirestoreOperation(operation, ...args) {
   if (!await validateServerAuth()) {
     throw new Error('Operazione non autorizzata');
   }
-  
+
   return await operation(...args);
 }
 
@@ -4860,31 +4947,31 @@ class LoginSecurity {
   recordFailedAttempt(email) {
     const key = email.toLowerCase();
     const attempt = this.attempts[key] || { count: 0, firstAttempt: Date.now(), lockouts: 0 };
-    
+
     attempt.count++;
-    
+
     // Blocco temporaneo dopo troppi tentativi
     if (attempt.count >= MAX_LOGIN_ATTEMPTS) {
       attempt.lockouts++;
       attempt.lockedUntil = Date.now() + LOCKOUT_DURATION;
       attempt.count = 0; // Reset counter
-      
+
       this.attempts[key] = attempt;
       this.saveAttempts();
-      
-      return { 
-        blocked: true, 
+
+      return {
+        blocked: true,
         duration: LOCKOUT_DURATION,
         reason: `Troppi tentativi falliti. Account bloccato per ${LOCKOUT_DURATION / 60000} minuti.`
       };
     }
-    
+
     this.attempts[key] = attempt;
     this.saveAttempts();
-    
-    return { 
-      blocked: false, 
-      remaining: MAX_LOGIN_ATTEMPTS - attempt.count 
+
+    return {
+      blocked: false,
+      remaining: MAX_LOGIN_ATTEMPTS - attempt.count
     };
   }
 
@@ -4897,24 +4984,24 @@ class LoginSecurity {
   isBlocked(email) {
     const key = email.toLowerCase();
     const attempt = this.attempts[key];
-    
+
     if (!attempt || !attempt.lockedUntil) {
       return { blocked: false };
     }
-    
+
     if (attempt.lockedUntil > Date.now()) {
       const minutesLeft = Math.ceil((attempt.lockedUntil - Date.now()) / 60000);
-      return { 
-        blocked: true, 
+      return {
+        blocked: true,
         minutesLeft,
         reason: `Account bloccato. Riprova tra ${minutesLeft} minuti.`
       };
     }
-    
+
     // Blocco scaduto, reset
     delete this.attempts[key];
     this.saveAttempts();
-    
+
     return { blocked: false };
   }
 }
@@ -4933,13 +5020,13 @@ function validatePasswordStrength(password) {
     noCommonPatterns: !hasCommonPatterns(password),
     noCommonWords: !hasCommonWords(password)
   };
-  
+
   const passed = Object.values(checks).filter(v => v).length;
-  const strength = 
+  const strength =
     passed === 7 ? 'strong' :
-    passed >= 5 ? 'medium' :
-    'weak';
-  
+      passed >= 5 ? 'medium' :
+        'weak';
+
   return {
     valid: strength !== 'weak',
     strength,
@@ -4957,7 +5044,7 @@ function hasCommonPatterns(password) {
     /admin/i,
     /welcome/i
   ];
-  
+
   return patterns.some(pattern => pattern.test(password));
 }
 
@@ -4966,13 +5053,13 @@ function hasCommonWords(password) {
     'password', 'password123', 'admin', 'welcome', 'hello',
     'monkey', '123456', 'letmein', 'trustno1', 'dragon'
   ];
-  
+
   return commonWords.some(word => password.toLowerCase().includes(word));
 }
 
 function generatePasswordFeedback(checks) {
   const feedback = [];
-  
+
   if (!checks.length) feedback.push('La password deve essere di almeno 12 caratteri');
   if (!checks.lowercase) feedback.push('Includi almeno una lettera minuscola');
   if (!checks.uppercase) feedback.push('Includi almeno una lettera maiuscola');
@@ -4980,7 +5067,7 @@ function generatePasswordFeedback(checks) {
   if (!checks.special) feedback.push('Includi almeno un carattere speciale (!@#$%^&*...)');
   if (!checks.noCommonPatterns) feedback.push('Evita sequenze comuni (1234, abcd...)');
   if (!checks.noCommonWords) feedback.push('Evita parole comuni o prevedibili');
-  
+
   return feedback;
 }
 
@@ -4995,54 +5082,54 @@ class SessionManager {
     this.isShowingWarning = false;
     this.init();
   }
-  
+
   init() {
     // Reset timer su qualsiasi interazione utente
     ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
       document.addEventListener(event, () => this.resetTimer(), true);
     });
-    
+
     this.resetTimer();
   }
-  
+
   resetTimer() {
     clearTimeout(this.idleTimer);
     clearTimeout(this.warningTimer);
     this.isShowingWarning = false;
-    
+
     // Warning dopo 25 minuti
     this.warningTimer = setTimeout(() => {
       this.showWarning();
     }, this.timeoutMs - (5 * 60 * 1000)); // 5 minuti prima del timeout
-    
+
     // Timeout completo dopo 30 minuti
     this.idleTimer = setTimeout(() => {
       this.onTimeout();
     }, this.timeoutMs);
   }
-  
+
   showWarning() {
     if (this.isShowingWarning) return;
     this.isShowingWarning = true;
-    
+
     // Mostra avviso con opzione di restare connesso
     const confirmed = confirm(
       '⚠️ Sei inattivo da 25 minuti.\n\n' +
       'Sarai disconnesso tra 5 minuti per sicurezza.\n\n' +
       'Clicca OK per restare connesso.'
     );
-    
+
     if (confirmed) {
       this.resetTimer();
     }
   }
-  
+
   onTimeout() {
     clearTimeout(this.idleTimer);
     clearTimeout(this.warningTimer);
-    
+
     console.log('⏰ Session timeout - Disconnessione automatica');
-    
+
     // Logout Firebase
     if (window.auth && window.signOut) {
       signOut(window.auth).then(() => {
@@ -5055,7 +5142,7 @@ class SessionManager {
       window.location.href = '/index.html';
     }
   }
-  
+
   destroy() {
     clearTimeout(this.idleTimer);
     clearTimeout(this.warningTimer);
@@ -5083,67 +5170,67 @@ function cleanupSession() {
 class InputSanitizer {
   static sanitizeHTML(input) {
     if (!input) return '';
-    
+
     // Creare elemento temporaneo per escape HTML
     const div = document.createElement('div');
     div.textContent = input;
     const sanitized = div.innerHTML;
-    
+
     // Rimuovere possibili script tag
     return sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   }
-  
+
   static sanitizeEmail(email) {
     if (!email) return '';
-    
+
     // Validazione email base
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       throw new Error('Email non valida');
     }
-    
+
     return email.toLowerCase().trim();
   }
-  
+
   static sanitizePhone(phone) {
     if (!phone) return '';
-    
+
     // Rimuovere tutti i caratteri non numerici
     return phone.replace(/\D/g, '');
   }
-  
+
   static sanitizeText(input, maxLength = 1000) {
     if (!input) return '';
-    
+
     // Trim e limit lunghezza
     let sanitized = input.trim();
-    
+
     if (sanitized.length > maxLength) {
       sanitized = sanitized.substring(0, maxLength);
     }
-    
+
     // Escape HTML
     return this.sanitizeHTML(sanitized);
   }
-  
+
   static sanitizeCoordinate(value) {
     const num = parseFloat(value);
-    
+
     if (isNaN(num)) {
       throw new Error('Coordinate non valide');
     }
-    
+
     // Valori validi per latitudine e longitudine
     if (Math.abs(num) > 180) {
       throw new Error('Coordinate fuori range');
     }
-    
+
     return num;
   }
-  
+
   static sanitizeURL(url) {
     if (!url) return '';
-    
+
     try {
       const parsed = new URL(url);
       // Permetti solo http e https
@@ -5155,10 +5242,10 @@ class InputSanitizer {
       return '';
     }
   }
-  
+
   static sanitizeNome(nome) {
     if (!nome) return '';
-    
+
     // Rimuovi caratteri pericolosi, mantieni solo lettere, numeri, spazi e alcuni caratteri speciali
     return nome.replace(/[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ\s'-]/g, '').trim().substring(0, 100);
   }
@@ -5172,25 +5259,25 @@ function inizializzaAuth() {
       // Utente autenticato
       updateAuthState(user);
       console.log('✅ Utente autenticato:', user.email);
-      
+
       // Nascondi schermata di login
       nascondiSchermataLogin();
-      
+
       // Carica profilo utente da Firestore
       await caricaProfiloUtente(user.uid);
-      
+
       // Aggiorna UI
       aggiornaUIUtente();
       caricaElencoPersonaleUtente();
-      
+
       // Aggiorna contatore elenco
       aggiornaContatoreElenco();
-      
+
       // Carica strutture dopo l'autenticazione
       try {
         strutture = await caricaStrutture();
         window.strutture = strutture;
-        
+
         if (!strutture || strutture.length === 0) {
           console.warn('⚠️ Nessuna struttura caricata!');
           // Mostra empty state invece di non fare nulla
@@ -5204,7 +5291,7 @@ function inizializzaAuth() {
           }
           return;
         }
-        
+
         // Applica filtro provincia preferita se impostata
         const preferredProvince = localStorage.getItem('preferredProvince');
         if (preferredProvince && preferredProvince !== '') {
@@ -5215,7 +5302,7 @@ function inizializzaAuth() {
         }
         aggiornaContatoreElenco();
         console.log('✅ Strutture caricate e visualizzate');
-        
+
         // Inizializza mappa principale dopo caricamento strutture (post-first-paint)
         const scheduleInit = () => {
           try { initializeMainMap(); } catch (e) { console.warn('⚠️ Init mappa posticipato:', e?.message); }
@@ -5237,7 +5324,7 @@ function inizializzaAuth() {
           </div>`;
         }
       }
-      
+
       // Carica filtri salvati (con delay per assicurarsi che l'utente sia completamente autenticato)
       setTimeout(async () => {
         try {
@@ -5246,10 +5333,10 @@ function inizializzaAuth() {
           console.warn('⚠️ Errore nel caricamento filtri salvati (non critico):', error);
         }
       }, 1000);
-      
+
       // 🔒 Inizializza session timeout
       initSessionTimeout();
-      
+
       // 🔒 Inizializza validazione continua dell'autenticazione
       startAuthValidation();
     } else {
@@ -5257,10 +5344,10 @@ function inizializzaAuth() {
       updateAuthState(null);
       elencoPersonale = [];
       console.log('❌ Nessun utente autenticato');
-      
+
       // 🔒 Cleanup session timeout
       cleanupSession();
-      
+
       // Mostra schermata di login
       mostraSchermataLogin();
     }
@@ -5274,15 +5361,15 @@ async function caricaProfiloUtente(uid) {
       console.warn('🔒 Sessione non valida per caricamento profilo');
       return;
     }
-    
+
     const userDocRef = doc(db, 'users', uid);
     const userDoc = await secureFirestoreOperation(getDoc, userDocRef);
-    
+
     if (userDoc.exists()) {
       const profile = userDoc.data();
       updateAuthState(getCurrentUser(), profile);
       console.log('📋 Profilo utente caricato:', profile);
-      
+
       // Assicurati che i campi nuovi esistano (retrocompatibilità)
       if (!profile.cognome) profile.cognome = '';
       if (!profile.telefono) profile.telefono = '';
@@ -5298,7 +5385,7 @@ async function caricaProfiloUtente(uid) {
           distance: 10
         };
       }
-      
+
       // Aggiorna lo stato con il profilo corretto
       updateAuthState(getCurrentUser(), profile);
     } else {
@@ -5322,7 +5409,7 @@ async function caricaProfiloUtente(uid) {
           distance: 10
         }
       };
-      
+
       await secureFirestoreOperation(setDoc, userDocRef, newProfile);
       updateAuthState(currentUser, newProfile);
       console.log('✅ Nuovo profilo utente creato');
@@ -5336,29 +5423,29 @@ async function caricaProfiloUtente(uid) {
 async function mostraSchedaUtente() {
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   // Nascondi il modale "Le Mie Liste" se è aperto
   const elencoModal = document.getElementById('elencoPersonaleModal');
   if (elencoModal) {
     elencoModal.remove();
   }
-  
+
   // Verifica e ricarica il profilo se necessario
   const currentUser = getCurrentUser();
   if (!currentUser) {
     alert('❌ Errore: utente non autenticato');
     return;
   }
-  
+
   let userProfile = getUserProfile();
-  
+
   // Se il profilo non è disponibile, ricaricalo da Firestore
   if (!userProfile) {
     console.log('🔄 Profilo non disponibile, ricarico da Firestore...');
     try {
       await caricaProfiloUtente(currentUser.uid);
       userProfile = getUserProfile();
-      
+
       if (!userProfile) {
         console.warn('⚠️ Impossibile caricare il profilo utente');
         alert('⚠️ Impossibile caricare il profilo utente. Riprova più tardi.');
@@ -5370,13 +5457,13 @@ async function mostraSchedaUtente() {
       return;
     }
   }
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('userProfileModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'userProfileModal';
   modal.style.cssText = `
@@ -5391,7 +5478,7 @@ async function mostraSchedaUtente() {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -5406,7 +5493,7 @@ async function mostraSchedaUtente() {
     min-width: 400px;
     width: 100%;
   `;
-  
+
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
@@ -5417,7 +5504,7 @@ async function mostraSchedaUtente() {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--accent-color, #2f6b2f);
   `;
-  
+
   const title = document.createElement('h2');
   title.textContent = '👤 Scheda Utente';
   title.style.cssText = `
@@ -5425,7 +5512,7 @@ async function mostraSchedaUtente() {
     color: var(--accent-color, #2f6b2f);
     font-size: 1.5rem;
   `;
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.style.cssText = `
@@ -5442,10 +5529,10 @@ async function mostraSchedaUtente() {
     justify-content: center;
   `;
   closeBtn.onclick = () => modal.remove();
-  
+
   header.appendChild(title);
   header.appendChild(closeBtn);
-  
+
   // Form
   const form = document.createElement('form');
   form.style.cssText = `
@@ -5453,7 +5540,7 @@ async function mostraSchedaUtente() {
     gap: 15px;
     grid-template-columns: 1fr 1fr;
   `;
-  
+
   form.innerHTML = `
     <div>
       <label style="display: block; margin-bottom: 5px; font-weight: 500; color: var(--text-primary);">Nome *</label>
@@ -5588,7 +5675,7 @@ async function mostraSchedaUtente() {
       </div>
     </div>
   `;
-  
+
   // Footer con pulsanti
   const footer = document.createElement('div');
   footer.style.cssText = `
@@ -5599,7 +5686,7 @@ async function mostraSchedaUtente() {
     border-top: 1px solid var(--border-light);
     justify-content: flex-end;
   `;
-  
+
   const saveBtn = document.createElement('button');
   saveBtn.textContent = '💾 Salva Profilo';
   saveBtn.style.cssText = `
@@ -5615,7 +5702,7 @@ async function mostraSchedaUtente() {
     await salvaProfiloUtente();
     modal.remove();
   };
-  
+
   const cancelBtn = document.createElement('button');
   cancelBtn.textContent = '❌ Annulla';
   cancelBtn.style.cssText = `
@@ -5628,7 +5715,7 @@ async function mostraSchedaUtente() {
     font-size: 14px;
   `;
   cancelBtn.onclick = () => modal.remove();
-  
+
   const logoutBtn = document.createElement('button');
   logoutBtn.textContent = '🚪 Logout';
   logoutBtn.style.cssText = `
@@ -5647,23 +5734,23 @@ async function mostraSchedaUtente() {
       modal.remove();
     }
   };
-  
+
   footer.appendChild(saveBtn);
   footer.appendChild(cancelBtn);
   footer.appendChild(logoutBtn);
-  
+
   // Assembla il modal
   modalContent.appendChild(header);
   modalContent.appendChild(form);
   modalContent.appendChild(footer);
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Toggle visualizzazione password per cambio password
   document.getElementById('toggleCurrentPassword').addEventListener('click', () => {
     const passwordInput = document.getElementById('currentPassword');
     const toggleBtn = document.getElementById('toggleCurrentPassword');
-    
+
     if (passwordInput.type === 'password') {
       passwordInput.type = 'text';
       toggleBtn.textContent = '🙈';
@@ -5672,11 +5759,11 @@ async function mostraSchedaUtente() {
       toggleBtn.textContent = '👁️';
     }
   });
-  
+
   document.getElementById('toggleNewPassword').addEventListener('click', () => {
     const passwordInput = document.getElementById('newPassword');
     const toggleBtn = document.getElementById('toggleNewPassword');
-    
+
     if (passwordInput.type === 'password') {
       passwordInput.type = 'text';
       toggleBtn.textContent = '🙈';
@@ -5685,11 +5772,11 @@ async function mostraSchedaUtente() {
       toggleBtn.textContent = '👁️';
     }
   });
-  
+
   document.getElementById('toggleConfirmPassword').addEventListener('click', () => {
     const passwordInput = document.getElementById('confirmNewPassword');
     const toggleBtn = document.getElementById('toggleConfirmPassword');
-    
+
     if (passwordInput.type === 'password') {
       passwordInput.type = 'text';
       toggleBtn.textContent = '🙈';
@@ -5698,16 +5785,16 @@ async function mostraSchedaUtente() {
       toggleBtn.textContent = '👁️';
     }
   });
-  
+
   // Cambio password
   document.getElementById('changePasswordBtn').onclick = async () => {
     const messageDiv = document.getElementById('passwordChangeMessage');
     messageDiv.style.display = 'none';
-    
+
     const currentPassword = document.getElementById('currentPassword').value;
     const newPassword = document.getElementById('newPassword').value;
     const confirmPassword = document.getElementById('confirmNewPassword').value;
-    
+
     if (!currentPassword || !newPassword || !confirmPassword) {
       messageDiv.textContent = '⚠️ Compila tutti i campi';
       messageDiv.style.display = 'block';
@@ -5716,7 +5803,7 @@ async function mostraSchedaUtente() {
       messageDiv.style.border = '1px solid #f5c6cb';
       return;
     }
-    
+
     if (newPassword.length < 6) {
       messageDiv.textContent = '⚠️ La nuova password deve essere di almeno 6 caratteri';
       messageDiv.style.display = 'block';
@@ -5725,7 +5812,7 @@ async function mostraSchedaUtente() {
       messageDiv.style.border = '1px solid #f5c6cb';
       return;
     }
-    
+
     if (newPassword !== confirmPassword) {
       messageDiv.textContent = '⚠️ Le password non corrispondono';
       messageDiv.style.display = 'block';
@@ -5734,7 +5821,7 @@ async function mostraSchedaUtente() {
       messageDiv.style.border = '1px solid #f5c6cb';
       return;
     }
-    
+
     try {
       const currentUser = getCurrentUser();
       if (!currentUser || !currentUser.email) {
@@ -5745,7 +5832,7 @@ async function mostraSchedaUtente() {
         messageDiv.style.border = '1px solid #f5c6cb';
         return;
       }
-      
+
       // Verifica che l'utente non sia loggato con Google
       if (currentUser.providerData && currentUser.providerData.some(provider => provider.providerId === 'google.com')) {
         messageDiv.textContent = '⚠️ Gli utenti loggati con Google non possono cambiare la password qui';
@@ -5755,31 +5842,31 @@ async function mostraSchedaUtente() {
         messageDiv.style.border = '1px solid #ffeeba';
         return;
       }
-      
+
       // Re-autentica l'utente con la password corrente
       const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
       await reauthenticateWithCredential(currentUser, credential);
-      
+
       // Aggiorna la password
       await updatePassword(currentUser, newPassword);
-      
+
       messageDiv.textContent = '✅ Password cambiata con successo!';
       messageDiv.style.display = 'block';
       messageDiv.style.background = '#d4edda';
       messageDiv.style.color = '#155724';
       messageDiv.style.border = '1px solid #c3e6cb';
-      
+
       // Pulisci i campi
       document.getElementById('currentPassword').value = '';
       document.getElementById('newPassword').value = '';
       document.getElementById('confirmNewPassword').value = '';
-      
+
       console.log('✅ Password cambiata con successo');
-      
+
     } catch (error) {
       console.error('❌ Errore cambio password:', error);
       let errorMessage = '❌ Errore nel cambio password';
-      
+
       switch (error.code) {
         case 'auth/wrong-password':
         case 'auth/invalid-credential':
@@ -5792,7 +5879,7 @@ async function mostraSchedaUtente() {
           errorMessage = '⚠️ Per sicurezza, effettua nuovamente il login prima di cambiare la password';
           break;
       }
-      
+
       messageDiv.textContent = errorMessage;
       messageDiv.style.display = 'block';
       messageDiv.style.background = '#f8d7da';
@@ -5800,7 +5887,7 @@ async function mostraSchedaUtente() {
       messageDiv.style.border = '1px solid #f5c6cb';
     }
   };
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -5812,38 +5899,38 @@ async function mostraSchedaUtente() {
 async function salvaProfiloUtente() {
   try {
     const currentUser = getCurrentUser();
-    
+
     if (!currentUser) {
       alert('❌ Errore: utente non autenticato');
       return;
     }
-    
+
     // 🔒 Validazione server-side
     if (!await validateServerAuth()) {
       alert('❌ Sessione non valida. Effettua nuovamente il login.');
       return;
     }
-    
+
     const nome = document.getElementById('userNome').value.trim();
     const cognome = document.getElementById('userCognome').value.trim();
     const telefono = document.getElementById('userTelefono').value.trim();
     const gruppo = document.getElementById('userGruppo').value;
     const ruolo = document.getElementById('userRuolo').value;
-    
+
     if (!nome || !cognome || !telefono || !gruppo || !ruolo) {
       alert('⚠️ Compila tutti i campi obbligatori');
       return;
     }
-    
+
     // Ottieni il profilo corrente (o creane uno nuovo se non esiste)
     let userProfile = getUserProfile();
-    
+
     // Se il profilo non esiste, caricalo da Firestore o creane uno nuovo
     if (!userProfile) {
       console.log('🔄 Profilo non disponibile, ricarico da Firestore...');
       await caricaProfiloUtente(currentUser.uid);
       userProfile = getUserProfile();
-      
+
       // Se ancora non esiste, crea un profilo base
       if (!userProfile) {
         userProfile = {
@@ -5866,7 +5953,7 @@ async function salvaProfiloUtente() {
         };
       }
     }
-    
+
     // Crea nuovo profilo aggiornato
     const updatedProfile = {
       ...userProfile,
@@ -5886,25 +5973,25 @@ async function salvaProfiloUtente() {
       },
       ultimoAggiornamento: new Date().toISOString()
     };
-    
+
     // Salva in Firestore PRIMA di aggiornare lo stato locale
     const userDocRef = doc(db, 'users', currentUser.uid);
     await secureFirestoreOperation(setDoc, userDocRef, updatedProfile);
-    
+
     console.log('✅ Profilo utente salvato su Firestore:', updatedProfile);
-    
+
     // Aggiorna lo stato locale DOPO il salvataggio
     updateAuthState(currentUser, updatedProfile);
-    
+
     console.log('✅ Profilo utente aggiornato nello stato locale');
     alert('✅ Profilo salvato con successo!');
-    
+
     // Chiudi il modale dopo il salvataggio
     const modal = document.getElementById('userProfileModal');
     if (modal) {
       modal.remove();
     }
-    
+
   } catch (error) {
     console.error('❌ Errore salvataggio profilo:', error);
     console.error('Dettagli errore:', {
@@ -5922,13 +6009,13 @@ function mostraSchermataLogin() {
   const header = document.querySelector('header');
   if (main) main.style.display = 'none';
   if (header) header.style.display = 'none';
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('loginModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'loginModal';
   modal.style.cssText = `
@@ -5943,7 +6030,7 @@ function mostraSchermataLogin() {
     justify-content: center;
     z-index: 10001;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -5956,7 +6043,7 @@ function mostraSchermataLogin() {
     box-shadow: 0 20px 40px rgba(0,0,0,0.3);
     text-align: center;
   `;
-  
+
   modalContent.innerHTML = `
     <div style="margin-bottom: 30px;">
       <h1 style="color: #2f6b2f; margin: 0 0 10px 0; font-size: 2rem;">🏕️ QuoVadiScout</h1>
@@ -6084,10 +6171,10 @@ function mostraSchermataLogin() {
     
     <div id="errorMessage" style="display: none; color: #dc3545; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin-top: 20px;"></div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Aggiungi CSS per animazione
   if (!document.getElementById('authStyles')) {
     const style = document.createElement('style');
@@ -6100,7 +6187,7 @@ function mostraSchermataLogin() {
     `;
     document.head.appendChild(style);
   }
-  
+
   // Event listeners
   setupAuthEventListeners();
 }
@@ -6112,14 +6199,14 @@ function setupAuthEventListeners() {
     document.getElementById('registerForm').style.display = 'block';
     hideError();
   };
-  
+
   document.getElementById('showLoginBtn').onclick = () => {
     document.getElementById('registerForm').style.display = 'none';
     document.getElementById('loginForm').style.display = 'block';
     document.getElementById('resetPasswordForm').style.display = 'none';
     hideError();
   };
-  
+
   // Password dimenticata
   document.getElementById('forgotPasswordBtn').onclick = () => {
     document.getElementById('loginForm').style.display = 'none';
@@ -6127,24 +6214,24 @@ function setupAuthEventListeners() {
     document.getElementById('resetPasswordForm').style.display = 'block';
     hideError();
   };
-  
+
   // Login con email/password
   document.getElementById('loginBtn').onclick = async () => {
     try {
       const email = InputSanitizer.sanitizeEmail(document.getElementById('loginEmail').value);
       const password = document.getElementById('loginPassword').value;
-      
+
       if (!email || !password) {
         showError('⚠️ Inserisci email e password');
         return;
       }
-      
+
       await loginWithEmail(email, password);
     } catch (error) {
       showError('⚠️ Email non valida');
     }
   };
-  
+
   // Registrazione
   document.getElementById('registerBtn').onclick = async () => {
     try {
@@ -6155,12 +6242,12 @@ function setupAuthEventListeners() {
       const gruppo = document.getElementById('registerGruppo').value;
       const ruolo = document.getElementById('registerRuolo').value;
       const password = document.getElementById('registerPassword').value;
-      
+
       if (!nome || !cognome || !email || !telefono || !gruppo || !ruolo || !password) {
         showError('⚠️ Compila tutti i campi obbligatori');
         return;
       }
-      
+
       // Validazione password robusta
       const passwordCheck = validatePasswordStrength(password);
       if (!passwordCheck.valid) {
@@ -6168,30 +6255,30 @@ function setupAuthEventListeners() {
         showError(`⚠️ Password troppo debole:\n${feedback}`);
         return;
       }
-      
+
       await registerWithEmail(nome, cognome, email, telefono, gruppo, ruolo, password);
     } catch (error) {
       showError('⚠️ Dati non validi. Controlla i campi inseriti.');
     }
   };
-  
+
   // Login con Google
   document.getElementById('googleLoginBtn').onclick = async () => {
     await loginWithGoogle();
   };
-  
+
   // Enter per login
   document.getElementById('loginPassword').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       document.getElementById('loginBtn').click();
     }
   });
-  
+
   // Toggle visualizzazione password login
   document.getElementById('toggleLoginPassword').addEventListener('click', () => {
     const passwordInput = document.getElementById('loginPassword');
     const toggleBtn = document.getElementById('toggleLoginPassword');
-    
+
     if (passwordInput.type === 'password') {
       passwordInput.type = 'text';
       toggleBtn.textContent = '🙈';
@@ -6200,12 +6287,12 @@ function setupAuthEventListeners() {
       toggleBtn.textContent = '👁️';
     }
   });
-  
+
   // Toggle visualizzazione password registrazione
   document.getElementById('toggleRegisterPassword').addEventListener('click', () => {
     const passwordInput = document.getElementById('registerPassword');
     const toggleBtn = document.getElementById('toggleRegisterPassword');
-    
+
     if (passwordInput.type === 'password') {
       passwordInput.type = 'text';
       toggleBtn.textContent = '🙈';
@@ -6214,29 +6301,29 @@ function setupAuthEventListeners() {
       toggleBtn.textContent = '👁️';
     }
   });
-  
+
   // Back to login dal reset password
   document.getElementById('backToLoginBtn').onclick = () => {
     document.getElementById('resetPasswordForm').style.display = 'none';
     document.getElementById('loginForm').style.display = 'block';
     hideError();
   };
-  
+
   // Reset password
   document.getElementById('resetPasswordBtn').onclick = async () => {
     try {
       const email = InputSanitizer.sanitizeEmail(document.getElementById('resetEmail').value);
-      
+
       if (!email) {
         showError('⚠️ Inserisci un indirizzo email valido');
         return;
       }
-      
+
       showLoading(true);
       hideError();
-      
+
       await sendPasswordResetEmail(auth, email);
-      
+
       // Mostra messaggio di successo
       const errorDiv = document.getElementById('errorMessage');
       errorDiv.textContent = '✅ Email di recupero inviata! Controlla la tua casella di posta e segui le istruzioni per reimpostare la password.';
@@ -6244,7 +6331,7 @@ function setupAuthEventListeners() {
       errorDiv.style.color = '#155724';
       errorDiv.style.background = '#d4edda';
       errorDiv.style.border = '1px solid #c3e6cb';
-      
+
       // Torna al login dopo 3 secondi
       setTimeout(() => {
         document.getElementById('resetPasswordForm').style.display = 'none';
@@ -6252,11 +6339,11 @@ function setupAuthEventListeners() {
         document.getElementById('resetEmail').value = '';
         hideError();
       }, 3000);
-      
+
     } catch (error) {
       console.error('❌ Errore recupero password:', error);
       let errorMessage = '❌ Errore nell\'invio dell\'email di recupero';
-      
+
       switch (error.code) {
         case 'auth/user-not-found':
           errorMessage = '⚠️ Nessun account trovato con questa email';
@@ -6268,7 +6355,7 @@ function setupAuthEventListeners() {
           errorMessage = '⚠️ Troppi tentativi, riprova più tardi';
           break;
       }
-      
+
       showError(errorMessage);
     } finally {
       showLoading(false);
@@ -6278,34 +6365,34 @@ function setupAuthEventListeners() {
 
 async function loginWithEmail(email, password) {
   try {
-    
+
     // 1. Verifica se account è bloccato (Rate Limiting)
     const blocked = loginSecurity.isBlocked(email);
     if (blocked.blocked) {
       showError(blocked.reason);
       return;
     }
-    
+
     showLoading(true);
     hideError();
-    
+
     // 2. Tentativo login Firebase
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log('✅ Login riuscito:', userCredential.user.email);
-    
+
     // 3. Successo - reset tentativi falliti
     loginSecurity.recordSuccess(email);
-    
+
     // La UI si aggiornerà automaticamente tramite onAuthStateChanged
-    
+
   } catch (error) {
     console.error('❌ Errore login:', error);
-    
+
     // 4. Record tentativo fallito
     const result = loginSecurity.recordFailedAttempt(email);
-    
+
     let errorMessage = '❌ Credenziali non valide';
-    
+
     // Messaggi generici per evitare enumerazione utenti
     switch (error.code) {
       case 'auth/user-not-found':
@@ -6324,12 +6411,12 @@ async function loginWithEmail(email, password) {
         errorMessage = '❌ Account disabilitato';
         break;
     }
-    
+
     // Se il blocco è stato attivato, mostra quel messaggio
     if (result.blocked) {
       errorMessage = result.reason;
     }
-    
+
     showError(errorMessage);
   } finally {
     showLoading(false);
@@ -6340,14 +6427,14 @@ async function registerWithEmail(nome, cognome, email, telefono, gruppo, ruolo, 
   try {
     showLoading(true);
     hideError();
-    
+
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    
+
     // Aggiorna il profilo con il nome
     await userCredential.user.updateProfile({
       displayName: nome
     });
-    
+
     // Crea profilo utente completo
     const userProfile = {
       nome: nome,
@@ -6367,17 +6454,17 @@ async function registerWithEmail(nome, cognome, email, telefono, gruppo, ruolo, 
         distance: 10
       }
     };
-    
+
     // Salva profilo in Firestore
     await setDoc(doc(db, 'users', userCredential.user.uid), userProfile);
-    
+
     console.log('✅ Registrazione riuscita:', userCredential.user.email);
     console.log('✅ Profilo utente creato con tutti i campi');
-    
+
   } catch (error) {
     console.error('❌ Errore registrazione:', error);
     let errorMessage = 'Errore durante la registrazione';
-    
+
     switch (error.code) {
       case 'auth/email-already-in-use':
         errorMessage = '❌ Email già in uso';
@@ -6389,7 +6476,7 @@ async function registerWithEmail(nome, cognome, email, telefono, gruppo, ruolo, 
         errorMessage = '❌ Email non valida';
         break;
     }
-    
+
     showError(errorMessage);
   } finally {
     showLoading(false);
@@ -6400,15 +6487,15 @@ async function loginWithGoogle() {
   try {
     showLoading(true);
     hideError();
-    
+
     const result = await signInWithPopup(auth, googleProvider);
     console.log('✅ Login Google riuscito:', result.user.email);
-    
+
     // La UI si aggiornerà automaticamente tramite onAuthStateChanged
-    
+
   } catch (error) {
     console.error('❌ Errore login Google:', error);
-    
+
     if (error.code === 'auth/popup-closed-by-user') {
       showError('❌ Login annullato');
     } else {
@@ -6424,22 +6511,22 @@ async function logoutUser() {
     // Salva l'elenco personale SOLO in localStorage (nessuna operazione Firestore)
     const currentUser = getCurrentUser();
     const userProfile = getUserProfile();
-    
+
     if (currentUser && userProfile && elencoPersonale) {
       // Salva in localStorage come backup
       localStorage.setItem(`elenco_personale_${currentUser.uid}`, JSON.stringify(elencoPersonale));
       console.log('✅ Elenco personale salvato in localStorage');
     }
-    
+
     // 🔒 Pulisci stato di autenticazione
     updateAuthState(null);
-    
+
     // Effettua il logout
     await signOut(auth);
     console.log('✅ Logout riuscito');
-    
+
     // La UI si aggiornerà automaticamente tramite onAuthStateChanged
-    
+
   } catch (error) {
     console.error('❌ Errore logout:', error);
     alert('Errore durante il logout');
@@ -6451,7 +6538,7 @@ function showLoading(show) {
   const loginBtn = document.getElementById('loginBtn');
   const registerBtn = document.getElementById('registerBtn');
   const googleBtn = document.getElementById('googleLoginBtn');
-  
+
   if (loading) loading.style.display = show ? 'block' : 'none';
   if (loginBtn) loginBtn.disabled = show;
   if (registerBtn) registerBtn.disabled = show;
@@ -6508,19 +6595,19 @@ function aggiornaUIUtente() {
     console.warn('⚠️ Pulsante utente non trovato');
     return;
   }
-  
+
   const userIcon = userBtn.querySelector('.user-icon') || userBtn.querySelector('.user-avatar');
   const userName = userBtn.querySelector('.user-name');
-  
+
   const currentUser = getCurrentUser();
   const userProfile = getUserProfile();
-  
+
   if (currentUser) {
     const displayName = userProfile?.nome || currentUser.displayName || currentUser.email.split('@')[0];
     if (userName) userName.textContent = displayName;
     if (userIcon) userIcon.textContent = '👤';
     userBtn.title = `Utente: ${displayName} (${elencoPersonale.length} strutture) - Clicca per disconnetterti`;
-    
+
     // Rimuovi stili personalizzati per mantenere lo stile standard del menu
     userBtn.style.background = '';
     userBtn.style.color = '';
@@ -6529,7 +6616,7 @@ function aggiornaUIUtente() {
     if (userName) userName.textContent = 'Accedi';
     if (userIcon) userIcon.textContent = '🔑';
     userBtn.title = 'Accedi o registrati';
-    
+
     // Rimuovi stili personalizzati per mantenere lo stile standard del menu
     userBtn.style.background = '';
     userBtn.style.color = '';
@@ -6540,7 +6627,7 @@ function aggiornaUIUtente() {
 function caricaElencoPersonaleUtente() {
   const userProfile = getUserProfile();
   const currentUser = getCurrentUser();
-  
+
   if (userProfile) {
     elencoPersonale = userProfile.elencoPersonale || [];
   } else if (currentUser) {
@@ -6565,28 +6652,28 @@ function caricaElencoPersonaleUtente() {
 async function salvaElencoPersonaleUtente() {
   const currentUser = getCurrentUser();
   const userProfile = getUserProfile();
-  
+
   if (currentUser && userProfile) {
     try {
       // Salva sempre in localStorage come backup
       localStorage.setItem(`elenco_personale_${currentUser.uid}`, JSON.stringify(elencoPersonale));
-      
+
       // 🔒 Validazione server-side
       if (!await validateServerAuth()) {
         console.warn('🔒 Sessione non valida per salvataggio elenco personale');
         return;
       }
-      
+
       // Aggiorna il profilo locale
       userProfile.elencoPersonale = elencoPersonale;
-      
+
       // Salva su Firestore
       const userDocRef = doc(db, 'users', currentUser.uid);
       await secureFirestoreOperation(updateDoc, userDocRef, {
         elencoPersonale: elencoPersonale,
         ultimoAggiornamento: new Date().toISOString()
       });
-      
+
       console.log('✅ Elenco personale salvato su Firestore');
     } catch (error) {
       console.error('❌ Errore salvataggio elenco personale:', error);
@@ -6609,13 +6696,13 @@ function cambiaUtente() {
 function mostraModaleProfiloUtente() {
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('profiloUtenteModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'profiloUtenteModal';
   modal.className = 'modal-overlay';
@@ -6630,7 +6717,7 @@ function mostraModaleProfiloUtente() {
     padding: 20px;
     animation: fadeIn 0.3s ease-out;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.className = 'modal-content';
   modalContent.style.cssText = `
@@ -6645,19 +6732,19 @@ function mostraModaleProfiloUtente() {
     animation: slideUp 0.3s ease-out;
     position: relative;
   `;
-  
+
   // Carica dati utente dal localStorage
   const profiloUtente = JSON.parse(localStorage.getItem('userProfile') || '{}');
   const preferenzeNotifiche = JSON.parse(localStorage.getItem('notificationPreferences') || '{}');
   const provinciaPreferita = localStorage.getItem('preferredProvince') || '';
-  
+
   // Ottieni province uniche dal database
   const provinceNelDB = [...new Set(strutture.map(s => s.Prov).filter(p => p))].sort();
-  
+
   const currentUser = getCurrentUser();
   const userProfile = getUserProfile();
   const displayName = userProfile?.nome || currentUser?.displayName || currentUser?.email?.split('@')[0];
-  
+
   modalContent.innerHTML = `
     <!-- Header -->
     <div style="position: sticky; top: 0; background: var(--bg-primary, white); border-radius: 12px 12px 0 0; padding: 20px; border-bottom: 1px solid var(--border-color, #e5e7eb); z-index: 10;">
@@ -6786,28 +6873,28 @@ function mostraModaleProfiloUtente() {
       </div>
     </div>
   `;
-  
+
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Event listeners
   document.getElementById('salvaProfiloBtn').onclick = () => {
     salvaProfiloUtente();
     modal.remove();
   };
-  
+
   document.getElementById('logoutBtn').onclick = async () => {
     modal.remove();
     await logoutUser();
   };
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.remove();
     }
   });
-  
+
   // CSS per toggle switches
   const style = document.createElement('style');
   style.textContent = `
@@ -6829,7 +6916,7 @@ function nascondiSchermataLogin() {
   const header = document.querySelector('header');
   if (main) main.style.display = 'block';
   if (header) header.style.display = 'flex';
-  
+
   // Rimuovi modal di login
   const loginModal = document.getElementById('loginModal');
   if (loginModal) {
@@ -6861,12 +6948,12 @@ function aggiornaContatoreElenco() {
   safeUpdateElement('contatore-elenco', (element) => {
     element.textContent = elencoPersonale.length;
   });
-  
+
   // Aggiorna badge nel menu
   safeQuerySelector('.menu-badge', (element) => {
     element.textContent = elencoPersonale.length;
   });
-  
+
   // Aggiorna anche l'UI utente per riflettere il nuovo numero di strutture
   aggiornaUIUtente();
 }
@@ -6875,12 +6962,12 @@ function aggiornaContatoreElenco() {
 async function esportaElencoPersonale() {
   console.log('📤 Avvio esportazione elenco personale...');
   console.log('📋 Strutture in elenco personale:', elencoPersonale.length);
-  
+
   if (elencoPersonale.length === 0) {
     alert('❌ L\'elenco personale è vuoto. Aggiungi alcune strutture prima di esportare.');
     return;
   }
-  
+
   await mostraGestioneElencoPersonale();
 }
 
@@ -6888,22 +6975,22 @@ async function mostraGestioneElencoPersonale() {
   console.log('📋 Apertura gestione elenco personale...');
   const struttureElenco = strutture.filter(s => elencoPersonale.includes(s.id));
   console.log('📊 Strutture trovate:', struttureElenco.length);
-  
+
   // Carica le note personali per tutte le strutture dell'elenco
   await loadPersonalNotesForElenco(struttureElenco);
-  
+
   // Nascondi la scheda utente se è aperta
   const userModal = document.getElementById('userProfileModal');
   if (userModal) {
     userModal.remove();
   }
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('gestioneElencoModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'gestioneElencoModal';
   modal.style.cssText = `
@@ -6918,7 +7005,7 @@ async function mostraGestioneElencoPersonale() {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -6933,7 +7020,7 @@ async function mostraGestioneElencoPersonale() {
     min-width: 320px;
     width: 100%;
   `;
-  
+
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
@@ -6944,7 +7031,7 @@ async function mostraGestioneElencoPersonale() {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
   `;
-  
+
   const title = document.createElement('h2');
   title.textContent = `📋 Elenco Personale`;
   title.style.cssText = `
@@ -6952,7 +7039,7 @@ async function mostraGestioneElencoPersonale() {
     color: var(--text-primary);
     font-size: 1.5rem;
   `;
-  
+
   // Toggle visualizzazione per elenco personale
   const headerActions = document.createElement('div');
   headerActions.style.cssText = `
@@ -6960,7 +7047,7 @@ async function mostraGestioneElencoPersonale() {
     align-items: center;
     gap: 12px;
   `;
-  
+
   const toggleBtn = document.createElement('button');
   toggleBtn.id = 'modalViewToggle';
   toggleBtn.className = 'btn-view-toggle';
@@ -6969,7 +7056,7 @@ async function mostraGestioneElencoPersonale() {
     <span class="view-label">Schede</span>
   `;
   toggleBtn.title = 'Cambia visualizzazione';
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.style.cssText = `
@@ -6986,19 +7073,19 @@ async function mostraGestioneElencoPersonale() {
     justify-content: center;
   `;
   closeBtn.onclick = () => modal.remove();
-  
+
   headerActions.appendChild(toggleBtn);
   headerActions.appendChild(closeBtn);
-  
+
   header.appendChild(title);
   header.appendChild(headerActions);
-  
+
   // Contenuto principale
   const content = document.createElement('div');
   content.style.cssText = `
     margin-bottom: 20px;
   `;
-  
+
   if (struttureElenco.length === 0) {
     content.innerHTML = `
       <div style="text-align: center; padding: 40px; color: #6c757d;">
@@ -7019,12 +7106,12 @@ async function mostraGestioneElencoPersonale() {
       border-radius: 8px;
       padding: 10px;
     `;
-    
+
     // Funzione per creare elementi dell'elenco
     const createElencoItem = (struttura, isListMode) => {
       const itemDiv = document.createElement('div');
       itemDiv.className = 'item-div';
-      
+
       if (isListMode) {
         // Modalità elenco - layout compatto
         itemDiv.style.cssText = `
@@ -7037,14 +7124,14 @@ async function mostraGestioneElencoPersonale() {
           border-radius: 6px;
           border: 1px solid var(--border-light);
         `;
-        
+
         const infoDiv = document.createElement('div');
         infoDiv.style.cssText = `flex: 1;`;
         // Controlla se ci sono note personali
         const hasNotes = struttura.personalNotes && struttura.personalNotes.length > 0;
         const notesCount = hasNotes ? struttura.personalNotes.length : 0;
         const latestNote = hasNotes ? struttura.personalNotes[0] : null;
-        
+
         infoDiv.innerHTML = `
           <div style="font-weight: bold; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
             ${struttura.Struttura || 'Senza nome'}
@@ -7062,11 +7149,11 @@ async function mostraGestioneElencoPersonale() {
           <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 6px; padding: 6px; background: var(--bg-tertiary); border-radius: 4px; border-left: 3px solid var(--accent);">
             <strong style="color: var(--text-primary);">📝 Ultima nota:</strong> ${latestNote.nota.length > 80 ? latestNote.nota.substring(0, 80) + '...' : latestNote.nota}
             <div style="font-size: 0.7rem; color: var(--text-tertiary); margin-top: 2px;">
-              ${latestNote.createdAt.toLocaleDateString('it-IT')} alle ${latestNote.createdAt.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}
+              ${latestNote.createdAt.toLocaleDateString('it-IT')} alle ${latestNote.createdAt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>` : ''}
         `;
-        
+
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'actions-div';
         actionsDiv.style.cssText = `
@@ -7074,7 +7161,7 @@ async function mostraGestioneElencoPersonale() {
           gap: 8px;
           align-items: center;
         `;
-        
+
         const viewBtn = document.createElement('button');
         viewBtn.innerHTML = '👁️';
         viewBtn.title = 'Visualizza scheda completa';
@@ -7091,7 +7178,7 @@ async function mostraGestioneElencoPersonale() {
           modal.remove();
           mostraSchedaCompleta(struttura.id);
         };
-        
+
         const notesBtn = document.createElement('button');
         notesBtn.innerHTML = '📝';
         notesBtn.title = 'Note personali';
@@ -7107,7 +7194,7 @@ async function mostraGestioneElencoPersonale() {
         notesBtn.onclick = () => {
           mostraNotePersonali(struttura.id);
         };
-        
+
         const removeBtn = document.createElement('button');
         removeBtn.innerHTML = '🗑️';
         removeBtn.title = 'Rimuovi dall\'elenco';
@@ -7125,14 +7212,14 @@ async function mostraGestioneElencoPersonale() {
           modal.remove();
           await mostraGestioneElencoPersonale();
         };
-        
+
         actionsDiv.appendChild(viewBtn);
         actionsDiv.appendChild(notesBtn);
         actionsDiv.appendChild(removeBtn);
-        
+
         itemDiv.appendChild(infoDiv);
         itemDiv.appendChild(actionsDiv);
-        
+
       } else {
         // Modalità schede - layout verticale completo
         itemDiv.style.cssText = `
@@ -7145,7 +7232,7 @@ async function mostraGestioneElencoPersonale() {
           border: 1px solid var(--border-light);
           box-shadow: var(--shadow-sm);
         `;
-        
+
         const headerDiv = document.createElement('div');
         headerDiv.style.cssText = `
           display: flex;
@@ -7153,7 +7240,7 @@ async function mostraGestioneElencoPersonale() {
           align-items: center;
           margin-bottom: 12px;
         `;
-        
+
         const titleDiv = document.createElement('div');
         titleDiv.style.cssText = `
           font-weight: bold;
@@ -7166,13 +7253,13 @@ async function mostraGestioneElencoPersonale() {
           modal.remove();
           mostraSchedaCompleta(struttura.id);
         };
-        
+
         const actionsDiv = document.createElement('div');
         actionsDiv.style.cssText = `
           display: flex;
           gap: 8px;
         `;
-        
+
         const viewBtn = document.createElement('button');
         viewBtn.innerHTML = '👁️ Visualizza';
         viewBtn.title = 'Visualizza scheda completa';
@@ -7189,7 +7276,7 @@ async function mostraGestioneElencoPersonale() {
           modal.remove();
           mostraSchedaCompleta(struttura.id);
         };
-        
+
         const notesBtn = document.createElement('button');
         notesBtn.innerHTML = '📝 Note';
         notesBtn.title = 'Note personali';
@@ -7206,7 +7293,7 @@ async function mostraGestioneElencoPersonale() {
           modal.remove();
           mostraNotePersonali(struttura.id);
         };
-        
+
         const removeBtn = document.createElement('button');
         removeBtn.innerHTML = '🗑️ Rimuovi';
         removeBtn.title = 'Rimuovi dall\'elenco';
@@ -7224,19 +7311,19 @@ async function mostraGestioneElencoPersonale() {
           modal.remove();
           await mostraGestioneElencoPersonale();
         };
-        
+
         actionsDiv.appendChild(viewBtn);
         actionsDiv.appendChild(notesBtn);
         actionsDiv.appendChild(removeBtn);
-        
+
         headerDiv.appendChild(titleDiv);
         headerDiv.appendChild(actionsDiv);
-        
+
         // Controlla se ci sono note personali
         const hasNotes = struttura.personalNotes && struttura.personalNotes.length > 0;
         const notesCount = hasNotes ? struttura.personalNotes.length : 0;
         const latestNote = hasNotes ? struttura.personalNotes[0] : null;
-        
+
         const contentDiv = document.createElement('div');
         contentDiv.innerHTML = `
           <div style="margin-bottom: 8px; color: var(--text-secondary);">
@@ -7260,7 +7347,7 @@ async function mostraGestioneElencoPersonale() {
               ${latestNote.nota.length > 120 ? latestNote.nota.substring(0, 120) + '...' : latestNote.nota}
             </div>
             <div style="font-size: 11px; color: var(--text-tertiary);">
-              ${latestNote.createdAt.toLocaleDateString('it-IT')} alle ${latestNote.createdAt.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}
+              ${latestNote.createdAt.toLocaleDateString('it-IT')} alle ${latestNote.createdAt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
               ${notesCount > 1 ? ` • ${notesCount - 1} altre note` : ''}
             </div>
           </div>` : ''}
@@ -7268,17 +7355,17 @@ async function mostraGestioneElencoPersonale() {
             ${struttura.Info.length > 150 ? struttura.Info.substring(0, 150) + '...' : struttura.Info}
           </div>` : ''}
         `;
-        
+
         itemDiv.appendChild(headerDiv);
         itemDiv.appendChild(contentDiv);
       }
-      
+
       return itemDiv;
     };
-    
+
     // Variabile per tracciare la modalità corrente del modale
     let modalListMode = false;
-    
+
     // Genera gli elementi iniziali
     const generateElencoItems = () => {
       listaContainer.innerHTML = '';
@@ -7286,14 +7373,14 @@ async function mostraGestioneElencoPersonale() {
         listaContainer.appendChild(createElencoItem(struttura, modalListMode));
       });
     };
-    
+
     // Event listener per il toggle del modale
     toggleBtn.addEventListener('click', () => {
       modalListMode = !modalListMode;
-      
+
       const viewIcon = toggleBtn.querySelector('.view-icon');
       const viewLabel = toggleBtn.querySelector('.view-label');
-      
+
       if (modalListMode) {
         viewIcon.textContent = '📄';
         viewLabel.textContent = 'Schede';
@@ -7303,18 +7390,18 @@ async function mostraGestioneElencoPersonale() {
         viewLabel.textContent = 'Elenco';
         toggleBtn.classList.remove('active');
       }
-      
+
       generateElencoItems();
     });
-    
+
     // Genera gli elementi iniziali
     generateElencoItems();
-    
+
     if (content && listaContainer) {
       content.appendChild(listaContainer);
     }
   }
-  
+
   // Footer con azioni
   const footer = document.createElement('div');
   footer.style.cssText = `
@@ -7325,10 +7412,10 @@ async function mostraGestioneElencoPersonale() {
     border-top: 1px solid var(--border-light);
     gap: 10px;
   `;
-  
+
   const leftActions = document.createElement('div');
   leftActions.style.cssText = `display: flex; gap: 10px;`;
-  
+
   const clearAllBtn = document.createElement('button');
   clearAllBtn.innerHTML = '🧹 Svuota Elenco';
   clearAllBtn.style.cssText = `
@@ -7350,10 +7437,10 @@ async function mostraGestioneElencoPersonale() {
       await mostraGestioneElencoPersonale();
     }
   };
-  
+
   const rightActions = document.createElement('div');
   rightActions.style.cssText = `display: flex; gap: 10px;`;
-  
+
   const exportBtn = document.createElement('button');
   exportBtn.innerHTML = '📤 Esporta';
   exportBtn.style.cssText = `
@@ -7370,7 +7457,7 @@ async function mostraGestioneElencoPersonale() {
   exportBtn.onclick = async () => {
     console.log('📤 Pulsante esportazione cliccato');
     console.log('📊 Strutture da esportare:', struttureElenco.length);
-    
+
     if (struttureElenco.length > 0) {
       console.log('✅ Rimuovo modal e apro menu esportazione');
       modal.remove();
@@ -7379,7 +7466,7 @@ async function mostraGestioneElencoPersonale() {
       console.log('❌ Nessuna struttura da esportare');
     }
   };
-  
+
   const printBtn = document.createElement('button');
   printBtn.innerHTML = '🖨️ Stampa';
   printBtn.style.cssText = `
@@ -7399,20 +7486,20 @@ async function mostraGestioneElencoPersonale() {
       modal.remove();
     }
   };
-  
+
   leftActions.appendChild(clearAllBtn);
   rightActions.appendChild(printBtn);
   rightActions.appendChild(exportBtn);
-  
+
   footer.appendChild(leftActions);
   footer.appendChild(rightActions);
-  
+
   modalContent.appendChild(header);
   modalContent.appendChild(content);
   modalContent.appendChild(footer);
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -7424,7 +7511,7 @@ async function mostraGestioneElencoPersonale() {
 async function mostraMenuEsportazione(struttureElenco) {
   console.log('📋 Apertura menu esportazione...');
   console.log('📊 Strutture ricevute:', struttureElenco.length);
-  
+
   // Usa direttamente la funzione unificata, passando l'elenco personale
   if (typeof window.mostraOpzioniEsportazione === 'function') {
     window.mostraOpzioniEsportazione(struttureElenco, { forcePersonalList: true });
@@ -7439,7 +7526,7 @@ async function mostraMenuEsportazione(struttureElenco) {
 async function stampaElenco(struttureElenco) {
   // Carica le note personali per tutte le strutture
   await loadPersonalNotesForElenco(struttureElenco);
-  
+
   const printWindow = window.open('', '_blank');
   const printContent = generaContenutoStampa(struttureElenco);
   printWindow.document.write(printContent);
@@ -7485,7 +7572,7 @@ function generaContenutoStampa(struttureElenco) {
             ${s.personalNotes.map(nota => `
               <div style="margin: 5px 0; padding: 8px; background: #f8f9fa; border-left: 3px solid #28a745; border-radius: 4px;">
                 <div style="font-size: 14px; margin-bottom: 4px;">${nota.nota}</div>
-                <div style="font-size: 12px; color: #6c757d;">${nota.createdAt.toLocaleDateString('it-IT')} alle ${nota.createdAt.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}</div>
+                <div style="font-size: 12px; color: #6c757d;">${nota.createdAt.toLocaleDateString('it-IT')} alle ${nota.createdAt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
             `).join('')}
           </div>` : ''}
@@ -7510,17 +7597,17 @@ let struttureTemporanee = new Map();
 async function mostraSchedaCompleta(strutturaId) {
   // Prima cerca nell'array normale
   let struttura = strutture.find(s => s.id === strutturaId);
-  
+
   // Se non trovata, cerca nelle strutture temporanee
   if (!struttura) {
     struttura = struttureTemporanee.get(strutturaId);
   }
-  
+
   if (!struttura) {
     console.error('Struttura non trovata:', strutturaId);
     return;
   }
-  
+
   // Chiama la funzione principale con la struttura trovata
   mostraSchedaCompletaConStruttura(struttura);
 }
@@ -7533,26 +7620,26 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   if (window.analyticsManager) {
     window.analyticsManager.trackStructureView(strutturaId, struttura.Struttura, 'modal');
   }
-  
+
   // Trigger evento per preloading predittivo
   document.dispatchEvent(new CustomEvent('cardOpened', {
     detail: { structureId: strutturaId }
   }));
-  
+
   // Determina se è una nuova struttura: solo se l'ID inizia con 'new_'
   // Se la struttura ha già un ID Firestore valido (non inizia con 'new_'), è una struttura esistente
   const isNewStructure = strutturaId.startsWith('new_');
-  
+
   // Se è una nuova struttura, salvala nella mappa temporanea per riferimento
   if (isNewStructure) {
     struttureTemporanee.set(strutturaId, struttura);
   }
-  
+
   // Rimuovi modal esistente se presente
   if (modalScheda) {
     modalScheda.remove();
   }
-  
+
   // Crea modal per scheda completa
   modalScheda = document.createElement('div');
   modalScheda.id = 'schedaCompletaModal';
@@ -7568,7 +7655,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -7584,7 +7671,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     position: relative;
     border: 1px solid var(--border-light);
   `;
-  
+
   // Header con titolo e controlli
   const header = document.createElement('div');
   header.style.cssText = `
@@ -7595,7 +7682,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
   `;
-  
+
   const title = document.createElement('h2');
   title.textContent = isNewStructure ? '📋 Nuova Struttura' : `📋 Scheda: ${struttura.Struttura || 'Senza nome'}`;
   title.style.cssText = `
@@ -7603,14 +7690,14 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     color: var(--accent-color, #2f6b2f);
     font-size: 1.5rem;
   `;
-  
+
   const controls = document.createElement('div');
   controls.style.cssText = `
     display: flex;
     gap: 10px;
     align-items: center;
   `;
-  
+
   const editBtn = document.createElement('button');
   editBtn.innerHTML = isNewStructure ? '✏️ Compila' : '✏️ Modifica';
   editBtn.style.cssText = `
@@ -7623,7 +7710,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     font-size: 14px;
   `;
   editBtn.onclick = () => toggleEditMode();
-  
+
   const saveBtn = document.createElement('button');
   saveBtn.innerHTML = isNewStructure ? '💾 Crea' : '💾 Salva';
   saveBtn.style.cssText = `
@@ -7637,7 +7724,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     display: none;
   `;
   saveBtn.onclick = () => salvaModificheScheda(strutturaId);
-  
+
   const cancelBtn = document.createElement('button');
   cancelBtn.innerHTML = '❌ Annulla';
   cancelBtn.style.cssText = `
@@ -7659,7 +7746,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       toggleEditMode();
     }
   };
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '← Indietro';
   closeBtn.style.cssText = `
@@ -7681,7 +7768,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     }
     modalScheda.remove();
   };
-  
+
   const mapBtn = document.createElement('button');
   mapBtn.innerHTML = '🗺️ Vedi su mappa';
   mapBtn.style.cssText = `
@@ -7703,16 +7790,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       centerMapOnStructure(strutturaId);
     }, 1500);
   };
-  
+
   controls.appendChild(editBtn);
   controls.appendChild(mapBtn);
   controls.appendChild(saveBtn);
   controls.appendChild(cancelBtn);
   controls.appendChild(closeBtn);
-  
+
   header.appendChild(title);
   header.appendChild(controls);
-  
+
   // Galleria immagini
   const galleryContainer = document.createElement('div');
   galleryContainer.id = 'imageGallery';
@@ -7721,7 +7808,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     border-radius: 8px;
     overflow: hidden;
   `;
-  
+
   // Contenuto scheda
   const content = document.createElement('div');
   content.id = 'schedaContent';
@@ -7730,7 +7817,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 20px;
   `;
-  
+
   // Funzione per creare la galleria immagini
   async function creaGalleriaImmagini() {
     galleryContainer.innerHTML = `
@@ -7751,29 +7838,29 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         </div>
       </div>
     `;
-    
+
     // Carica immagini esistenti
     await caricaImmaginiEsistenti();
-    
+
     // Event listener per upload
     if (isEditMode) {
       const fileInput = document.getElementById('imageUpload');
       fileInput.addEventListener('change', handleImageUpload);
     }
   }
-  
+
   async function caricaImmaginiEsistenti() {
     const galleryGrid = document.getElementById('galleryGrid');
-    
+
     if (!galleryGrid) {
       console.warn('⚠️ GalleryGrid non trovato, skip caricamento immagini');
       return;
     }
-    
+
     try {
       // Carica galleria da MediaManager
       const images = await window.mediaManager?.getGallery(strutturaId) || [];
-      
+
       if (images.length === 0) {
         galleryGrid.innerHTML = `
           <div style="grid-column: 1/-1; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.9rem; padding: 20px;">
@@ -7782,7 +7869,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         `;
         return;
       }
-      
+
       galleryGrid.innerHTML = images.map(img => `
         <div style="position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="if(typeof apriLightbox === 'function') apriLightbox('${img.id}'); else console.warn('apriLightbox non disponibile')">
           <img src="${img.thumbnailUrl || img.url}" 
@@ -7806,7 +7893,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           ` : ''}
         </div>
       `).join('');
-      
+
     } catch (error) {
       console.error('❌ Errore caricamento galleria:', error);
       if (galleryGrid) {
@@ -7818,13 +7905,13 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       }
     }
   }
-  
+
   async function handleImageUpload(event) {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
-    
+
     const galleryGrid = document.getElementById('galleryGrid');
-    
+
     // Mostra indicatore di caricamento
     const loadingDiv = document.createElement('div');
     loadingDiv.style.cssText = `
@@ -7838,64 +7925,64 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     `;
     loadingDiv.innerHTML = `📤 Caricamento ${files.length} immagine/i...`;
     galleryGrid.appendChild(loadingDiv);
-    
+
     try {
       for (const file of files) {
         if (!file.type.startsWith('image/')) {
           console.warn('⚠️ File non supportato:', file.name);
           continue;
         }
-        
+
         // Upload immagine
         const uploadedImage = await window.mediaManager.uploadImage(file, strutturaId, {
           uploadedBy: window.getCurrentUser()?.uid || 'anonymous'
         });
-        
+
         console.log('✅ Immagine caricata:', uploadedImage.id);
       }
-      
+
       // Ricarica galleria
       await caricaImmaginiEsistenti();
-      
+
       // Notifica successo
       window.showNotification('✅ Immagini caricate', {
         body: `${files.length} immagini aggiunte alla galleria`,
         tag: 'images-uploaded'
       });
-      
+
     } catch (error) {
       console.error('❌ Errore upload immagini:', error);
       alert('Errore durante il caricamento delle immagini: ' + error.message);
-      
+
       // Rimuovi indicatore di caricamento e ricarica
       loadingDiv.remove();
       await caricaImmaginiEsistenti();
     }
   }
-  
+
   async function eliminaImmagine(imageId) {
     if (!confirm('Sei sicuro di voler eliminare questa immagine?')) {
       return;
     }
-    
+
     try {
       await window.mediaManager.deleteImage(imageId, strutturaId);
       await caricaImmaginiEsistenti();
-      
+
       window.showNotification('✅ Immagine eliminata', {
         body: 'L\'immagine è stata rimossa dalla galleria',
         tag: 'image-deleted'
       });
-      
+
     } catch (error) {
       console.error('❌ Errore eliminazione immagine:', error);
       alert('Errore durante l\'eliminazione dell\'immagine: ' + error.message);
     }
   }
-  
+
   // Esponi funzione globalmente per uso inline
   window.eliminaImmagine = eliminaImmagine;
-  
+
   // Funzione per aprire lightbox
   function apriLightbox(imageId) {
     // Implementazione lightbox semplificata
@@ -7910,16 +7997,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       z-index: 10001;
       padding: 20px;
     `;
-    
+
     lightbox.innerHTML = `
       <div style="position: relative; max-width: 90%; max-height: 90%;">
         <img id="lightboxImage" src="" alt="Immagine" style="max-width: 100%; max-height: 100%; object-fit: contain;">
         <button onclick="this.closest('div').remove()" style="position: absolute; top: -40px; right: 0; background: none; border: none; color: white; font-size: 2rem; cursor: pointer;">×</button>
       </div>
     `;
-    
+
     document.body.appendChild(lightbox);
-    
+
     // Carica immagine full-size
     window.mediaManager.getGallery(strutturaId).then(images => {
       const image = images.find(img => img.id === imageId);
@@ -7927,26 +8014,26 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         document.getElementById('lightboxImage').src = image.url;
       }
     });
-    
+
     // Chiudi con ESC
     lightbox.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         lightbox.remove();
       }
     });
-    
+
     // Focus per ricevere eventi tastiera
     lightbox.focus();
     lightbox.tabIndex = -1;
   }
-  
+
   // Esponi funzione globalmente per uso inline
   window.apriLightbox = apriLightbox;
-  
+
   // Funzione per creare il contenuto
   function creaContenutoScheda() {
     content.innerHTML = '';
-    
+
     // Organizza i campi per categoria
     const categorie = {
       'Informazioni Principali': [
@@ -7955,10 +8042,10 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       'Costi €': [
         'A persona', 'A giornata', 'A notte', 'Offerta', 'Forfait', 'Riscaldamento', 'Cucina', 'Altri costi', 'Altre info'
       ],
-    'Caratteristiche Struttura': [
-      'Terreno', 'Casa', 'Letti', 'Letti', 'Cucina', 'Cucina', 'Spazi', 'Spazi', 'Fuochi', 'Fuochi',
-      'Hike', 'Hike', 'Trasporti', 'Altre info'
-    ],
+      'Caratteristiche Struttura': [
+        'Terreno', 'Casa', 'Letti', 'Letti', 'Cucina', 'Cucina', 'Spazi', 'Spazi', 'Fuochi', 'Fuochi',
+        'Hike', 'Hike', 'Trasporti', 'Altre info'
+      ],
       'Adatto per': [
         'Branco', 'Reparto', 'Compagnia', 'Gruppo', 'Sezione'
       ],
@@ -7975,7 +8062,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         'rating'
       ]
     };
-    
+
     // Aggiungi campi per categoria
     Object.entries(categorie).forEach(([nomeCategoria, campi]) => {
       const categoriaDiv = document.createElement('div');
@@ -7986,7 +8073,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         border-left: 4px solid var(--primary);
         border: 1px solid var(--border-light);
       `;
-      
+
       const categoriaTitle = document.createElement('h3');
       categoriaTitle.textContent = nomeCategoria;
       categoriaTitle.style.cssText = `
@@ -7995,17 +8082,17 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         font-size: 1.1rem;
       `;
       if (categoriaDiv && categoriaTitle) {
-      categoriaDiv.appendChild(categoriaTitle);
-    }
-      
+        categoriaDiv.appendChild(categoriaTitle);
+      }
+
       // Traccia le occorrenze dei campi per gestire i duplicati
       const campoOccorrenze = {};
-      
+
       campi.forEach(campo => {
         // Conta le occorrenze del campo
         campoOccorrenze[campo] = (campoOccorrenze[campo] || 0) + 1;
         const isSecondaOccorrenza = campoOccorrenze[campo] > 1;
-        
+
         const campoDiv = document.createElement('div');
         campoDiv.style.cssText = `
           margin-bottom: 10px;
@@ -8015,27 +8102,27 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           border-radius: 4px;
           border: 1px solid var(--border-light);
         `;
-        
+
         const label = document.createElement('strong');
         // Per i campi duplicati, aggiungi "info" alle etichette dei campi text
-        const labelText = (['Letti', 'Cucina', 'Spazi', 'Fuochi', 'Hike'].includes(campo) && isSecondaOccorrenza) 
-          ? `${campo} info: ` 
+        const labelText = (['Letti', 'Cucina', 'Spazi', 'Fuochi', 'Hike'].includes(campo) && isSecondaOccorrenza)
+          ? `${campo} info: `
           : `${campo}: `;
         label.textContent = labelText;
         label.style.color = 'var(--text-primary)';
-        
+
         if (isEditMode) {
           // Modalità modifica
           // Per i campi duplicati, la prima occorrenza è checkbox, la seconda è text
-          const isCheckboxField = ['Terreno', 'Casa', 'Branco', 'Reparto', 'Compagnia', 'Gruppo', 'Sezione'].includes(campo) || 
-                                 (['Letti', 'Cucina', 'Spazi', 'Fuochi', 'Hike'].includes(campo) && !isSecondaOccorrenza);
+          const isCheckboxField = ['Terreno', 'Casa', 'Branco', 'Reparto', 'Compagnia', 'Gruppo', 'Sezione'].includes(campo) ||
+            (['Letti', 'Cucina', 'Spazi', 'Fuochi', 'Hike'].includes(campo) && !isSecondaOccorrenza);
           const isGeoField = ['coordinate_lat', 'coordinate_lng'].includes(campo);
           const isUrlField = ['google_maps_link'].includes(campo);
           const isWebsiteField = campo === 'Sito';
           const isEmailField = campo === 'Email';
           const isPhoneField = ['Contatto', 'IIcontatto'].includes(campo);
           const isStateField = campo === 'stato';
-          
+
           if (isCheckboxField) {
             // Campo checkbox
             const input = document.createElement('input');
@@ -8048,7 +8135,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             input.onchange = (e) => {
               struttura[campo] = e.target.checked;
             };
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(input);
           } else if (isStateField) {
@@ -8063,13 +8150,13 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               color: var(--text-primary);
               border: 1px solid var(--border-medium);
             `;
-            
+
             const options = [
               { value: 'attiva', text: '🟢 Attiva' },
               { value: 'temporaneamente_non_attiva', text: '🟡 Temporaneamente non attiva' },
               { value: 'non_piu_attiva', text: '🔴 Non più attiva' }
             ];
-            
+
             options.forEach(option => {
               const optionElement = document.createElement('option');
               optionElement.value = option.value;
@@ -8079,11 +8166,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               }
               select.appendChild(optionElement);
             });
-            
+
             select.onchange = (e) => {
               struttura[campo] = e.target.value;
             };
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(select);
           } else if (isGeoField) {
@@ -8105,7 +8192,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             input.onchange = (e) => {
               struttura[campo] = e.target.value ? parseFloat(e.target.value) : null;
             };
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(input);
           } else if (isUrlField) {
@@ -8126,7 +8213,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             input.onchange = (e) => {
               struttura[campo] = e.target.value;
             };
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(input);
           } else if (isWebsiteField) {
@@ -8137,7 +8224,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 8px;
               align-items: center;
             `;
-            
+
             const input = document.createElement('input');
             input.type = 'url';
             input.value = struttura[campo] || '';
@@ -8154,7 +8241,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             input.onchange = (e) => {
               struttura[campo] = e.target.value;
             };
-            
+
             const websiteBtn = document.createElement('button');
             websiteBtn.innerHTML = '🌐';
             websiteBtn.title = 'Apri sito web';
@@ -8179,10 +8266,10 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             websiteBtn.onmouseout = () => {
               websiteBtn.style.backgroundColor = '#6c757d';
             };
-            
+
             inputContainer.appendChild(input);
             inputContainer.appendChild(websiteBtn);
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(inputContainer);
           } else if (isEmailField) {
@@ -8193,7 +8280,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 8px;
               align-items: center;
             `;
-            
+
             const input = document.createElement('input');
             input.type = 'email';
             input.value = struttura[campo] || '';
@@ -8210,7 +8297,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             input.onchange = (e) => {
               struttura[campo] = e.target.value;
             };
-            
+
             const emailBtn = document.createElement('button');
             emailBtn.innerHTML = '📧';
             emailBtn.title = 'Scrivi email';
@@ -8237,10 +8324,10 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             emailBtn.onmouseout = () => {
               emailBtn.style.backgroundColor = '#007bff';
             };
-            
+
             inputContainer.appendChild(input);
             inputContainer.appendChild(emailBtn);
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(inputContainer);
           } else if (isPhoneField) {
@@ -8251,7 +8338,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 8px;
               align-items: center;
             `;
-            
+
             const input = document.createElement('input');
             input.type = 'tel';
             input.value = struttura[campo] || '';
@@ -8268,7 +8355,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             input.onchange = (e) => {
               struttura[campo] = e.target.value;
             };
-            
+
             const whatsappBtn = document.createElement('button');
             whatsappBtn.innerHTML = '💬';
             whatsappBtn.title = 'Contatta via WhatsApp';
@@ -8295,10 +8382,10 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             whatsappBtn.onmouseout = () => {
               whatsappBtn.style.backgroundColor = '#25d366';
             };
-            
+
             inputContainer.appendChild(input);
             inputContainer.appendChild(whatsappBtn);
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(inputContainer);
           } else if (campo === 'rating') {
@@ -8310,16 +8397,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 10px;
               margin: 8px 0;
             `;
-            
+
             const starsContainer = document.createElement('div');
             starsContainer.style.cssText = `
               display: flex;
               gap: 2px;
             `;
-            
+
             const currentRating = struttura.rating?.average || 0;
             const totalVotes = struttura.rating?.count || 0;
-            
+
             // Crea le stelle
             for (let i = 1; i <= 5; i++) {
               const star = document.createElement('span');
@@ -8340,16 +8427,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               };
               starsContainer.appendChild(star);
             }
-            
+
             const ratingInfo = document.createElement('span');
             ratingInfo.textContent = ` (${currentRating.toFixed(1)}/5 - ${totalVotes} voti)`;
             ratingInfo.style.color = 'var(--text-secondary)';
             ratingInfo.style.fontSize = '14px';
-            
+
             ratingDiv.appendChild(label);
             ratingDiv.appendChild(starsContainer);
             ratingDiv.appendChild(ratingInfo);
-            
+
             campoDiv.appendChild(ratingDiv);
           } else {
             // Campo di testo normale
@@ -8369,16 +8456,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             input.onchange = (e) => {
               struttura[campo] = e.target.value;
             };
-            
+
             campoDiv.appendChild(label);
             campoDiv.appendChild(input);
           }
         } else {
           // Modalità visualizzazione
           // Per i campi duplicati, la prima occorrenza è checkbox, la seconda è text
-          const isCheckboxField = ['Terreno', 'Casa', 'Branco', 'Reparto', 'Compagnia', 'Gruppo', 'Sezione'].includes(campo) || 
-                                 (['Letti', 'Cucina', 'Spazi', 'Fuochi', 'Hike'].includes(campo) && !isSecondaOccorrenza);
-          
+          const isCheckboxField = ['Terreno', 'Casa', 'Branco', 'Reparto', 'Compagnia', 'Gruppo', 'Sezione'].includes(campo) ||
+            (['Letti', 'Cucina', 'Spazi', 'Fuochi', 'Hike'].includes(campo) && !isSecondaOccorrenza);
+
           if (campo === 'rating') {
             // Gestione speciale per il rating
             const ratingDiv = document.createElement('div');
@@ -8388,20 +8475,20 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 10px;
               margin: 8px 0;
             `;
-            
+
             const ratingLabel = document.createElement('strong');
             ratingLabel.textContent = 'Rating: ';
             ratingLabel.style.color = 'var(--text-primary)';
-            
+
             const starsContainer = document.createElement('div');
             starsContainer.style.cssText = `
               display: flex;
               gap: 2px;
             `;
-            
+
             const currentRating = struttura.rating?.average || 0;
             const totalVotes = struttura.rating?.count || 0;
-            
+
             // Crea le stelle
             for (let i = 1; i <= 5; i++) {
               const star = document.createElement('span');
@@ -8422,16 +8509,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               };
               starsContainer.appendChild(star);
             }
-            
+
             const ratingInfo = document.createElement('span');
             ratingInfo.textContent = ` (${currentRating.toFixed(1)}/5 - ${totalVotes} voti)`;
             ratingInfo.style.color = 'var(--text-secondary)';
             ratingInfo.style.fontSize = '14px';
-            
+
             ratingDiv.appendChild(ratingLabel);
             ratingDiv.appendChild(starsContainer);
             ratingDiv.appendChild(ratingInfo);
-            
+
             campoDiv.appendChild(ratingDiv);
           } else if (campo === 'stato') {
             // Gestione speciale per lo stato
@@ -8442,18 +8529,18 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 10px;
               margin: 8px 0;
             `;
-            
+
             const statoLabel = document.createElement('strong');
             statoLabel.textContent = 'Stato: ';
             statoLabel.style.color = 'var(--text-primary)';
-            
+
             const statoValue = document.createElement('span');
             const stato = struttura[campo];
-            
+
             if (stato) {
               let statoText = '';
               let statoColor = '';
-              
+
               switch (stato) {
                 case 'attiva':
                   statoText = '🟢 Attiva';
@@ -8471,7 +8558,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
                   statoText = '❓ Stato sconosciuto';
                   statoColor = '#6c757d';
               }
-              
+
               statoValue.textContent = statoText;
               statoValue.style.cssText = `
                 color: ${statoColor};
@@ -8488,7 +8575,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
                 font-style: italic;
               `;
             }
-            
+
             statoDiv.appendChild(statoLabel);
             statoDiv.appendChild(statoValue);
             campoDiv.appendChild(statoDiv);
@@ -8501,13 +8588,13 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 10px;
               margin: 8px 0;
             `;
-            
+
             const linkLabel = document.createElement('strong');
             linkLabel.textContent = 'Google Maps: ';
             linkLabel.style.color = 'var(--text-primary)';
-            
+
             const valore = struttura[campo];
-            
+
             if (valore && valore.trim() !== '') {
               const link = document.createElement('a');
               link.href = valore;
@@ -8531,7 +8618,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
                 link.style.backgroundColor = 'transparent';
                 link.style.color = '#007bff';
               };
-              
+
               linkDiv.appendChild(linkLabel);
               linkDiv.appendChild(link);
             } else {
@@ -8539,11 +8626,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               noLink.textContent = 'Non specificato';
               noLink.style.color = 'var(--text-secondary)';
               noLink.style.fontStyle = 'italic';
-              
+
               linkDiv.appendChild(linkLabel);
               linkDiv.appendChild(noLink);
             }
-            
+
             // Aggiungi pulsanti di navigazione se abbiamo coordinate
             if (struttura.coordinate_lat && struttura.coordinate_lng) {
               const navButtonsDiv = document.createElement('div');
@@ -8553,7 +8640,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
                 margin-top: 8px;
                 flex-wrap: wrap;
               `;
-              
+
               // Pulsante Apri in Mappe
               const mapsBtn = document.createElement('button');
               mapsBtn.innerHTML = '🗺️ Apri in Mappe';
@@ -8576,7 +8663,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               };
               mapsBtn.onmouseover = () => mapsBtn.style.backgroundColor = '#218838';
               mapsBtn.onmouseout = () => mapsBtn.style.backgroundColor = '#28a745';
-              
+
               // Pulsante Calcola Percorso
               const routeBtn = document.createElement('button');
               routeBtn.innerHTML = '🧭 Percorso';
@@ -8603,7 +8690,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               };
               routeBtn.onmouseover = () => routeBtn.style.backgroundColor = '#0056b3';
               routeBtn.onmouseout = () => routeBtn.style.backgroundColor = '#007bff';
-              
+
               // Pulsante Aggiungi a Calendario
               const calendarBtn = document.createElement('button');
               calendarBtn.innerHTML = '📅 Calendario';
@@ -8622,14 +8709,14 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               };
               calendarBtn.onmouseover = () => calendarBtn.style.backgroundColor = '#5a32a3';
               calendarBtn.onmouseout = () => calendarBtn.style.backgroundColor = '#6f42c1';
-              
+
               navButtonsDiv.appendChild(mapsBtn);
               navButtonsDiv.appendChild(routeBtn);
               navButtonsDiv.appendChild(calendarBtn);
-              
+
               linkDiv.appendChild(navButtonsDiv);
             }
-            
+
             campoDiv.appendChild(linkDiv);
           } else if (campo === 'Sito') {
             // Campo sito web con pulsante nella modalità visualizzazione
@@ -8640,18 +8727,18 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 10px;
               margin: 8px 0;
             `;
-            
+
             const websiteLabel = document.createElement('strong');
             websiteLabel.textContent = 'Sito: ';
             websiteLabel.style.color = 'var(--text-primary)';
-            
+
             const valore = struttura[campo];
-            
+
             if (valore && valore.trim() !== '') {
               const websiteValue = document.createElement('span');
               websiteValue.textContent = valore;
               websiteValue.style.color = 'var(--text-primary)';
-              
+
               const websiteBtn = document.createElement('button');
               websiteBtn.innerHTML = '🌐';
               websiteBtn.title = 'Apri sito web';
@@ -8674,7 +8761,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               websiteBtn.onmouseout = () => {
                 websiteBtn.style.backgroundColor = '#6c757d';
               };
-              
+
               websiteDiv.appendChild(websiteLabel);
               websiteDiv.appendChild(websiteValue);
               websiteDiv.appendChild(websiteBtn);
@@ -8685,7 +8772,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               noValue.style.color = 'var(--text-secondary)';
               websiteDiv.appendChild(noValue);
             }
-            
+
             campoDiv.appendChild(websiteDiv);
           } else if (campo === 'Email') {
             // Campo email con pulsante nella modalità visualizzazione
@@ -8696,18 +8783,18 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 10px;
               margin: 8px 0;
             `;
-            
+
             const emailLabel = document.createElement('strong');
             emailLabel.textContent = 'Email: ';
             emailLabel.style.color = 'var(--text-primary)';
-            
+
             const valore = struttura[campo];
-            
+
             if (valore && valore.trim() !== '') {
               const emailValue = document.createElement('span');
               emailValue.textContent = valore;
               emailValue.style.color = 'var(--text-primary)';
-              
+
               const emailBtn = document.createElement('button');
               emailBtn.innerHTML = '📧';
               emailBtn.title = 'Scrivi email';
@@ -8732,7 +8819,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               emailBtn.onmouseout = () => {
                 emailBtn.style.backgroundColor = '#007bff';
               };
-              
+
               emailDiv.appendChild(emailLabel);
               emailDiv.appendChild(emailValue);
               emailDiv.appendChild(emailBtn);
@@ -8743,7 +8830,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               noValue.style.color = 'var(--text-secondary)';
               emailDiv.appendChild(noValue);
             }
-            
+
             campoDiv.appendChild(emailDiv);
           } else if (['Contatto', 'IIcontatto'].includes(campo)) {
             // Campo telefono con pulsante WhatsApp nella modalità visualizzazione
@@ -8754,18 +8841,18 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               gap: 10px;
               margin: 8px 0;
             `;
-            
+
             const phoneLabel = document.createElement('strong');
             phoneLabel.textContent = `${campo}: `;
             phoneLabel.style.color = 'var(--text-primary)';
-            
+
             const valore = struttura[campo];
-            
+
             if (valore && valore.trim() !== '') {
               const phoneValue = document.createElement('span');
               phoneValue.textContent = valore;
               phoneValue.style.color = 'var(--text-primary)';
-              
+
               const whatsappBtn = document.createElement('button');
               whatsappBtn.innerHTML = '💬';
               whatsappBtn.title = 'Contatta via WhatsApp';
@@ -8790,7 +8877,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               whatsappBtn.onmouseout = () => {
                 whatsappBtn.style.backgroundColor = '#25d366';
               };
-              
+
               phoneDiv.appendChild(phoneLabel);
               phoneDiv.appendChild(phoneValue);
               phoneDiv.appendChild(whatsappBtn);
@@ -8801,42 +8888,42 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               noValue.style.color = 'var(--text-secondary)';
               phoneDiv.appendChild(noValue);
             }
-            
+
             campoDiv.appendChild(phoneDiv);
           } else {
-          const value = document.createElement('span');
-          const valore = struttura[campo];
-          
-          if (valore === undefined || valore === null || valore === '') {
-            value.textContent = 'Non specificato';
-            value.style.color = 'var(--text-secondary)';
-            value.style.fontStyle = 'italic';
-          } else if (typeof valore === 'boolean') {
-            value.textContent = valore ? 'Sì' : 'No';
-            value.style.color = valore ? '#28a745' : '#dc3545';
-            value.style.fontWeight = 'bold';
-          } else {
-            value.textContent = valore;
-            value.style.color = 'var(--text-primary)';
-          }
-          
-          campoDiv.appendChild(label);
-          campoDiv.appendChild(value);
+            const value = document.createElement('span');
+            const valore = struttura[campo];
+
+            if (valore === undefined || valore === null || valore === '') {
+              value.textContent = 'Non specificato';
+              value.style.color = 'var(--text-secondary)';
+              value.style.fontStyle = 'italic';
+            } else if (typeof valore === 'boolean') {
+              value.textContent = valore ? 'Sì' : 'No';
+              value.style.color = valore ? '#28a745' : '#dc3545';
+              value.style.fontWeight = 'bold';
+            } else {
+              value.textContent = valore;
+              value.style.color = 'var(--text-primary)';
+            }
+
+            campoDiv.appendChild(label);
+            campoDiv.appendChild(value);
           }
         }
-        
+
         if (categoriaDiv && campoDiv) {
           categoriaDiv.appendChild(campoDiv);
         }
       });
-      
+
       if (content && categoriaDiv) {
         content.appendChild(categoriaDiv);
       }
     });
-    
+
     // Sezione WhatsApp rimossa - ora integrata nella sezione Contatti
-    
+
     // Aggiungi campo Note
     const noteDiv = document.createElement('div');
     noteDiv.style.cssText = `
@@ -8846,7 +8933,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       border-left: 4px solid var(--text-secondary);
       grid-column: 1 / -1;
     `;
-    
+
     const noteTitle = document.createElement('h3');
     noteTitle.textContent = 'Note';
     noteTitle.style.cssText = `
@@ -8855,7 +8942,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       font-size: 1.1rem;
     `;
     noteDiv.appendChild(noteTitle);
-    
+
     const campoDiv = document.createElement('div');
     campoDiv.style.cssText = `
       margin-bottom: 10px;
@@ -8865,11 +8952,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       border-radius: 4px;
       border: 1px solid var(--border-light);
     `;
-    
+
     const label = document.createElement('strong');
     label.textContent = 'Note: ';
     label.style.color = 'var(--text-primary)';
-    
+
     if (isEditMode) {
       // Modalità modifica - textarea per note
       const textarea = document.createElement('textarea');
@@ -8891,7 +8978,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       textarea.onchange = (e) => {
         struttura.Note = e.target.value;
       };
-      
+
       if (campoDiv) {
         campoDiv.appendChild(label);
         campoDiv.appendChild(textarea);
@@ -8900,7 +8987,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       // Modalità visualizzazione
       const value = document.createElement('span');
       const valore = struttura.Note;
-      
+
       if (valore === undefined || valore === null || valore === '') {
         value.textContent = 'Nessuna nota';
         value.style.color = 'var(--text-secondary)';
@@ -8910,20 +8997,20 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         value.style.color = 'var(--text-primary)';
         value.style.whiteSpace = 'pre-wrap';
       }
-      
+
       if (campoDiv) {
         campoDiv.appendChild(label);
         campoDiv.appendChild(value);
       }
     }
-    
+
     if (noteDiv && campoDiv) {
       noteDiv.appendChild(campoDiv);
     }
     if (content && noteDiv) {
       content.appendChild(noteDiv);
     }
-    
+
     // Aggiungi bottone Elimina solo se non è una nuova struttura
     if (!isNewStructure) {
       const deleteSection = document.createElement('div');
@@ -8935,7 +9022,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         grid-column: 1 / -1;
         text-align: center;
       `;
-      
+
       const deleteTitle = document.createElement('h3');
       deleteTitle.textContent = 'Zona Pericolosa';
       deleteTitle.style.cssText = `
@@ -8946,7 +9033,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       if (deleteSection && deleteTitle) {
         deleteSection.appendChild(deleteTitle);
       }
-      
+
       const deleteBtn = document.createElement('button');
       deleteBtn.innerHTML = '🗑️ Elimina Struttura';
       deleteBtn.style.cssText = `
@@ -8961,19 +9048,19 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
         transition: background-color 0.2s;
       `;
-      
+
       deleteBtn.onmouseover = () => {
         deleteBtn.style.background = '#c82333';
       };
-      
+
       deleteBtn.onmouseout = () => {
         deleteBtn.style.background = '#dc3545';
       };
-      
+
       deleteBtn.onclick = () => {
         eliminaStrutturaConConferma(strutturaId);
       };
-      
+
       // Aggiungi pulsante Segnala nella sezione Zona Pericolosa
       const reportBtn = document.createElement('button');
       reportBtn.innerHTML = '⚠️ Segnala';
@@ -8988,7 +9075,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         margin-left: 10px;
       `;
       reportBtn.onclick = () => mostraSegnalazione(strutturaId);
-      
+
       if (deleteSection && deleteBtn) {
         deleteSection.appendChild(deleteBtn);
         deleteSection.appendChild(reportBtn);
@@ -8998,7 +9085,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       }
     }
   }
-  
+
   // Funzione per alternare modalità
   async function toggleEditMode() {
     isEditMode = !isEditMode;
@@ -9008,7 +9095,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     await creaGalleriaImmagini();
     creaContenutoScheda();
   }
-  
+
   // Per le nuove strutture, inizia direttamente in modalità modifica
   if (isNewStructure) {
     isEditMode = true;
@@ -9016,17 +9103,17 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     saveBtn.style.display = 'inline-block';
     cancelBtn.style.display = 'inline-block';
   }
-  
+
   // Funzione per salvare modifiche
   async function salvaModificheScheda(strutturaId) {
     try {
       // I dati del form vengono già aggiornati direttamente nell'oggetto struttura
       // tramite gli event handler onchange dei campi, quindi non serve leggerli dal form
-      
+
       // Determina se è una nuova struttura basandosi sull'ID corrente (non sulla variabile locale)
       // Se l'ID inizia con 'new_', è una nuova struttura, altrimenti è un aggiornamento
       const isNuovaStruttura = strutturaId.startsWith('new_');
-      
+
       if (isNuovaStruttura) {
         // Aggiorna metadati per nuova struttura
         struttura.lastModified = new Date();
@@ -9034,43 +9121,43 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         struttura.createdAt = new Date();
         struttura.createdBy = getCurrentUser()?.uid || null;
         struttura.version = 1;
-        
+
         // Rimuovi la struttura temporanea dalla mappa se presente
         struttureTemporanee.delete(strutturaId);
-        
+
         // Verifica che non esista già una struttura con lo stesso contenuto
         // (per evitare duplicati se l'utente clicca più volte su "Crea")
         if (struttura.Struttura && struttura.Luogo && struttura.Prov) {
-          const strutturaEsistente = strutture.find(s => 
+          const strutturaEsistente = strutture.find(s =>
             s.Struttura && struttura.Struttura &&
-            s.Struttura.trim() === struttura.Struttura.trim() && 
+            s.Struttura.trim() === struttura.Struttura.trim() &&
             s.Luogo && struttura.Luogo &&
-            s.Luogo.trim() === struttura.Luogo.trim() && 
+            s.Luogo.trim() === struttura.Luogo.trim() &&
             s.Prov && struttura.Prov &&
             s.Prov.trim() === struttura.Prov.trim() &&
             s.id && !s.id.startsWith('new_') // Solo strutture già salvate
           );
-          
+
           if (strutturaEsistente) {
             alert('⚠️ Una struttura identica esiste già!');
             modalScheda.remove();
             return;
           }
         }
-        
+
         // Crea nuova struttura in Firestore
         const docRef = await addDoc(colRef, struttura);
-        
+
         // Aggiorna l'ID con quello di Firestore
         const nuovoId = docRef.id;
         struttura.id = nuovoId;
-        
+
         // Verifica che non esista già nell'array prima di aggiungerla
         const giaPresente = strutture.find(s => s.id === nuovoId);
         if (!giaPresente) {
           // Aggiungi la struttura con l'ID corretto all'array
           strutture.push({ ...struttura });
-          
+
           // Aggiorna le strutture globali
           window.strutture = strutture;
         } else {
@@ -9081,20 +9168,20 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             window.strutture = strutture;
           }
         }
-        
+
         // Log attività
         await logActivity('structure_created', nuovoId, getCurrentUser()?.uid, {
           name: struttura.Struttura,
           location: struttura.Luogo
         });
-        
+
         // Notifica push per nuova struttura
         if (window.notifyNewStructure) {
           await window.notifyNewStructure(struttura);
         }
-        
+
         alert('✅ Nuova struttura creata con successo!');
-        
+
         // Sincronizzazione automatica dopo creazione struttura
         console.log('🔄 Avvio sincronizzazione automatica dopo creazione struttura...');
         try {
@@ -9105,7 +9192,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             window.showStructuresOnMap(struttureLocali);
             console.log('✅ Mappa aggiornata con dati locali');
           }
-          
+
           // Aggiorna la lista principale (usa dati locali)
           aggiornaListaLocale();
           console.log('✅ Lista principale aggiornata con dati locali');
@@ -9113,13 +9200,13 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           console.warn('⚠️ Errore durante sincronizzazione automatica:', syncError);
           // Non bloccare l'utente per errori di sincronizzazione
         }
-        
+
         modalScheda.remove();
         return; // Esci dalla funzione dopo la creazione
       } else {
         // Salva versione precedente prima di modificare
         await salvaVersione(struttura, getCurrentUser()?.uid);
-        
+
         // Sincronizza formato coordinate se presenti
         if (struttura.coordinate_lat && struttura.coordinate_lng) {
           struttura.coordinate = { lat: struttura.coordinate_lat, lng: struttura.coordinate_lng };
@@ -9127,37 +9214,37 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           struttura.coordinate_lat = struttura.coordinate.lat;
           struttura.coordinate_lng = struttura.coordinate.lng;
         }
-        
+
         // Aggiorna metadati
         struttura.lastModified = new Date();
         struttura.lastModifiedBy = getCurrentUser()?.uid || null;
         struttura.version = (struttura.version || 1) + 1;
-        
+
         // Aggiorna struttura esistente
         const docRef = doc(db, "strutture", strutturaId);
         await updateDoc(docRef, struttura);
-        
+
         // INVALIDARE CACHE LOCALE per forzare ricaricamento
         localStorage.removeItem('strutture_cache');
         localStorage.removeItem('strutture_cache_timestamp');
         console.log('🗑️ Cache invalidata dopo modifica scheda completa');
-        
+
         // Aggiorna la struttura locale
         const index = strutture.findIndex(s => s.id === strutturaId);
         if (index !== -1) {
           strutture[index] = { ...struttura };
         }
-        
+
         // Aggiorna le strutture globali
         window.strutture = strutture;
-        
+
         // Log attività
         await logActivity('structure_updated', strutturaId, getCurrentUser()?.uid, {
           version: struttura.version
         });
-        
+
         alert('✅ Modifiche salvate con successo!');
-        
+
         // Sincronizzazione automatica dopo modifica struttura
         console.log('🔄 Avvio sincronizzazione automatica dopo modifica struttura...');
         try {
@@ -9168,7 +9255,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             window.showStructuresOnMap(struttureLocali);
             console.log('✅ Mappa aggiornata con dati locali');
           }
-          
+
           // Aggiorna la lista principale (usa dati locali)
           aggiornaListaLocale();
           console.log('✅ Lista principale aggiornata con dati locali');
@@ -9176,16 +9263,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           console.warn('⚠️ Errore durante sincronizzazione automatica:', syncError);
           // Non bloccare l'utente per errori di sincronizzazione
         }
-        
+
         toggleEditMode();
       }
-      
+
     } catch (error) {
       console.error('❌ Errore nel salvataggio:', error);
       alert('❌ Errore nel salvataggio: ' + error.message);
     }
   }
-  
+
   // Funzione per aprire lightbox immagini
   async function apriLightbox(imageId) {
     console.log('🖼️ Apertura lightbox per immagine:', imageId);
@@ -9202,18 +9289,18 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       console.error('❌ Errore apertura lightbox:', error);
     }
   }
-  
+
   // Costruisci DOM prima di caricare contenuto asincrono
   modalContent.appendChild(header);
   modalContent.appendChild(galleryContainer);
   modalContent.appendChild(content);
   modalScheda.appendChild(modalContent);
   document.body.appendChild(modalScheda);
-  
+
   // Ora che il modal è nel DOM, carica il contenuto
   creaContenutoScheda();
   await creaGalleriaImmagini();
-  
+
   // Chiudi modal cliccando fuori
   modalScheda.addEventListener('click', (e) => {
     if (e.target === modalScheda) {
@@ -9237,32 +9324,32 @@ window.mostraSchedaCompleta = mostraSchedaCompleta;
 // === Toggle modalità visualizzazione ===
 function toggleViewMode() {
   isListViewMode = !isListViewMode;
-  
+
   // Aggiorna il toggle button
   const toggleBtn = document.getElementById('viewToggle');
   const viewIcon = toggleBtn.querySelector('.view-icon');
   const viewLabel = toggleBtn.querySelector('.view-label');
-  
+
   if (isListViewMode) {
     viewIcon.textContent = '📄';
     viewLabel.textContent = 'Schede';
     toggleBtn.classList.add('active');
-    
+
     // Aggiungi classe al body per stili CSS
     document.body.classList.add('list-view');
   } else {
     viewIcon.textContent = '📋';
     viewLabel.textContent = 'Elenco';
     toggleBtn.classList.remove('active');
-    
+
     // Rimuovi classe dal body
     document.body.classList.remove('list-view');
   }
-  
+
   // Ricarica i risultati con la nuova modalità
   const listaFiltrata = filtra(strutture);
   renderStrutture(listaFiltrata);
-  
+
   // Salva preferenza utente
   localStorage.setItem('viewMode', isListViewMode ? 'list' : 'cards');
 }
@@ -9272,16 +9359,16 @@ function resetFiltri() {
   document.getElementById('search').value = '';
   const provEl = document.getElementById('filter-prov');
   if (provEl) provEl.value = '';
-  
+
   // Reset filtri avanzati
   window.filtriAvanzatiAttivi = null;
   const indicator = document.getElementById('indicatore-ricerca-avanzata');
   if (indicator) indicator.remove();
-  
+
   // Reset contatore
   const contatore = document.getElementById('contatore-risultati');
   if (contatore) contatore.remove();
-  
+
   renderStrutture(filtra(strutture));
 }
 
@@ -9289,7 +9376,7 @@ function resetFiltri() {
 let strutture = [];
 async function aggiornaLista() {
   strutture = await caricaStrutture();
-  
+
   // Rendi le strutture globali per accesso dalla dashboard
   window.strutture = strutture;
   renderStrutture(filtra(strutture));
@@ -9307,11 +9394,11 @@ function aggiornaListaLocale() {
 function mostraCaricamento() {
   const resultsContainer = document.getElementById('results');
   const loadingIndicator = document.getElementById('loadingIndicator');
-  
+
   if (resultsContainer) {
     resultsContainer.innerHTML = '';
   }
-  
+
   if (loadingIndicator) {
     loadingIndicator.classList.remove('hidden');
   }
@@ -9320,11 +9407,11 @@ function mostraCaricamento() {
 // Inizializzazione nuova UI mobile-first
 function initializeNewUI() {
   console.log('🎨 Inizializzazione UI mobile-first...');
-  
+
   // Menu toggle
   const menuToggle = document.getElementById('menuToggle');
   const mainMenu = document.getElementById('mainMenu');
-  
+
   if (menuToggle && mainMenu) {
     console.log('📱 Menu toggle trovato, aggiungo event listener');
     console.log('📱 Stato iniziale menu:', mainMenu.classList.toString());
@@ -9339,7 +9426,7 @@ function initializeNewUI() {
       menuToggle.setAttribute('aria-expanded', !isOpen);
       document.body.style.overflow = !isOpen ? 'hidden' : '';
     });
-    
+
     // Chiudi menu cliccando fuori
     mainMenu.addEventListener('click', (e) => {
       if (e.target === mainMenu) {
@@ -9364,7 +9451,7 @@ function initializeNewUI() {
     console.log('📱 Menu toggle element:', menuToggle);
     console.log('📱 Main menu element:', mainMenu);
   }
-  
+
   // Theme toggle
   const themeToggle = document.getElementById('themeToggle');
   if (themeToggle) {
@@ -9381,7 +9468,7 @@ function initializeNewUI() {
   } else {
     console.warn('⚠️ Theme toggle non trovato');
   }
-  
+
   // Empty state button
   const addBtnEmpty = document.getElementById('addBtnEmpty');
   const addBtn = document.getElementById('add-btn');
@@ -9390,7 +9477,7 @@ function initializeNewUI() {
       addBtn.click();
     });
   }
-  
+
   console.log('✅ Nuova UI inizializzata');
 }
 
@@ -9401,7 +9488,7 @@ function initializeNewUI() {
 function mostraPreferenzeNotifiche() {
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('preferenzeNotificheModal');
   if (existingModal) {
@@ -9837,11 +9924,11 @@ function mostraPreferenzeNotifiche() {
 
   // Carica preferenze attuali
   caricaPreferenzeNotifiche();
-  
+
   // Event listener per slider distanza
   const distanceSlider = document.getElementById('distanceSlider');
   const distanceValue = document.getElementById('distanceValue');
-  
+
   distanceSlider.addEventListener('input', (e) => {
     distanceValue.textContent = `${e.target.value} km`;
   });
@@ -9856,22 +9943,22 @@ function mostraPreferenzeNotifiche() {
 
 function caricaPreferenzeNotifiche() {
   if (!window.pushManager?.preferences) return;
-  
+
   const prefs = window.pushManager.preferences.preferences;
-  
+
   // Carica toggle switches (solo se esistono)
   const newStructuresEl = document.getElementById('newStructures');
   const structureUpdatesEl = document.getElementById('structureUpdates');
   const personalListUpdatesEl = document.getElementById('personalListUpdates');
   const nearbyStructuresEl = document.getElementById('nearbyStructures');
   const reportsEl = document.getElementById('reports');
-  
+
   if (newStructuresEl) newStructuresEl.checked = prefs.newStructures;
   if (structureUpdatesEl) structureUpdatesEl.checked = prefs.structureUpdates;
   if (personalListUpdatesEl) personalListUpdatesEl.checked = prefs.personalListUpdates;
   if (nearbyStructuresEl) nearbyStructuresEl.checked = prefs.nearbyStructures;
   if (reportsEl) reportsEl.checked = prefs.reports;
-  
+
   // Carica slider distanza
   document.getElementById('distanceSlider').value = prefs.distance;
   document.getElementById('distanceValue').textContent = `${prefs.distance} km`;
@@ -9882,7 +9969,7 @@ async function salvaPreferenzeNotifiche() {
     alert('Errore: Utente non autenticato');
     return;
   }
-  
+
   // Aggiorna preferenze (solo se gli elementi esistono)
   const prefs = window.pushManager.preferences.preferences;
   const newStructuresEl = document.getElementById('newStructures');
@@ -9891,20 +9978,20 @@ async function salvaPreferenzeNotifiche() {
   const nearbyStructuresEl = document.getElementById('nearbyStructures');
   const reportsEl = document.getElementById('reports');
   const distanceSliderEl = document.getElementById('distanceSlider');
-  
+
   if (newStructuresEl) prefs.newStructures = newStructuresEl.checked;
   if (structureUpdatesEl) prefs.structureUpdates = structureUpdatesEl.checked;
   if (personalListUpdatesEl) prefs.personalListUpdates = personalListUpdatesEl.checked;
   if (nearbyStructuresEl) prefs.nearbyStructures = nearbyStructuresEl.checked;
   if (reportsEl) prefs.reports = reportsEl.checked;
   if (distanceSliderEl) prefs.distance = parseInt(distanceSliderEl.value);
-  
+
   // Salva su Firestore
   await window.pushManager.preferences.save(window.getCurrentUser().uid);
-  
+
   // Chiudi modal
   document.getElementById('preferenzeNotificheModal').remove();
-  
+
   // Mostra conferma
   window.showNotification('✅ Preferenze salvate', {
     body: 'Le tue preferenze notifiche sono state aggiornate',
@@ -9922,30 +10009,30 @@ function testNotification() {
 // === Preloading Predittivo ===
 function preloadNearbyStructures(currentStructureId) {
   if (!currentStructureId || !window.strutture) return;
-  
+
   const currentStructure = window.strutture.find(s => s.id === currentStructureId);
   if (!currentStructure) return;
-  
+
   // Trova strutture vicine (stessa provincia o coordinate simili)
   const nearby = window.strutture.filter(s => {
     if (s.id === currentStructureId) return false;
-    
+
     // Stessa provincia
     if (s.Prov === currentStructure.Prov) return true;
-    
+
     // Coordinate simili (se disponibili)
-    if (currentStructure.coordinate?.lat && currentStructure.coordinate?.lng && 
-        s.coordinate?.lat && s.coordinate?.lng) {
+    if (currentStructure.coordinate?.lat && currentStructure.coordinate?.lng &&
+      s.coordinate?.lat && s.coordinate?.lng) {
       const distance = calculateDistance(
-        currentStructure.coordinate, 
+        currentStructure.coordinate,
         s.coordinate
       );
       return distance < 10; // 10 km
     }
-    
+
     return false;
   });
-  
+
   // Preload prime 5 strutture vicine
   nearby.slice(0, 5).forEach(s => {
     if (s.immagini?.[0]) {
@@ -9954,7 +10041,7 @@ function preloadNearbyStructures(currentStructureId) {
       console.log('🔄 Preloading immagine per:', s.Struttura);
     }
   });
-  
+
   console.log(`🔄 Preloaded ${nearby.slice(0, 5).length} strutture vicine`);
 }
 
@@ -9963,11 +10050,11 @@ function calculateDistance(coord1, coord2) {
   const R = 6371; // Raggio della Terra in km
   const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
   const dLon = (coord2.lng - coord1.lng) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
@@ -9984,11 +10071,11 @@ document.addEventListener('cardOpened', (e) => {
 
 async function caricaStruttureOfflineList() {
   const listContainer = document.getElementById('offlineStructuresList');
-  
+
   try {
     // Carica elenco personale
     const elencoPersonale = JSON.parse(localStorage.getItem('elencoPersonale') || '[]');
-    
+
     if (elencoPersonale.length === 0) {
       listContainer.innerHTML = `
         <div style="text-align: center; color: #666; padding: 20px;">
@@ -9997,10 +10084,10 @@ async function caricaStruttureOfflineList() {
       `;
       return;
     }
-    
+
     // Trova le strutture corrispondenti
     const struttureElenco = strutture.filter(s => elencoPersonale.includes(s.id));
-    
+
     listContainer.innerHTML = struttureElenco.map(struttura => `
       <div style="display: flex; align-items: center; padding: 8px; border-bottom: 1px solid #f3f4f6;">
         <input type="checkbox" id="offline_${struttura.id}" style="margin-right: 12px;" checked>
@@ -10013,7 +10100,7 @@ async function caricaStruttureOfflineList() {
         </div>
       </div>
     `).join('');
-    
+
   } catch (error) {
     console.error('❌ Errore caricamento strutture offline:', error);
     listContainer.innerHTML = `
@@ -10029,12 +10116,12 @@ async function caricaStruttureOfflineList() {
 async function downloadForOffline_DISABLED() {
   const checkboxes = document.querySelectorAll('#offlineStructuresList input[type="checkbox"]:checked');
   const selectedIds = Array.from(checkboxes).map(cb => cb.id.replace('offline_', ''));
-  
+
   if (selectedIds.length === 0) {
     alert('Seleziona almeno una struttura da scaricare');
     return;
   }
-  
+
   const progressModal = document.createElement('div');
   progressModal.style.cssText = `
     position: fixed;
@@ -10045,7 +10132,7 @@ async function downloadForOffline_DISABLED() {
     justify-content: center;
     z-index: 1100;
   `;
-  
+
   progressModal.innerHTML = `
     <div style="background: var(--bg-primary); color: var(--text-primary); padding: 24px; border-radius: 12px; text-align: center; min-width: 300px;">
       <h3 style="margin: 0 0 16px 0; color: #2f6b2f;">📥 Download in corso...</h3>
@@ -10057,37 +10144,37 @@ async function downloadForOffline_DISABLED() {
       <div id="downloadStatus" style="color: #666;">Preparazione...</div>
     </div>
   `;
-  
+
   document.body.appendChild(progressModal);
-  
+
   try {
     let completed = 0;
-    
+
     for (const structureId of selectedIds) {
       const struttura = strutture.find(s => s.id === structureId);
       if (!struttura) continue;
-      
+
       // Aggiorna status
       document.getElementById('downloadStatus').textContent = `Scaricando ${struttura.Struttura}...`;
-      
+
       // Salva struttura in IndexedDB
       await salvaStrutturaOffline(struttura);
-      
+
       // Scarica immagini se presenti
       if (struttura.immagini && struttura.immagini.length > 0) {
         for (const img of struttura.immagini) {
           await salvaImmagineOffline(img.url, structureId);
         }
       }
-      
+
       completed++;
       const progress = (completed / selectedIds.length) * 100;
       document.getElementById('downloadProgress').style.width = `${progress}%`;
     }
-    
+
     // Completato
     document.getElementById('downloadStatus').textContent = 'Download completato!';
-    
+
     setTimeout(() => {
       progressModal.remove();
       aggiornaInfoCache();
@@ -10096,7 +10183,7 @@ async function downloadForOffline_DISABLED() {
         tag: 'offline-download-complete'
       });
     }, 1500);
-    
+
   } catch (error) {
     console.error('❌ Errore download offline:', error);
     progressModal.remove();
@@ -10108,22 +10195,22 @@ async function downloadForOffline_DISABLED() {
 async function salvaStrutturaOffline_DISABLED(struttura) {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('QuoVadiScoutDB', 1);
-    
+
     request.onsuccess = () => {
       const db = request.result;
       const transaction = db.transaction(['cachedStructures'], 'readwrite');
       const store = transaction.objectStore('cachedStructures');
-      
+
       const offlineStructure = {
         ...struttura,
         downloadedAt: Date.now(),
         offline: true
       };
-      
+
       store.put(offlineStructure).onsuccess = () => resolve();
       store.put(offlineStructure).onerror = () => reject(store.error);
     };
-    
+
     request.onerror = () => reject(request.error);
   });
 }
@@ -10132,33 +10219,33 @@ async function salvaImmagineOffline(imageUrl, structureId) {
   try {
     const response = await fetch(imageUrl);
     const blob = await response.blob();
-    
+
     return new Promise((resolve, reject) => {
       const request = indexedDB.open('QuoVadiScoutDB', 1);
-      
+
       request.onsuccess = () => {
         const db = request.result;
-        
+
         // Crea store per immagini se non esiste
         if (!db.objectStoreNames.contains('cachedImages')) {
           const transaction = db.transaction(['cachedImages'], 'readwrite');
           db.createObjectStore('cachedImages', { keyPath: 'url' });
         }
-        
+
         const transaction = db.transaction(['cachedImages'], 'readwrite');
         const store = transaction.objectStore('cachedImages');
-        
+
         const imageData = {
           url: imageUrl,
           blob: blob,
           structureId: structureId,
           downloadedAt: Date.now()
         };
-        
+
         store.put(imageData).onsuccess = () => resolve();
         store.put(imageData).onerror = () => reject(store.error);
       };
-      
+
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
@@ -10175,10 +10262,10 @@ async function aggiornaInfoCache_DISABLED() {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    
+
     // Calcola spazio utilizzato
     let cacheSize = 0;
-    
+
     if (db.objectStoreNames.contains('cachedStructures')) {
       const transaction = db.transaction(['cachedStructures'], 'readonly');
       const store = transaction.objectStore('cachedStructures');
@@ -10188,7 +10275,7 @@ async function aggiornaInfoCache_DISABLED() {
       });
       cacheSize += JSON.stringify(structures).length;
     }
-    
+
     if (db.objectStoreNames.contains('cachedImages')) {
       const transaction = db.transaction(['cachedImages'], 'readonly');
       const store = transaction.objectStore('cachedImages');
@@ -10198,14 +10285,14 @@ async function aggiornaInfoCache_DISABLED() {
       });
       cacheSize += images.reduce((total, img) => total + (img.blob?.size || 0), 0);
     }
-    
+
     const sizeMB = (cacheSize / (1024 * 1024)).toFixed(2);
     const maxSize = 50; // MB limite stimato
     const percentage = Math.min((sizeMB / maxSize) * 100, 100);
-    
+
     document.getElementById('cacheSize').textContent = `${sizeMB} MB`;
     document.getElementById('cacheBar').style.width = `${percentage}%`;
-    
+
   } catch (error) {
     console.error('❌ Errore aggiornamento info cache:', error);
     document.getElementById('cacheSize').textContent = 'Errore';
@@ -10217,35 +10304,35 @@ async function pulisciCacheOffline_DISABLED() {
   if (!confirm('Sei sicuro di voler cancellare tutta la cache offline? Questa azione non può essere annullata.')) {
     return;
   }
-  
+
   try {
     const db = await new Promise((resolve, reject) => {
       const request = indexedDB.open('QuoVadiScoutDB', 1);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    
+
     // Pulisci strutture cached
     if (db.objectStoreNames.contains('cachedStructures')) {
       const transaction = db.transaction(['cachedStructures'], 'readwrite');
       const store = transaction.objectStore('cachedStructures');
       await store.clear();
     }
-    
+
     // Pulisci immagini cached
     if (db.objectStoreNames.contains('cachedImages')) {
       const transaction = db.transaction(['cachedImages'], 'readwrite');
       const store = transaction.objectStore('cachedImages');
       await store.clear();
     }
-    
+
     aggiornaInfoCache();
-    
+
     window.showNotification('✅ Cache pulita', {
       body: 'Tutti i dati offline sono stati rimossi',
       tag: 'cache-cleared'
     });
-    
+
   } catch (error) {
     console.error('❌ Errore pulizia cache:', error);
     alert('Errore durante la pulizia della cache: ' + error.message);
@@ -10255,90 +10342,90 @@ async function pulisciCacheOffline_DISABLED() {
 // === Inizializzazione pagina ===
 window.addEventListener("DOMContentLoaded", async () => {
   try {
-  mostraCaricamento();
-  
-  // 🔒 Inizializza sistema di sicurezza
-  console.log('🔒 Sistema di sicurezza attivato');
-  
-  // Attiva lazy loading immagini dopo caricamento DOM
-  if (typeof setupLazyLoading === 'function') {
-    setupLazyLoading();
-  }
-  
-  // Gestisci parametri URL dalla dashboard
-  const urlParams = new URLSearchParams(window.location.search);
-  const filtro = urlParams.get('filtro');
-  const provincia = urlParams.get('provincia');
-  
-  if (filtro && provincia) {
-    console.log(`🔍 Filtro dalla dashboard: ${filtro} in ${provincia}`);
-    // Applica il filtro automaticamente dopo il caricamento
-    window.dashboardFilter = { filtro, provincia };
-  }
-  
-  // Inizializza push notifications
-  if (window.pushManager) {
-    await window.initializePushNotifications();
-  }
-  
-  // Carica preferenza modalità visualizzazione
-  const savedViewMode = localStorage.getItem('viewMode');
-  if (savedViewMode === 'list') {
-    isListViewMode = true;
-    document.body.classList.add('list-view');
-    
-    // Aggiorna il toggle button
-    const toggleBtn = document.getElementById('viewToggle');
-    if (toggleBtn) {
-    const viewIcon = toggleBtn.querySelector('.view-icon');
-    const viewLabel = toggleBtn.querySelector('.view-label');
-    
-      if (viewIcon) viewIcon.textContent = '📄';
-      if (viewLabel) viewLabel.textContent = 'Schede';
-    toggleBtn.classList.add('active');
+    mostraCaricamento();
+
+    // 🔒 Inizializza sistema di sicurezza
+    console.log('🔒 Sistema di sicurezza attivato');
+
+    // Attiva lazy loading immagini dopo caricamento DOM
+    if (typeof setupLazyLoading === 'function') {
+      setupLazyLoading();
     }
-  }
-  
-  // Inizializza UI event listeners
-  initializeNewUI();
-  initializeUIEventListeners();
-  
-  // Inizializza controlli mappa principale
-  setupMainMapControls();
-  
-  // Inizializza sistema autenticazione Firebase
-  inizializzaAuth();
-  
-  // Il caricamento delle strutture è ora gestito in onAuthStateChanged
-  // try {
-  //   strutture = await caricaStrutture();
-  //   // ... resto del codice
-  // }
-    
-  try {
-    // Applica filtro dalla dashboard se presente
-    if (window.dashboardFilter) {
-      const { filtro, provincia } = window.dashboardFilter;
-      console.log(`🔍 Applicando filtro dashboard: ${filtro} in ${provincia}`);
-      
-      // Applica i filtri direttamente senza cercare elementi UI
-      window.filtriAvanzatiAttivi = {
-        tipo: filtro,
-        provincia: provincia
-      };
-      
-      // Applica il filtro
-      const struttureFiltrate = filtra(strutture);
-      renderStrutture(struttureFiltrate);
-      
-      // Mostra indicatore di ricerca avanzata
-      mostraIndicatoreRicercaAvanzata(2);
-      
-      // Mostra messaggio informativo
-      const container = document.getElementById("results");
-      if (container && container.firstChild !== null) {
-        const infoDiv = document.createElement('div');
-        infoDiv.style.cssText = `
+
+    // Gestisci parametri URL dalla dashboard
+    const urlParams = new URLSearchParams(window.location.search);
+    const filtro = urlParams.get('filtro');
+    const provincia = urlParams.get('provincia');
+
+    if (filtro && provincia) {
+      console.log(`🔍 Filtro dalla dashboard: ${filtro} in ${provincia}`);
+      // Applica il filtro automaticamente dopo il caricamento
+      window.dashboardFilter = { filtro, provincia };
+    }
+
+    // Inizializza push notifications
+    if (window.pushManager) {
+      await window.initializePushNotifications();
+    }
+
+    // Carica preferenza modalità visualizzazione
+    const savedViewMode = localStorage.getItem('viewMode');
+    if (savedViewMode === 'list') {
+      isListViewMode = true;
+      document.body.classList.add('list-view');
+
+      // Aggiorna il toggle button
+      const toggleBtn = document.getElementById('viewToggle');
+      if (toggleBtn) {
+        const viewIcon = toggleBtn.querySelector('.view-icon');
+        const viewLabel = toggleBtn.querySelector('.view-label');
+
+        if (viewIcon) viewIcon.textContent = '📄';
+        if (viewLabel) viewLabel.textContent = 'Schede';
+        toggleBtn.classList.add('active');
+      }
+    }
+
+    // Inizializza UI event listeners
+    initializeNewUI();
+    initializeUIEventListeners();
+
+    // Inizializza controlli mappa principale
+    setupMainMapControls();
+
+    // Inizializza sistema autenticazione Firebase
+    inizializzaAuth();
+
+    // Il caricamento delle strutture è ora gestito in onAuthStateChanged
+    // try {
+    //   strutture = await caricaStrutture();
+    //   // ... resto del codice
+    // }
+
+    try {
+      // Applica filtro dalla dashboard se presente
+      if (window.dashboardFilter) {
+        const { filtro, provincia } = window.dashboardFilter;
+        console.log(`🔍 Applicando filtro dashboard: ${filtro} in ${provincia}`);
+
+        // Applica i filtri direttamente senza cercare elementi UI
+        window.filtriAvanzatiAttivi = {
+          tipo: filtro,
+          provincia: provincia
+        };
+
+        // Applica il filtro
+        const struttureFiltrate = filtra(strutture);
+        renderStrutture(struttureFiltrate);
+
+        // Mostra indicatore di ricerca avanzata
+        mostraIndicatoreRicercaAvanzata(2);
+
+        // Mostra messaggio informativo
+        const container = document.getElementById("results");
+        if (container && container.firstChild !== null) {
+          const infoDiv = document.createElement('div');
+          infoDiv.style.cssText = `
           background: #e8f5e8;
           border: 1px solid #2f6b2f;
           border-radius: 6px;
@@ -10347,17 +10434,17 @@ window.addEventListener("DOMContentLoaded", async () => {
           color: #2f6b2f;
           font-weight: 500;
         `;
-        infoDiv.innerHTML = `
+          infoDiv.innerHTML = `
           🔍 <strong>Filtro applicato dalla dashboard:</strong> 
           ${filtro === 'casa' ? 'Case' : filtro === 'terreno' ? 'Terreni' : 'Case e Terreni'} 
           in provincia di ${provincia}
           <button onclick="this.parentElement.remove()" style="float: right; background: none; border: none; color: #2f6b2f; cursor: pointer; font-size: 16px;">✕</button>
         `;
-        container.insertBefore(infoDiv, container.firstChild);
-      } else if (container) {
-        // Se container esiste ma non ha firstChild, usa appendChild
-        const infoDiv = document.createElement('div');
-        infoDiv.style.cssText = `
+          container.insertBefore(infoDiv, container.firstChild);
+        } else if (container) {
+          // Se container esiste ma non ha firstChild, usa appendChild
+          const infoDiv = document.createElement('div');
+          infoDiv.style.cssText = `
           background: #e8f5e8;
           border: 1px solid #2f6b2f;
           border-radius: 6px;
@@ -10366,157 +10453,157 @@ window.addEventListener("DOMContentLoaded", async () => {
           color: #2f6b2f;
           font-weight: 500;
         `;
-        infoDiv.innerHTML = `
+          infoDiv.innerHTML = `
           🔍 <strong>Filtro applicato dalla dashboard:</strong> 
           ${filtro === 'casa' ? 'Case' : filtro === 'terreno' ? 'Terreni' : 'Case e Terreni'} 
           in provincia di ${provincia}
           <button onclick="this.parentElement.remove()" style="float: right; background: none; border: none; color: #2f6b2f; cursor: pointer; font-size: 16px;">✕</button>
         `;
-        container.appendChild(infoDiv);
+          container.appendChild(infoDiv);
+        }
+
+        // Pulisci il filtro dashboard
+        delete window.dashboardFilter;
       }
-      
-      // Pulisci il filtro dashboard
-      delete window.dashboardFilter;
-    }
-    
-    // Mostra messaggio informativo se si usano dati locali
-    if (strutture.length > 0 && strutture[0].id.startsWith('demo-')) {
+
+      // Mostra messaggio informativo se si usano dati locali
+      if (strutture.length > 0 && strutture[0].id.startsWith('demo-')) {
+        const container = document.getElementById("results");
+        if (container && container.firstChild !== null) {
+          const infoDiv = document.createElement('div');
+          infoDiv.className = 'info-message';
+          infoDiv.innerHTML = `
+          <div class="info-banner">
+            <strong>ℹ️ Modalità Demo</strong> - Stai visualizzando dati di esempio. 
+            <button onclick="this.parentElement.parentElement.remove()">✕</button>
+          </div>
+        `;
+          container.insertBefore(infoDiv, container.firstChild);
+        } else if (container) {
+          // Se container esiste ma non ha firstChild, usa appendChild
+          const infoDiv = document.createElement('div');
+          infoDiv.className = 'info-message';
+          infoDiv.innerHTML = `
+          <div class="info-banner">
+            <strong>ℹ️ Modalità Demo</strong> - Stai visualizzando dati di esempio. 
+            <button onclick="this.parentElement.parentElement.remove()">✕</button>
+          </div>
+        `;
+          container.appendChild(infoDiv);
+        }
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento:', error);
       const container = document.getElementById("results");
-      if (container && container.firstChild !== null) {
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'info-message';
-        infoDiv.innerHTML = `
-          <div class="info-banner">
-            <strong>ℹ️ Modalità Demo</strong> - Stai visualizzando dati di esempio. 
-            <button onclick="this.parentElement.parentElement.remove()">✕</button>
-          </div>
-        `;
-        container.insertBefore(infoDiv, container.firstChild);
-      } else if (container) {
-        // Se container esiste ma non ha firstChild, usa appendChild
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'info-message';
-        infoDiv.innerHTML = `
-          <div class="info-banner">
-            <strong>ℹ️ Modalità Demo</strong> - Stai visualizzando dati di esempio. 
-            <button onclick="this.parentElement.parentElement.remove()">✕</button>
-          </div>
-        `;
-        container.appendChild(infoDiv);
-      }
-    }
-  } catch (error) {
-    console.error('Errore nel caricamento:', error);
-    const container = document.getElementById("results");
-    if (container) {
-      container.innerHTML = `
+      if (container) {
+        container.innerHTML = `
         <div class="error">
           <h3>⚠️ Errore nel caricamento</h3>
           <p>Impossibile caricare le strutture. Controlla la connessione e riprova.</p>
           <button onclick="location.reload()">🔄 Ricarica pagina</button>
         </div>
       `;
+      }
     }
-  }
 
-  // Popola le province
-  const province = [...new Set(strutture.map(s => s.Prov).filter(Boolean))].sort();
-  const provSelect = document.getElementById("filter-prov");
-  if (provSelect) {
-    province.forEach(prov => {
-      const option = document.createElement("option");
-      option.value = prov;
-      option.textContent = prov;
-      provSelect.appendChild(option);
-    });
-  }
-
-  // Event listeners
-  const searchInput = document.getElementById("search");
-  if (searchInput) {
-    searchInput.addEventListener("input", () => {
-      renderStrutture(filtra(strutture));
-    });
-  }
-  const filterProv = document.getElementById("filter-prov");
-  if (filterProv) {
-    filterProv.addEventListener("change", () => {
-      renderStrutture(filtra(strutture));
-    });
-  }
-  
-  // Filtri casa e terreno gestiti tramite ricerca avanzata
-  // const filterCasa = document.getElementById("filter-casa");
-  // const filterTerreno = document.getElementById("filter-terreno");
-  
-  const sortBy = document.getElementById("sort-by");
-  if (sortBy) {
-    sortBy.addEventListener("change", () => {
-      paginaCorrente = 1; // Reset alla prima pagina
-      renderStrutture(filtra(strutture));
-      // Chiudi il menu automaticamente dopo l'ordinamento
-      closeMenu();
-    });
-  }
-  
-  const addBtn = document.getElementById("add-btn");
-  if (addBtn) {
-    addBtn.addEventListener("click", aggiungiStruttura);
-  }
-  
-  const resetBtn = document.getElementById("resetBtn");
-  if (resetBtn) {
-    resetBtn.addEventListener("click", resetFiltri);
-  }
-  // exportBtn gestito in initializeUIEventListeners()
-  
-  // Event listener per toggle visualizzazione
-  const viewToggle = document.getElementById("viewToggle");
-  if (viewToggle) {
-    viewToggle.addEventListener("click", toggleViewMode);
-  }
-  
-  // Event listener per ricerca avanzata
-  const advancedSearchBtn = document.getElementById("advancedSearchBtn");
-  if (advancedSearchBtn) {
-    console.log('✅ Pulsante ricerca avanzata trovato, aggiungo event listener');
-    advancedSearchBtn.addEventListener("click", mostraRicercaAvanzata);
-  } else {
-    console.log('ℹ️ Pulsante ricerca avanzata non presente (opzionale)');
-  }
-  
-  // Event listener per pulsante utente
-  const userBtn = document.getElementById("userBtn");
-  if (userBtn) {
-    console.log('✅ Pulsante utente trovato, aggiungo event listener');
-    userBtn.addEventListener("click", cambiaUtente);
-  } else {
-    console.error('❌ Pulsante utente non trovato!');
-  }
-  
-  // Event listeners per il modale
-  document.getElementById("closeModal").addEventListener("click", chiudiModale);
-  document.getElementById("cancelBtn").addEventListener("click", chiudiModale);
-  document.getElementById("saveBtn").addEventListener("click", salvaModifiche);
-  document.getElementById("deleteBtn").addEventListener("click", () => {
-    if (strutturaCorrente && confirm("Vuoi davvero eliminare questa struttura?")) {
-      eliminaStruttura(strutturaCorrente.id);
-      chiudiModale();
+    // Popola le province
+    const province = [...new Set(strutture.map(s => s.Prov).filter(Boolean))].sort();
+    const provSelect = document.getElementById("filter-prov");
+    if (provSelect) {
+      province.forEach(prov => {
+        const option = document.createElement("option");
+        option.value = prov;
+        option.textContent = prov;
+        provSelect.appendChild(option);
+      });
     }
-  });
-  
-  // Chiudi modale cliccando fuori
-  document.getElementById("modal").addEventListener("click", (e) => {
-    if (e.target.id === "modal") chiudiModale();
-  });
-  
-  // Carica filtri salvati (solo se utente autenticato)
-  // await caricaFiltriSalvatiDropdown(); // Spostato in onAuthStateChanged
-  
-  // Inizializza ottimizzazioni performance
-  setupLazyLoading();
-  
-  // Inizializza gestione temi - RIMOSSO: già gestito in initializeNewUI()
+
+    // Event listeners
+    const searchInput = document.getElementById("search");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        renderStrutture(filtra(strutture));
+      });
+    }
+    const filterProv = document.getElementById("filter-prov");
+    if (filterProv) {
+      filterProv.addEventListener("change", () => {
+        renderStrutture(filtra(strutture));
+      });
+    }
+
+    // Filtri casa e terreno gestiti tramite ricerca avanzata
+    // const filterCasa = document.getElementById("filter-casa");
+    // const filterTerreno = document.getElementById("filter-terreno");
+
+    const sortBy = document.getElementById("sort-by");
+    if (sortBy) {
+      sortBy.addEventListener("change", () => {
+        paginaCorrente = 1; // Reset alla prima pagina
+        renderStrutture(filtra(strutture));
+        // Chiudi il menu automaticamente dopo l'ordinamento
+        closeMenu();
+      });
+    }
+
+    const addBtn = document.getElementById("add-btn");
+    if (addBtn) {
+      addBtn.addEventListener("click", aggiungiStruttura);
+    }
+
+    const resetBtn = document.getElementById("resetBtn");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", resetFiltri);
+    }
+    // exportBtn gestito in initializeUIEventListeners()
+
+    // Event listener per toggle visualizzazione
+    const viewToggle = document.getElementById("viewToggle");
+    if (viewToggle) {
+      viewToggle.addEventListener("click", toggleViewMode);
+    }
+
+    // Event listener per ricerca avanzata
+    const advancedSearchBtn = document.getElementById("advancedSearchBtn");
+    if (advancedSearchBtn) {
+      console.log('✅ Pulsante ricerca avanzata trovato, aggiungo event listener');
+      advancedSearchBtn.addEventListener("click", mostraRicercaAvanzata);
+    } else {
+      console.log('ℹ️ Pulsante ricerca avanzata non presente (opzionale)');
+    }
+
+    // Event listener per pulsante utente
+    const userBtn = document.getElementById("userBtn");
+    if (userBtn) {
+      console.log('✅ Pulsante utente trovato, aggiungo event listener');
+      userBtn.addEventListener("click", cambiaUtente);
+    } else {
+      console.error('❌ Pulsante utente non trovato!');
+    }
+
+    // Event listeners per il modale
+    document.getElementById("closeModal").addEventListener("click", chiudiModale);
+    document.getElementById("cancelBtn").addEventListener("click", chiudiModale);
+    document.getElementById("saveBtn").addEventListener("click", salvaModifiche);
+    document.getElementById("deleteBtn").addEventListener("click", () => {
+      if (strutturaCorrente && confirm("Vuoi davvero eliminare questa struttura?")) {
+        eliminaStruttura(strutturaCorrente.id);
+        chiudiModale();
+      }
+    });
+
+    // Chiudi modale cliccando fuori
+    document.getElementById("modal").addEventListener("click", (e) => {
+      if (e.target.id === "modal") chiudiModale();
+    });
+
+    // Carica filtri salvati (solo se utente autenticato)
+    // await caricaFiltriSalvatiDropdown(); // Spostato in onAuthStateChanged
+
+    // Inizializza ottimizzazioni performance
+    setupLazyLoading();
+
+    // Inizializza gestione temi - RIMOSSO: già gestito in initializeNewUI()
   } catch (error) {
     console.error('❌ Errore durante il bootstrap dell\'app:', error);
     if (window && window.errorHandler) {
@@ -10533,7 +10620,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           </div>
         `;
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 });
 
@@ -10542,12 +10629,12 @@ async function caricaFiltriSalvatiDropdown() {
   try {
     const filtriSalvati = await caricaFiltriSalvati();
     const dropdown = document.getElementById('saved-filters');
-    
+
     if (!dropdown) return;
-    
+
     // Pulisci dropdown
     dropdown.innerHTML = '<option value="">Filtri salvati</option>';
-    
+
     if (filtriSalvati.length > 0) {
       filtriSalvati.forEach(filtro => {
         const option = document.createElement('option');
@@ -10556,7 +10643,7 @@ async function caricaFiltriSalvatiDropdown() {
         dropdown.appendChild(option);
       });
     }
-    
+
     // Event listener per applicare filtri salvati
     dropdown.addEventListener('change', async (e) => {
       if (e.target.value) {
@@ -10564,7 +10651,7 @@ async function caricaFiltriSalvatiDropdown() {
         e.target.value = ''; // Reset dropdown
       }
     });
-    
+
   } catch (error) {
     console.error('Errore nel caricamento filtri salvati:', error);
   }
@@ -10574,7 +10661,7 @@ async function caricaFiltriSalvatiDropdown() {
 function mostraOpzioniEsportazioneGenerale() {
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   // Usa la stessa funzione unificata, passando tutte le strutture
   if (typeof window.mostraOpzioniEsportazione === 'function') {
     window.mostraOpzioniEsportazione(strutture, { forcePersonalList: false });
@@ -10587,13 +10674,13 @@ function mostraOpzioniEsportazioneGenerale() {
 async function mostraFeedAttivita() {
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('feedAttivitaModal');
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'feedAttivitaModal';
   modal.style.cssText = `
@@ -10608,7 +10695,7 @@ async function mostraFeedAttivita() {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -10623,7 +10710,7 @@ async function mostraFeedAttivita() {
     min-width: 400px;
     width: 100%;
   `;
-  
+
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
@@ -10634,7 +10721,7 @@ async function mostraFeedAttivita() {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
   `;
-  
+
   const title = document.createElement('h2');
   title.textContent = '📋 Feed Attività';
   title.style.cssText = `
@@ -10642,7 +10729,7 @@ async function mostraFeedAttivita() {
     color: #2f6b2f;
     font-size: 1.5rem;
   `;
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.style.cssText = `
@@ -10659,10 +10746,10 @@ async function mostraFeedAttivita() {
     justify-content: center;
   `;
   closeBtn.onclick = () => modal.remove();
-  
+
   header.appendChild(title);
   header.appendChild(closeBtn);
-  
+
   // Filtri
   const filtriDiv = document.createElement('div');
   filtriDiv.style.cssText = `
@@ -10672,7 +10759,7 @@ async function mostraFeedAttivita() {
     flex-wrap: wrap;
     align-items: center;
   `;
-  
+
   const tipoSelect = document.createElement('select');
   tipoSelect.id = 'filtroTipo';
   tipoSelect.style.cssText = `
@@ -10690,7 +10777,7 @@ async function mostraFeedAttivita() {
     <option value="note_deleted">Nota eliminata</option>
     <option value="filter_saved">Filtro salvato</option>
   `;
-  
+
   const periodoSelect = document.createElement('select');
   periodoSelect.id = 'filtroPeriodo';
   periodoSelect.style.cssText = `
@@ -10705,7 +10792,7 @@ async function mostraFeedAttivita() {
     <option value="month">Ultimo mese</option>
     <option value="all">Tutto</option>
   `;
-  
+
   const refreshBtn = document.createElement('button');
   refreshBtn.innerHTML = '🔄 Aggiorna';
   refreshBtn.style.cssText = `
@@ -10718,13 +10805,13 @@ async function mostraFeedAttivita() {
     font-size: 14px;
   `;
   refreshBtn.onclick = () => caricaAttivita();
-  
+
   filtriDiv.appendChild(document.createElement('label')).textContent = 'Tipo:';
   filtriDiv.appendChild(tipoSelect);
   filtriDiv.appendChild(document.createElement('label')).textContent = 'Periodo:';
   filtriDiv.appendChild(periodoSelect);
   filtriDiv.appendChild(refreshBtn);
-  
+
   // Contenuto attività
   const contentDiv = document.createElement('div');
   contentDiv.id = 'attivitaContent';
@@ -10735,17 +10822,17 @@ async function mostraFeedAttivita() {
     border-radius: 8px;
     padding: 10px;
   `;
-  
+
   // Assembla il modal
   modalContent.appendChild(header);
   modalContent.appendChild(filtriDiv);
   modalContent.appendChild(contentDiv);
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Carica attività iniziali
   await caricaAttivita();
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -10758,12 +10845,12 @@ async function caricaAttivita() {
   try {
     const contentDiv = document.getElementById('attivitaContent');
     if (!contentDiv) return;
-    
+
     contentDiv.innerHTML = '<div style="text-align: center; padding: 20px;">🔄 Caricamento attività...</div>';
-    
+
     const tipoFiltro = document.getElementById('filtroTipo')?.value || '';
     const periodoFiltro = document.getElementById('filtroPeriodo')?.value || 'week';
-    
+
     // Calcola data limite
     let dataLimite = new Date();
     switch (periodoFiltro) {
@@ -10780,39 +10867,39 @@ async function caricaAttivita() {
         dataLimite = null;
         break;
     }
-    
+
     // Carica attività da Firestore
     const activitiesRef = collection(db, "activity_log");
     let q = query(activitiesRef, orderBy("timestamp", "desc"));
-    
+
     if (dataLimite) {
       q = query(activitiesRef, where("timestamp", ">=", dataLimite), orderBy("timestamp", "desc"));
     }
-    
+
     const snapshot = await getDocs(q);
     let attivita = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    
+
     // Filtra per tipo se specificato
     if (tipoFiltro) {
       attivita = attivita.filter(a => a.action === tipoFiltro);
     }
-    
+
     // Limita a 50 attività
     attivita = attivita.slice(0, 50);
-    
+
     if (attivita.length === 0) {
       contentDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Nessuna attività trovata</div>';
       return;
     }
-    
+
     // Renderizza attività
     contentDiv.innerHTML = attivita.map(attivita => {
       const icona = getAttivitaIcona(attivita.action);
       const descrizione = getAttivitaDescrizione(attivita);
-      
+
       // Gestione corretta delle date Firestore
       let data;
       try {
@@ -10829,10 +10916,10 @@ async function caricaAttivita() {
         console.warn('Errore nel parsing data:', error);
         data = 'Data non disponibile';
       }
-      
+
       // Informazioni utente
       const utente = attivita.userName || attivita.userEmail || 'Utente sconosciuto';
-      
+
       return `
         <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid #f0f0f0;">
           <div style="font-size: 24px;">${icona}</div>
@@ -10845,7 +10932,7 @@ async function caricaAttivita() {
         </div>
       `;
     }).join('');
-    
+
   } catch (error) {
     console.error('Errore nel caricamento attività:', error);
     const contentDiv = document.getElementById('attivitaContent');
@@ -10876,13 +10963,13 @@ function getAttivitaDescrizione(attivita) {
     'note_deleted': 'Nota personale eliminata',
     'filter_saved': 'Filtro salvato'
   };
-  
+
   let descrizione = descrizioni[attivita.action] || 'Attività sconosciuta';
-  
+
   if (attivita.details && attivita.details.structureName) {
     descrizione += `: ${attivita.details.structureName}`;
   }
-  
+
   return descrizione;
 }
 
@@ -10900,7 +10987,7 @@ async function geocodificaStruttura(struttura) {
       console.log('⚠️ Nessun indirizzo disponibile per geocoding');
       return null;
     }
-    
+
     // Costruisci query di ricerca
     let query = '';
     if (struttura.Indirizzo) {
@@ -10908,9 +10995,9 @@ async function geocodificaStruttura(struttura) {
     } else if (struttura.Luogo) {
       query = `${struttura.Luogo}, ${struttura.Prov || ''}, Italia`;
     }
-    
+
     query = query.replace(/,\s*,/g, ',').replace(/,$/, '').trim();
-    
+
     // Controlla cache
     if (geocodingCache.has(query)) {
       const cached = geocodingCache.get(query);
@@ -10922,56 +11009,56 @@ async function geocodificaStruttura(struttura) {
         return null;
       }
     }
-    
+
     console.log(`🔍 Geocoding per: ${query}`);
-    
+
     // Rate limiting
     const now = Date.now();
     const timeSinceLastRequest = now - lastGeocodingRequest;
     if (timeSinceLastRequest < GEOCODING_DELAY) {
-      await new Promise(resolve => 
+      await new Promise(resolve =>
         setTimeout(resolve, GEOCODING_DELAY - timeSinceLastRequest)
       );
     }
-    
+
     // Usa proxy CORS per evitare errori
     const proxyUrl = 'https://api.allorigins.win/raw?url=';
     const targetUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=it`;
-    
+
     const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
       }
     });
-    
+
     lastGeocodingRequest = Date.now();
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    
+
     if (data && data.length > 0) {
       const result = data[0];
       const coordinates = {
         lat: parseFloat(result.lat),
         lng: parseFloat(result.lon)
       };
-      
+
       // Valida coordinate
-      if (isNaN(coordinates.lat) || isNaN(coordinates.lng) || 
-          coordinates.lat < -90 || coordinates.lat > 90 || 
-          coordinates.lng < -180 || coordinates.lng > 180) {
+      if (isNaN(coordinates.lat) || isNaN(coordinates.lng) ||
+        coordinates.lat < -90 || coordinates.lat > 90 ||
+        coordinates.lng < -180 || coordinates.lng > 180) {
         console.warn('⚠️ Coordinate non valide per:', query);
         geocodingCache.set(query, null);
         return null;
       }
-      
+
       // Salva in cache
       geocodingCache.set(query, coordinates);
-      
+
       console.log(`✅ Coordinate trovate: ${coordinates.lat}, ${coordinates.lng}`);
       return coordinates;
     } else {
@@ -10980,72 +11067,72 @@ async function geocodificaStruttura(struttura) {
       geocodingCache.set(query, null);
       return null;
     }
-    
+
   } catch (error) {
     console.error('❌ Errore nel geocoding:', error);
-    
+
     // Gestione errori specifici
     if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
       console.warn('⚠️ Errore CORS, geocoding non disponibile');
     } else if (error.message.includes('HTTP')) {
       console.warn('⚠️ Errore server geocoding:', error.message);
     }
-    
+
     return null;
   }
 }
 
 async function geocodificaTutteStrutture() {
   console.log('🌍 Avvio geocoding di tutte le strutture...');
-  
+
   const strutture = window.strutture || [];
   let processed = 0;
   let success = 0;
-  
+
   for (const struttura of strutture) {
     // Salta se già ha coordinate
     if (struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng) {
       console.log(`⏭️ Struttura ${struttura.Struttura} già ha coordinate`);
       continue;
     }
-    
+
     const coordinates = await geocodificaStruttura(struttura);
-    
+
     if (coordinates) {
       try {
-      // Aggiorna la struttura su Firestore
-      await updateDoc(doc(db, "strutture", struttura.id), {
-        coordinate: coordinates,
-        coordinate_lat: coordinates.lat,
-        coordinate_lng: coordinates.lng,
-        lastModified: new Date(),
-        lastModifiedBy: getCurrentUser()?.uid || null
-      });
-      
-      // INVALIDARE CACHE LOCALE per forzare ricaricamento
-      localStorage.removeItem('strutture_cache');
-      localStorage.removeItem('strutture_cache_timestamp');
-      
-      // Aggiorna anche l'array locale
-      struttura.coordinate = coordinates;
-      struttura.coordinate_lat = coordinates.lat;
-      struttura.coordinate_lng = coordinates.lng;
-      success++;
-        
+        // Aggiorna la struttura su Firestore
+        await updateDoc(doc(db, "strutture", struttura.id), {
+          coordinate: coordinates,
+          coordinate_lat: coordinates.lat,
+          coordinate_lng: coordinates.lng,
+          lastModified: new Date(),
+          lastModifiedBy: getCurrentUser()?.uid || null
+        });
+
+        // INVALIDARE CACHE LOCALE per forzare ricaricamento
+        localStorage.removeItem('strutture_cache');
+        localStorage.removeItem('strutture_cache_timestamp');
+
+        // Aggiorna anche l'array locale
+        struttura.coordinate = coordinates;
+        struttura.coordinate_lat = coordinates.lat;
+        struttura.coordinate_lng = coordinates.lng;
+        success++;
+
         console.log(`✅ Coordinate salvate per: ${struttura.Struttura}`);
       } catch (error) {
         console.error(`❌ Errore nel salvataggio coordinate per ${struttura.Struttura}:`, error);
       }
     }
-    
+
     processed++;
-    
+
     // Pausa per evitare rate limiting (già gestito nella funzione geocodificaStruttura)
     // await new Promise(resolve => setTimeout(resolve, 1000));
   }
-  
+
   console.log(`🏁 Geocoding completato: ${success} successi su ${processed} strutture processate`);
-  
+
   // Mostra notifica di completamento
   if (success > 0) {
     alert(`✅ Geocoding completato!\n${success} strutture aggiornate con coordinate GPS`);
@@ -11061,11 +11148,11 @@ async function geocodificaSingolaStruttura(strutturaId) {
     alert('Struttura non trovata!');
     return;
   }
-  
+
   console.log(`🔍 Geocoding manuale per: ${struttura.Struttura}`);
-  
+
   const coordinates = await geocodificaStruttura(struttura);
-  
+
   if (coordinates) {
     try {
       // Aggiorna la struttura su Firestore
@@ -11076,23 +11163,23 @@ async function geocodificaSingolaStruttura(strutturaId) {
         lastModified: new Date(),
         lastModifiedBy: getCurrentUser()?.uid || null
       });
-      
+
       // INVALIDARE CACHE LOCALE per forzare ricaricamento
       localStorage.removeItem('strutture_cache');
       localStorage.removeItem('strutture_cache_timestamp');
-      
+
       // Aggiorna anche l'array locale
       struttura.coordinate = coordinates;
       struttura.coordinate_lat = coordinates.lat;
       struttura.coordinate_lng = coordinates.lng;
-      
+
       alert(`✅ Coordinate aggiornate per: ${struttura.Struttura}\nLat: ${coordinates.lat}, Lng: ${coordinates.lng}`);
-      
+
       // Log attività
       await logActivity('geocoding_updated', strutturaId, getCurrentUser()?.uid, {
         coordinates: coordinates
       });
-      
+
     } catch (error) {
       console.error('❌ Errore nel salvataggio coordinate:', error);
       alert('Errore nel salvataggio delle coordinate');
@@ -11106,13 +11193,13 @@ async function geocodificaSingolaStruttura(strutturaId) {
 async function trovaVicinoAMe() {
   try {
     console.log('📍 Richiesta geolocalizzazione utente...');
-    
+
     // Verifica se la geolocalizzazione è supportata
     if (!navigator.geolocation) {
       alert('❌ La geolocalizzazione non è supportata dal tuo browser');
       return;
     }
-    
+
     // Richiedi permesso per la geolocalizzazione
     const position = await new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -11121,12 +11208,12 @@ async function trovaVicinoAMe() {
         maximumAge: 300000 // 5 minuti
       });
     });
-    
+
     const userLat = position.coords.latitude;
     const userLng = position.coords.longitude;
-    
+
     console.log(`✅ Posizione utente: ${userLat}, ${userLng}`);
-    
+
     // Calcola distanze per tutte le strutture
     const struttureConDistanza = strutture
       .filter(struttura => struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng)
@@ -11138,23 +11225,23 @@ async function trovaVicinoAMe() {
         };
       })
       .sort((a, b) => a.distanza - b.distanza);
-    
+
     if (struttureConDistanza.length === 0) {
       alert('❌ Nessuna struttura con coordinate GPS disponibile');
       return;
     }
-    
+
     // Mostra le prime 10 strutture più vicine
     const struttureVicine = struttureConDistanza.slice(0, 10);
-    
+
     // Crea modale con risultati
     mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng);
-    
+
   } catch (error) {
     console.error('❌ Errore nella geolocalizzazione:', error);
-    
+
     let errorMessage = '❌ Errore nella geolocalizzazione: ';
-    
+
     if (error.code === error.PERMISSION_DENIED) {
       errorMessage = '❌ Permesso geolocalizzazione negato.\n\nPer utilizzare questa funzione:\n1. Clicca sull\'icona del lucchetto nella barra degli indirizzi\n2. Abilita "Posizione"\n3. Ricarica la pagina e riprova';
     } else if (error.code === error.POSITION_UNAVAILABLE) {
@@ -11164,7 +11251,7 @@ async function trovaVicinoAMe() {
     } else {
       errorMessage += error.message;
     }
-    
+
     // Mostra modale invece di alert per messaggi più lunghi
     if (error.code === error.PERMISSION_DENIED || error.code === error.POSITION_UNAVAILABLE) {
       mostraModaleErroreGeolocalizzazione(errorMessage);
@@ -11178,7 +11265,7 @@ function mostraModaleErroreGeolocalizzazione(message) {
   const modal = document.createElement('div');
   modal.className = 'modal';
   modal.style.display = 'block';
-  
+
   modal.innerHTML = `
     <div class="modal-content" style="max-width: 500px;">
       <div class="modal-header">
@@ -11202,7 +11289,7 @@ function mostraModaleErroreGeolocalizzazione(message) {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(modal);
 }
 
@@ -11210,10 +11297,10 @@ function calcolaDistanza(lat1, lng1, lat2, lng2) {
   const R = 6371; // Raggio della Terra in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
@@ -11223,7 +11310,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
   if (existingModal) {
     existingModal.remove();
   }
-  
+
   const modal = document.createElement('div');
   modal.id = 'vicinoAMeModal';
   modal.style.cssText = `
@@ -11238,7 +11325,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     justify-content: center;
     z-index: 10000;
   `;
-  
+
   const modalContent = document.createElement('div');
   modalContent.style.cssText = `
     background: var(--bg-primary);
@@ -11253,7 +11340,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     min-width: 400px;
     width: 100%;
   `;
-  
+
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
@@ -11264,7 +11351,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
   `;
-  
+
   const title = document.createElement('h2');
   title.textContent = '📍 Strutture Vicino a Te';
   title.style.cssText = `
@@ -11272,7 +11359,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     color: #2f6b2f;
     font-size: 1.5rem;
   `;
-  
+
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕';
   closeBtn.style.cssText = `
@@ -11289,17 +11376,17 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     justify-content: center;
   `;
   closeBtn.onclick = () => modal.remove();
-  
+
   header.appendChild(title);
   header.appendChild(closeBtn);
-  
+
   // Lista strutture
   const listaDiv = document.createElement('div');
   listaDiv.style.cssText = `
     max-height: 400px;
     overflow-y: auto;
   `;
-  
+
   if (struttureVicine.length === 0) {
     listaDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Nessuna struttura trovata nelle vicinanze</div>';
   } else {
@@ -11323,7 +11410,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
       </div>
     `).join('');
   }
-  
+
   // Footer
   const footer = document.createElement('div');
   footer.style.cssText = `
@@ -11332,7 +11419,7 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     border-top: 1px solid var(--border-light);
     text-align: center;
   `;
-  
+
   const mapBtn = document.createElement('button');
   mapBtn.innerHTML = '🗺️ Visualizza su Mappa';
   mapBtn.style.cssText = `
@@ -11350,16 +11437,16 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
     // Apri dashboard con filtri per strutture vicine
     window.open(`dashboard.html?filter=nearby&lat=${userLat}&lng=${userLng}`, '_blank');
   };
-  
+
   footer.appendChild(mapBtn);
-  
+
   // Assembla il modal
   modalContent.appendChild(header);
   modalContent.appendChild(listaDiv);
   modalContent.appendChild(footer);
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
-  
+
   // Chiudi cliccando fuori
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
@@ -11373,11 +11460,11 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
 
 function initializeUIEventListeners() {
   console.log('🎯 Inizializzazione event listeners UI...');
-  
+
   // Search functionality
   const searchInput = document.getElementById('search');
   const clearSearchBtn = document.getElementById('clearSearch');
-  
+
   if (searchInput) {
     // Funzione per aggiornare la visibilità del pulsante clear
     const updateClearButton = () => {
@@ -11389,10 +11476,10 @@ function initializeUIEventListeners() {
         }
       }
     };
-    
+
     searchInput.addEventListener('input', (e) => {
       const query = e.target.value.toLowerCase();
-      const filtered = strutture.filter(s => 
+      const filtered = strutture.filter(s =>
         s.Struttura?.toLowerCase().includes(query) ||
         s.Luogo?.toLowerCase().includes(query) ||
         s.Provincia?.toLowerCase().includes(query)
@@ -11400,11 +11487,11 @@ function initializeUIEventListeners() {
       renderStrutture(filtered);
       updateClearButton();
     });
-    
+
     // Inizializza visibilità pulsante clear
     updateClearButton();
   }
-  
+
   // Funzionalità pulsante clear
   if (clearSearchBtn) {
     clearSearchBtn.addEventListener('click', () => {
@@ -11418,28 +11505,28 @@ function initializeUIEventListeners() {
       }
     });
   }
-  
+
   // Filter functionality (now in menu)
   const filterProv = document.getElementById('filter-prov');
   const filterStato = document.getElementById('filter-stato');
   // Filtri casa e terreno gestiti tramite ricerca avanzata
   // const filterCasa = document.getElementById('filter-casa');
   // const filterTerreno = document.getElementById('filter-terreno');
-  
+
   if (filterProv) {
     filterProv.addEventListener('change', () => {
       paginaCorrente = 1;
       renderStrutture(filtra(strutture));
     });
   }
-  
+
   if (filterStato) {
     filterStato.addEventListener('change', () => {
       paginaCorrente = 1;
       renderStrutture(filtra(strutture));
     });
   }
-  
+
   // Filtri casa e terreno gestiti tramite ricerca avanzata
   // if (filterCasa) {
   //   filterCasa.addEventListener('change', () => {
@@ -11454,12 +11541,12 @@ function initializeUIEventListeners() {
   //     renderStrutture(filtra(strutture));
   //   });
   // }
-  
+
   // Action buttons
   const addBtn = document.getElementById('add-btn');
   const resetBtn = document.getElementById('resetBtn');
   const exportBtn = document.getElementById('exportBtn');
-  
+
   if (addBtn) {
     addBtn.addEventListener('click', () => {
       if (typeof window.aggiungiStruttura === 'function') {
@@ -11467,7 +11554,7 @@ function initializeUIEventListeners() {
       }
     });
   }
-  
+
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
       if (typeof window.resetFiltri === 'function') {
@@ -11475,7 +11562,7 @@ function initializeUIEventListeners() {
       }
     });
   }
-  
+
   if (exportBtn) {
     exportBtn.addEventListener('click', () => {
       if (typeof window.esportaElencoPersonale === 'function') {
@@ -11483,7 +11570,7 @@ function initializeUIEventListeners() {
       }
     });
   }
-  
+
   // View toggle
   const viewToggle = document.getElementById('viewToggle');
   if (viewToggle) {
@@ -11493,7 +11580,7 @@ function initializeUIEventListeners() {
       }
     });
   }
-  
+
   // Advanced search
   const advancedSearchBtn = document.getElementById('advancedSearchBtn');
   if (advancedSearchBtn) {
@@ -11503,7 +11590,7 @@ function initializeUIEventListeners() {
       }
     });
   }
-  
+
   // User button - rimosso listener per elenco personale, ora gestito da cambiaUtente()
   // const userBtn = document.getElementById('userBtn');
   // if (userBtn) {
@@ -11513,7 +11600,7 @@ function initializeUIEventListeners() {
   //     }
   //   });
   // }
-  
+
   // Saved filters dropdown
   const savedFiltersSelect = document.getElementById('savedFiltersSelect');
   if (savedFiltersSelect) {
@@ -11544,10 +11631,10 @@ window.mostraFeedAttivita = mostraFeedAttivita;
 function mostraStatisticheApp() {
   // Chiudi il menu automaticamente
   closeMenu();
-  
+
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
-  
+
   // Genera statistiche
   const stats = window.analyticsManager ? window.analyticsManager.generateUserReport() : {
     sessionId: 'N/A',
@@ -11638,15 +11725,15 @@ function mostraStatisticheApp() {
       <!-- Funzioni Più Utilizzate -->
       <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
         <h3 style="margin: 0 0 15px 0; color: #2f6b2f;">🏆 Funzioni Più Utilizzate</h3>
-        ${stats.mostUsedFeatures.length > 0 ? 
-          stats.mostUsedFeatures.map(f => `
+        ${stats.mostUsedFeatures.length > 0 ?
+      stats.mostUsedFeatures.map(f => `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border-radius: 4px; margin-bottom: 8px;">
               <span>${f.feature}</span>
               <span style="background: #2f6b2f; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${f.count}</span>
             </div>
-          `).join('') : 
-          '<p style="color: #666; text-align: center;">Nessun dato disponibile</p>'
-        }
+          `).join('') :
+      '<p style="color: #666; text-align: center;">Nessun dato disponibile</p>'
+    }
       </div>
 
       <!-- Azioni -->
@@ -11658,7 +11745,7 @@ function mostraStatisticheApp() {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(modal);
 }
 
@@ -11681,7 +11768,7 @@ function showNotification(title, options = {}) {
 function closeMenu() {
   const mainMenu = document.getElementById('mainMenu');
   const menuToggle = document.getElementById('menuToggle');
-  
+
   if (mainMenu && !mainMenu.classList.contains('hidden')) {
     console.log('📱 Chiusura automatica menu');
     mainMenu.classList.add('hidden');
@@ -11696,16 +11783,16 @@ function closeMenu() {
 function testMenuToggle() {
   const menuToggle = document.getElementById('menuToggle');
   const mainMenu = document.getElementById('mainMenu');
-  
+
   console.log('🧪 Test menu toggle:');
   console.log('- Menu toggle:', menuToggle);
   console.log('- Main menu:', mainMenu);
   console.log('- Menu classes:', mainMenu?.classList.toString());
-  
+
   if (mainMenu) {
     const isHidden = mainMenu.classList.contains('hidden');
     console.log('- Menu nascosto:', isHidden);
-    
+
     if (isHidden) {
       mainMenu.classList.remove('hidden');
       console.log('- Menu aperto manualmente');

@@ -151,7 +151,7 @@ class MapsManager {
   addStructureMarkerWithFallback(struttura) {
     if (!this.isInitialized || !this.map) return;
 
-    // Coordinate di fallback per provincia
+    // Coordinate di fallback per provincia (usata come ultimo ricorso)
     const provinceCoordinates = {
       'TO': [45.0703, 7.6869], // Torino
       'CN': [44.3849, 7.5427], // Cuneo
@@ -267,16 +267,21 @@ class MapsManager {
     const provincia = struttura.Prov || 'TO'; // Default Torino
     const fallbackCoords = provinceCoordinates[provincia] || [45.0703, 7.6869]; // Default Torino
     
-    // Aggiungi un piccolo offset casuale per evitare sovrapposizioni
-    const lat = fallbackCoords[0] + (Math.random() - 0.5) * 0.1;
-    const lng = fallbackCoords[1] + (Math.random() - 0.5) * 0.1;
+    // Aggiungi un piccolo offset casuale basato sull'ID per evitare che tutte finiscano nello stesso punto
+    // ma mantieni lo stesso punto per lo stessa struttura
+    const seed = struttura.id ? struttura.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) : Math.random();
+    const offsetLat = ((seed % 100) / 100 - 0.5) * 0.05;
+    const offsetLng = (((seed * 1.3) % 100) / 100 - 0.5) * 0.05;
+
+    const lat = fallbackCoords[0] + offsetLat;
+    const lng = fallbackCoords[1] + offsetLng;
 
     // Crea icona personalizzata per marker di fallback
     const icon = L.divIcon({
       className: 'custom-div-icon',
-      html: '<div style="background-color: #ffc107; color: #000; border: 2px solid #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">?</div>',
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
+      html: '<div style="background-color: #ffc107; color: #000; border: 2px solid #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">?</div>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
     });
 
     // Crea marker con popup personalizzato
@@ -746,6 +751,114 @@ class MapsManager {
   }
 }
 
+/**
+ * Gestore specifico per mappe con marker trascinabile (usato nel form di modifica)
+ */
+class DraggableMarkerMapManager {
+  constructor() {
+    this.map = null;
+    this.marker = null;
+    this.currentCoords = { lat: 0, lng: 0 };
+    this.onPositionChange = null;
+  }
+
+  async initialize(containerId, initialLat, initialLng, options = {}) {
+    try {
+      if (typeof L === 'undefined') {
+        console.error('❌ Leaflet non disponibile per draggable map');
+        return false;
+      }
+
+      // Se esiste già una mappa su questo container, distruggila
+      const container = document.getElementById(containerId);
+      if (container && container._leaflet_id) {
+        // Forza rimozione istanza precedente
+        container.innerHTML = '';
+      }
+
+      this.currentCoords = { 
+        lat: parseFloat(initialLat) || 45.0703, 
+        lng: parseFloat(initialLng) || 7.6869 
+      };
+
+      this.map = L.map(containerId).setView([this.currentCoords.lat, this.currentCoords.lng], initialLat && initialLng ? 15 : 10);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(this.map);
+
+      // Crea marker trascinabile
+      this.marker = L.marker([this.currentCoords.lat, this.currentCoords.lng], {
+        draggable: true,
+        icon: L.divIcon({
+          html: `<div style="background: #e91e63; color: white; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4);">📍</div>`,
+          className: 'draggable-marker',
+          iconSize: [34, 34],
+          iconAnchor: [17, 34]
+        })
+      }).addTo(this.map);
+
+      // Evento drag
+      this.marker.on('dragend', (event) => {
+        const position = event.target.getLatLng();
+        this.currentCoords = { lat: position.lat, lng: position.lng };
+        console.log('📍 Marker trascinato a:', this.currentCoords);
+        
+        if (typeof this.onPositionChange === 'function') {
+          this.onPositionChange(this.currentCoords.lat, this.currentCoords.lng);
+        }
+      });
+
+      // Permetti anche di cliccare sulla mappa per spostare il marker
+      this.map.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        this.updateMarkerPosition(lat, lng);
+        
+        if (typeof this.onPositionChange === 'function') {
+          this.onPositionChange(lat, lng);
+        }
+      });
+
+      // Forza resize dopo un breve delay per risolvere problemi di rendering in modali
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 300);
+
+      if (options.onPositionChange) {
+        this.onPositionChange = options.onPositionChange;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Errore inizializzazione draggable map:', error);
+      return false;
+    }
+  }
+
+  updateMarkerPosition(lat, lng, zoom = null) {
+    if (!this.map || !this.marker) return;
+    
+    const newLatLng = L.latLng(lat, lng);
+    this.marker.setLatLng(newLatLng);
+    this.currentCoords = { lat, lng };
+    
+    if (zoom !== null) {
+      this.map.setView(newLatLng, zoom);
+    } else {
+      this.map.panTo(newLatLng);
+    }
+  }
+
+  destroy() {
+    if (this.map) {
+      this.map.remove();
+      this.map = null;
+      this.marker = null;
+    }
+  }
+}
+
 // Variabili statiche di geocoding rimosse
 // Il geocoding automatico è stato disabilitato
 
@@ -796,6 +909,29 @@ window.calculateRouteToStructure = async (structureId) => {
 
 window.clearRoute = () => {
   mapsManager.clearRoute();
+};
+
+/**
+ * Funzione per inizializzare una mappa con marker trascinabile
+ * @param {string} containerId ID dell'elemento HTML
+ * @param {number} lat Latitudine iniziale
+ * @param {number} lng Longitudine iniziale
+ * @param {object} options Opzioni (es. callback onPositionChange)
+ */
+window.initializeDraggableMap = async (containerId, lat, lng, options = {}) => {
+  if (!window.draggableMapManager) {
+    window.draggableMapManager = new DraggableMarkerMapManager();
+  }
+  return await window.draggableMapManager.initialize(containerId, lat, lng, options);
+};
+
+/**
+ * Sposta il marker sulla mappa trascinabile
+ */
+window.updateDraggableMarker = (lat, lng, zoom = null) => {
+  if (window.draggableMapManager) {
+    window.draggableMapManager.updateMarkerPosition(lat, lng, zoom);
+  }
 };
 
 // Log delle funzioni esportate (dopo averle tutte definite)
