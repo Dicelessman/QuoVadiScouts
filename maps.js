@@ -20,114 +20,8 @@ document.head.appendChild(routingCSS);
 console.log('🗺️ Maps.js caricato correttamente');
 
 // Database locale di coordinate per i comuni principali (focus Nord Italia)
-const CITY_COORDINATES = {
-  // Piemonte
-  'Torino': [45.0703, 7.6869],
-  'Cuneo': [44.3849, 7.5427],
-  'Asti': [44.8990, 8.2061],
-  'Alessandria': [44.9133, 8.6150],
-  'Biella': [45.5663, 8.0523],
-  'Novara': [45.4469, 8.6226],
-  'Verbania': [45.9214, 8.5516],
-  'Vercelli': [45.3241, 8.4231],
-  'Ivrea': [45.4673, 7.8752],
-  'Alba': [44.7009, 8.0354],
-  'Bardonecchia': [45.0778, 6.7028],
-  'Susa': [45.1378, 7.0494],
-  'Pinerolo': [44.8856, 7.3323],
-  'Bra': [44.6989, 7.8587],
-  'Moncalieri': [45.0006, 7.6823],
-  'Nichelino': [44.9961, 7.6403],
-  'Rivoli': [45.0691, 7.5186],
-  'Collegno': [45.0775, 7.5744],
-  'Settimo Torinese': [45.1397, 7.7694],
+// CITY_COORDINATES rimosso: ora caricato da city-database.js
 
-  // Lombardia
-  'Milano': [45.4642, 9.1900],
-  'Brescia': [45.5416, 10.2118],
-  'Bergamo': [45.6949, 9.6773],
-  'Como': [45.8081, 9.0852],
-  'Cremona': [45.1327, 10.0226],
-  'Lecco': [45.8566, 9.3933],
-  'Lodi': [45.3232, 9.6592],
-  'Mantova': [45.1564, 10.7914],
-  'Monza': [45.5845, 9.2744],
-  'Pavia': [45.1847, 9.1582],
-  'Sondrio': [46.1718, 9.8729],
-  'Varese': [45.8206, 8.8256],
-  'Busto Arsizio': [45.6121, 8.8504],
-  'Legnano': [45.5947, 8.9189],
-  'Lissone': [45.6111, 9.2439],
-  'Seregno': [45.6499, 9.2064],
-  'Rho': [45.5303, 9.0416],
-  'Bollate': [45.5463, 9.1171],
-  'Cinisello Balsamo': [45.5567, 9.2273],
-
-  // Liguria
-  'Genova': [44.4056, 8.9463],
-  'Savona': [44.3079, 8.4683],
-  'Imperia': [43.8860, 8.0416],
-  'La Spezia': [44.1028, 9.8248],
-  'Sanremo': [43.8160, 7.7731],
-  'Chiavari': [44.3168, 9.3217],
-  'Rapallo': [44.3504, 9.2307],
-  'Sestri Levante': [44.2704, 9.3951],
-  'Finale Ligure': [44.1687, 8.3444],
-  'Alassio': [44.0044, 8.1736],
-  'Albenga': [44.0487, 8.2132],
-  'Ventimiglia': [43.7905, 7.6074],
-
-  // Veneto
-  'Venezia': [45.4408, 12.3155],
-  'Verona': [45.4384, 10.9916],
-  'Padova': [45.4064, 11.8768],
-  'Vicenza': [45.5455, 11.5353],
-  'Treviso': [45.6669, 12.2431],
-  'Rovigo': [45.0703, 11.7899],
-  'Belluno': [46.1379, 12.2151],
-  'Bassano del Grappa': [45.7667, 11.7333],
-  'Conegliano': [45.8858, 12.2964],
-  'Chioggia': [45.2185, 12.2796],
-  'San Donà di Piave': [45.6318, 12.5658],
-  'Schio': [45.7118, 11.3570],
-
-  // Emilia-Romagna
-  'Bologna': [44.4949, 11.3426],
-  'Modena': [44.6471, 10.9252],
-  'Parma': [44.8015, 10.3279],
-  'Reggio Emilia': [44.6989, 10.6297],
-  'Ravenna': [44.4175, 12.2035],
-  'Rimini': [44.0678, 12.5695],
-  'Ferrara': [44.8381, 11.6191],
-  'Forlì': [44.2227, 12.0407],
-  'Cesena': [44.1394, 12.2435],
-  'Piacenza': [45.0526, 9.6934],
-  'Faenza': [44.2858, 11.8833],
-  'Imola': [44.3533, 11.7142],
-  'Carpi': [44.7836, 10.8781],
-  'Sassuolo': [44.5401, 10.7812],
-
-  // Friuli-Venezia Giulia
-  'Trieste': [45.6495, 13.7768],
-  'Udine': [46.0640, 13.2363],
-  'Pordenone': [45.9564, 12.6615],
-  'Gorizia': [45.9411, 13.6281],
-
-  // Trentino-Alto Adige
-  'Trento': [46.0679, 11.1211],
-  'Bolzano': [46.4983, 11.3548],
-  'Merano': [46.6702, 11.1610],
-  'Rovereto': [45.8911, 11.0425],
-
-  // Toscana (alcuni capoluoghi Nord)
-  'Firenze': [43.7696, 11.2558],
-  'Massa': [44.0361, 10.1420],
-  'Carrara': [44.0772, 10.1009],
-  'Lucca': [43.8428, 10.5027],
-  'Pisa': [43.7228, 10.4017],
-  'Pistoia': [43.9334, 10.9174],
-  'Prato': [43.8789, 11.0966]
-};
 
 class MapsManager {
   constructor() {
@@ -288,12 +182,13 @@ class MapsManager {
       }
     }
 
-    // Tentativo 2: Cerca nel database locale dei comuni principales
+    // Tentativo 2: Cerca nel database locale dei comuni principale (ora espanso)
     if (!lat || !lng) {
-      if (struttura.Luogo && CITY_COORDINATES[struttura.Luogo]) {
-        [lat, lng] = CITY_COORDINATES[struttura.Luogo];
+      const lookupKey = struttura.Luogo ? struttura.Luogo.toUpperCase().trim() : '';
+      if (lookupKey && typeof CITY_COORDINATES !== 'undefined' && CITY_COORDINATES[lookupKey]) {
+        [lat, lng] = CITY_COORDINATES[lookupKey];
         isCityFallback = true;
-        console.log(`📍 Fallback basato sulla città (${struttura.Luogo}) trovato nel database locale`);
+        console.log(`📍 Fallback basato sulla città (${struttura.Luogo}) trovato nel database locale espanso`);
       }
     }
 
