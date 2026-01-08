@@ -11,7 +11,7 @@ const log = {
 // Espone il logger globalmente per gli altri script non-modulari
 window.log = log;
 
-// === Firebase SDK Imports ===
+// === Firebase SDK Imports ,===
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import {
   getFirestore,
