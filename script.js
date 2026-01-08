@@ -8264,6 +8264,147 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
             campoDiv.appendChild(label);
             campoDiv.appendChild(input);
+
+            // Se siamo nel campo longitudine, aggiungi anche i pulsanti di geocodifica
+            if (campo === 'coordinate_lng') {
+              const geoButtonsDiv = document.createElement('div');
+              geoButtonsDiv.style.cssText = `
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-top: 10px;
+                padding: 10px;
+                background: var(--bg-primary);
+                border-radius: 4px;
+                border: 1px solid var(--border-light);
+              `;
+
+              const geocodeBtn = document.createElement('button');
+              geocodeBtn.type = 'button';
+              geocodeBtn.innerHTML = '🔍 Da Indirizzo';
+              geocodeBtn.style.cssText = `
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+              `;
+
+              const centerOnCityBtn = document.createElement('button');
+              centerOnCityBtn.type = 'button';
+              centerOnCityBtn.innerHTML = '🏢 Su Città';
+              centerOnCityBtn.style.cssText = `
+                background: #17a2b8;
+                color: white;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+              `;
+
+              // Event listener per geocodeBtn
+              geocodeBtn.onclick = async () => {
+                const luogo = struttura.Luogo || '';
+                const indirizzo = struttura.Indirizzo || '';
+                const prov = struttura.Prov || '';
+
+                if (!luogo && !indirizzo) {
+                  alert('Inserisci almeno un luogo o un indirizzo per la geocodifica.');
+                  return;
+                }
+
+                geocodeBtn.disabled = true;
+                const originalText = geocodeBtn.innerHTML;
+                geocodeBtn.innerHTML = '🔄...';
+
+                try {
+                  const result = await geocodificaStruttura(struttura);
+                  if (result) {
+                    struttura.coordinate_lat = result.lat;
+                    struttura.coordinate_lng = result.lng;
+                    struttura.coordinate = { lat: result.lat, lng: result.lng };
+                    // Aggiorna marker se la mappa esiste
+                    if (window.updateDraggableMarker) {
+                      window.updateDraggableMarker(result.lat, result.lng, 16);
+                    }
+                    // Forza re-render contenuto scheda per aggiornare gli input
+                    creaContenutoScheda();
+                  } else {
+                    alert('Impossibile trovare le coordinate.');
+                  }
+                } catch (error) {
+                  console.error('Errore geocodifica:', error);
+                  alert('Errore durante la geocodifica.');
+                } finally {
+                  geocodeBtn.disabled = false;
+                  geocodeBtn.innerHTML = originalText;
+                }
+              };
+
+              // Event listener per centerOnCityBtn
+              centerOnCityBtn.onclick = async () => {
+                const luogo = struttura.Luogo || '';
+                const prov = struttura.Prov || '';
+
+                if (!luogo && !prov) {
+                  alert('Inserisci almeno un luogo o una provincia.');
+                  return;
+                }
+
+                centerOnCityBtn.disabled = true;
+                const originalText = centerOnCityBtn.innerHTML;
+                centerOnCityBtn.innerHTML = '🔄...';
+
+                try {
+                  let targetLat = null, targetLng = null;
+                  const sameCity = (window.strutture || []).filter(s =>
+                    s.Luogo === luogo &&
+                    ((s.coordinate && s.coordinate.lat) || s.coordinate_lat)
+                  );
+
+                  if (sameCity.length > 0) {
+                    let sLat = 0, sLng = 0;
+                    sameCity.forEach(s => {
+                      const l = s.coordinate_lat || s.coordinate.lat;
+                      const g = s.coordinate_lng || s.coordinate.lng;
+                      sLat += l; sLng += g;
+                    });
+                    targetLat = sLat / sameCity.length;
+                    targetLng = sLng / sameCity.length;
+                  } else {
+                    const result = await geocodificaStruttura({ Luogo: luogo, Prov: prov });
+                    if (result) {
+                      targetLat = result.lat;
+                      targetLng = result.lng;
+                    }
+                  }
+
+                  if (targetLat && targetLng) {
+                    struttura.coordinate_lat = targetLat;
+                    struttura.coordinate_lng = targetLng;
+                    struttura.coordinate = { lat: targetLat, lng: targetLng };
+                    if (window.updateDraggableMarker) {
+                      window.updateDraggableMarker(targetLat, targetLng, 14);
+                    }
+                    creaContenutoScheda();
+                  } else {
+                    alert('Impossibile trovare le coordinate per la città.');
+                  }
+                } catch (error) {
+                  console.error('Errore posizionamento città:', error);
+                } finally {
+                  centerOnCityBtn.disabled = false;
+                  centerOnCityBtn.innerHTML = originalText;
+                }
+              };
+
+              geoButtonsDiv.appendChild(geocodeBtn);
+              geoButtonsDiv.appendChild(centerOnCityBtn);
+              campoDiv.appendChild(geoButtonsDiv);
+            }
           } else if (isUrlField) {
             // Campo URL
             const input = document.createElement('input');
@@ -9078,6 +9219,50 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     }
     if (content && noteDiv) {
       content.appendChild(noteDiv);
+    }
+
+    // Aggiungi la mappa se siamo in modalità modifica
+    if (isEditMode) {
+      const mapSection = document.createElement('div');
+      mapSection.style.cssText = `
+        margin-top: 20px;
+        grid-column: 1 / -1;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border-medium);
+      `;
+
+      mapSection.innerHTML = `
+        <div style="padding: 10px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-medium); display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 500; font-size: 14px;">📍 Posiziona sulla mappa</span>
+          <small style="color: var(--text-secondary);">Trascina il segnaposto per correggere la posizione</small>
+        </div>
+        <div id="schedaMap" style="height: 250px; width: 100%;"></div>
+      `;
+
+      if (content) {
+        content.appendChild(mapSection);
+      }
+
+      // Inizializza la mappa con un piccolo ritardo per assicurarsi che il DOM sia pronto
+      setTimeout(async () => {
+        if (window.initializeDraggableMap) {
+          const lat = struttura.coordinate_lat || (struttura.coordinate && struttura.coordinate.lat);
+          const lng = struttura.coordinate_lng || (struttura.coordinate && struttura.coordinate.lng);
+
+          await window.initializeDraggableMap('schedaMap', lat, lng, {
+            onPositionChange: (newLat, newLng) => {
+              struttura.coordinate_lat = newLat;
+              struttura.coordinate_lng = newLng;
+              struttura.coordinate = { lat: newLat, lng: newLng };
+              // Aggiorniamo anche eventuali input manuali se sono visibili
+              // (ma siccome abbiamo creaContenutoScheda() che re-renderizza tutto, 
+              // forse non vogliamo re-renderizzare ad ogni drag per performance)
+            }
+          });
+        }
+      }, 100);
     }
 
     // Aggiungi bottone Elimina solo se non è una nuova struttura
