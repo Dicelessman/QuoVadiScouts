@@ -1,117 +1,181 @@
 <!doctype html>
 <html lang="it" class="no-js">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes" />
-<title>Quovadiscout - Strutture & Terreni</title>
-<script>
-  // Rimuovi classe no-js se JavaScript è abilitato
-  document.documentElement.classList.remove('no-js');
-  document.documentElement.classList.add('js');
-</script>
-<!-- CSS critico inline per first paint -->
-<style id="critical-css">
-  html, body { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
-  .app-header { display: flex; align-items: center; min-height: 56px; padding: 8px 12px; background: #2f6b2f; color: #fff; }
-  .app-title { font-size: 18px; margin: 0; }
-  .main-map-container { min-height: 280px; }
-  .results-container { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-  .loading-indicator { display: none; }
-  .loading-indicator .loading-spinner { width: 24px; height: 24px; border: 3px solid #e0e0e0; border-top-color: #2f6b2f; border-radius: 50%; animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
-<meta name="description" content="Sistema avanzato per la gestione di strutture e terreni scout" />
-<meta name="theme-color" content="#2f6b2f" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="QuoVadiScout" />
-<script>
-  // Logger shim globale con cattura delle funzioni console originali
-  (function(){
-    window.DEBUG = window.DEBUG === true ? true : false;
-    if (!window.__console) {
-      window.__console = {
-        log: console.log.bind(console),
-        info: (console.info || console.log).bind(console),
-        debug: (console.debug || console.log).bind(console),
-        warn: (console.warn || console.log).bind(console),
-        error: console.error.bind(console)
-      };
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes" />
+  <title>Quovadiscout - Strutture & Terreni</title>
+  <script>
+    // Rimuovi classe no-js se JavaScript è abilitato
+    document.documentElement.classList.remove('no-js');
+    document.documentElement.classList.add('js');
+  </script>
+  <!-- CSS critico inline per first paint -->
+  <style id="critical-css">
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
     }
-    if (!window.log) {
-      window.log = {
-        info: (...args) => window.DEBUG && window.__console.log(...args),
-        debug: (...args) => window.DEBUG && window.__console.debug(...args),
-        warn: (...args) => window.__console.warn(...args),
-        error: (...args) => window.__console.error(...args)
-      };
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      min-height: 56px;
+      padding: 8px 12px;
+      background: #2f6b2f;
+      color: #fff;
     }
-  })();
-</script>
-<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-<link rel="preconnect" href="https://unpkg.com" crossorigin>
-<link rel="preconnect" href="https://a.tile.openstreetmap.org" crossorigin>
-<!-- preconnect limitati a 3 origini: gstatic, unpkg, OSM (a) -->
-<style>
-  /* Font Awesome: forza font-display: swap per i webfont */
-  @font-face {
-    font-family: "Font Awesome 6 Free";
-    font-style: normal;
-    font-weight: 900;
-    font-display: swap;
-    src: url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2") format("woff2");
-  }
-  @font-face {
-    font-family: "Font Awesome 6 Free";
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.woff2") format("woff2");
-  }
-</style>
-<link rel="preload" href="/styles.css" as="style">
-<link rel="manifest" href="/api/manifest.js" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
-<link rel="preload" href="styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="styles.css"></noscript>
-<link rel="preload" href="geolocation-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="geolocation-styles.css"></noscript>
-<!-- Font Awesome non-blocking -->
-<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-<!-- Cloudinary SDK -->
-<script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript" defer></script>
-<!-- Runtime config (Vercel serverless) -->
-<script src="/api/firebase-config.js" defer></script>
-<script src="/api/cloudinary-config.js" defer></script>
-<!-- Export libraries caricati on-demand in export.js -->
-<!-- Maps libraries -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-<link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /></noscript>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
-<link rel="preload" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" /></noscript>
-<link rel="preload" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" /></noscript>
+
+    .app-title {
+      font-size: 18px;
+      margin: 0;
+    }
+
+    .main-map-container {
+      min-height: 280px;
+    }
+
+    .results-container {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+
+    .loading-indicator {
+      display: none;
+    }
+
+    .loading-indicator .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #2f6b2f;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <meta name="description" content="Sistema avanzato per la gestione di strutture e terreni scout" />
+  <meta name="theme-color" content="#2f6b2f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="QuoVadiScout" />
+  <script>
+    // Logger shim globale con cattura delle funzioni console originali
+    (function () {
+      window.DEBUG = window.DEBUG === true ? true : false;
+      if (!window.__console) {
+        window.__console = {
+          log: console.log.bind(console),
+          info: (console.info || console.log).bind(console),
+          debug: (console.debug || console.log).bind(console),
+          warn: (console.warn || console.log).bind(console),
+          error: console.error.bind(console)
+        };
+      }
+      if (!window.log) {
+        window.log = {
+          info: (...args) => window.DEBUG && window.__console.log(...args),
+          debug: (...args) => window.DEBUG && window.__console.debug(...args),
+          warn: (...args) => window.__console.warn(...args),
+          error: (...args) => window.__console.error(...args)
+        };
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="preconnect" href="https://a.tile.openstreetmap.org" crossorigin>
+  <!-- preconnect limitati a 3 origini: gstatic, unpkg, OSM (a) -->
+  <style>
+    /* Font Awesome: forza font-display: swap per i webfont */
+    @font-face {
+      font-family: "Font Awesome 6 Free";
+      font-style: normal;
+      font-weight: 900;
+      font-display: swap;
+      src: url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2") format("woff2");
+    }
+
+    @font-face {
+      font-family: "Font Awesome 6 Free";
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.woff2") format("woff2");
+    }
+  </style>
+  <link rel="preload" href="/styles.css" as="style">
+  <link rel="manifest" href="/api/manifest.js" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
+  <link rel="preload" href="styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="styles.css">
+  </noscript>
+  <link rel="preload" href="geolocation-styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="geolocation-styles.css">
+  </noscript>
+  <!-- Font Awesome non-blocking -->
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  </noscript>
+  <!-- Cloudinary SDK -->
+  <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript" defer></script>
+  <!-- Runtime config (Vercel serverless) -->
+  <script src="/api/firebase-config.js" defer></script>
+  <script src="/api/cloudinary-config.js" defer></script>
+  <!-- Export libraries caricati on-demand in export.js -->
+  <!-- Maps libraries -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  </noscript>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
+  <link rel="preload" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" as="style"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  </noscript>
+  <link rel="preload" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" as="style"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  </noscript>
 </head>
+
 <body>
   <!-- Fallback no-JavaScript -->
   <noscript>
-    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f5f5f5; display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 2rem;">
+    <div
+      style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f5f5f5; display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 2rem;">
       <div style="text-align: center; max-width: 500px;">
         <h1 style="color: #2f6b2f; margin-bottom: 1rem;">🏕️ QuoVadiScout</h1>
         <h2 style="color: #333; margin-bottom: 1rem;">JavaScript è richiesto</h2>
-        <p style="color: #666; margin-bottom: 1.5rem;">Questa applicazione richiede JavaScript per funzionare correttamente. Per favore abilita JavaScript nel tuo browser.</p>
+        <p style="color: #666; margin-bottom: 1.5rem;">Questa applicazione richiede JavaScript per funzionare
+          correttamente. Per favore abilita JavaScript nel tuo browser.</p>
         <p style="color: #999; font-size: 0.9rem;">Abilita JavaScript e ricarica la pagina.</p>
       </div>
     </div>
   </noscript>
-  
+
   <!-- Skip Navigation Link per Accessibilità -->
   <a href="#main-content" class="sr-only skip-link">Salta al contenuto principale</a>
-  
+
   <!-- Mobile-First Header -->
   <header class="app-header">
     <div class="header-main">
@@ -303,18 +367,18 @@
         <span id="resultsStatus" class="results-status"></span>
       </div>
     </div>
-    
+
     <!-- Results Grid -->
     <section id="results" class="results-container">
       <!-- Cards will be dynamically inserted here -->
     </section>
-    
+
     <!-- Loading Indicator -->
     <div id="loadingIndicator" class="loading-indicator hidden">
       <div class="loading-spinner"></div>
       <span class="loading-text">Caricamento...</span>
     </div>
-    
+
     <!-- Empty State -->
     <div id="emptyState" class="empty-state hidden">
       <div class="empty-icon"><i class="fas fa-search"></i></div>
@@ -340,16 +404,16 @@
 
   <!-- Reindirizza solo log/info/debug verso logger centralizzato (evita warn/error) -->
   <script>
-    (function(){
+    (function () {
       if (window.log) {
-        console.log = function() { window.log.info.apply(window.log, arguments); };
-        console.info = function() { window.log.info.apply(window.log, arguments); };
-        console.debug = function() { window.log.debug.apply(window.log, arguments); };
+        console.log = function () { window.log.info.apply(window.log, arguments); };
+        console.info = function () { window.log.info.apply(window.log, arguments); };
+        console.debug = function () { window.log.debug.apply(window.log, arguments); };
       }
     })();
   </script>
 
-  <script src="maps.js" defer></script>
+  <script src="maps.js?v=1.3.1" defer></script>
   <script src="export.js" defer></script>
   <script src="push-notifications.js" defer></script>
   <script src="offline-sync.js" defer></script>
@@ -373,59 +437,59 @@
   <script src="icons-config.js" defer></script>
   <!-- Gestione errori -->
   <script src="error-handler.js" defer></script>
-  <script type="module" src="script.js"></script>
+  <script type="module" src="script.js?v=1.3.1"></script>
 
-<script>
-// Registrazione Service Worker per PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    try {
-      // Prova a registrare il service worker
-      const registration = await navigator.serviceWorker.register('./service-worker.js');
-      log.info('✅ Service Worker registrato:', registration.scope);
-      
-      // Gestione aggiornamenti automatici
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Nuovo service worker disponibile
-            showUpdateNotification();
-          }
-        });
-      });
-      
-      // Listener per messaggi dal service worker
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data.action === 'SW_UPDATED') {
-          log.info('🔄 Service Worker aggiornato');
+  <script>
+    // Registrazione Service Worker per PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          // Prova a registrare il service worker
+          const registration = await navigator.serviceWorker.register('./service-worker.js');
+          log.info('✅ Service Worker registrato:', registration.scope);
+
+          // Gestione aggiornamenti automatici
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Nuovo service worker disponibile
+                showUpdateNotification();
+              }
+            });
+          });
+
+          // Listener per messaggi dal service worker
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data.action === 'SW_UPDATED') {
+              log.info('🔄 Service Worker aggiornato');
+            }
+          });
+
+          // Controlla aggiornamenti ogni 30 minuti
+          setInterval(() => {
+            registration.update();
+          }, 30 * 60 * 1000);
+
+        } catch (error) {
+          log.warn('⚠️ Service Worker non disponibile (modalità sviluppo):', error.message);
+          // In modalità sviluppo, continua senza service worker
+          log.info('📱 App funzionante senza PWA features');
         }
       });
-      
-      // Controlla aggiornamenti ogni 30 minuti
-      setInterval(() => {
-        registration.update();
-      }, 30 * 60 * 1000);
-      
-    } catch (error) {
-      log.warn('⚠️ Service Worker non disponibile (modalità sviluppo):', error.message);
-      // In modalità sviluppo, continua senza service worker
-      log.info('📱 App funzionante senza PWA features');
     }
-  });
-}
 
-// Mostra notifica di aggiornamento
-function showUpdateNotification() {
-  // Rimuovi notifica esistente se presente
-  const existingNotification = document.getElementById('updateNotification');
-  if (existingNotification) {
-    existingNotification.remove();
-  }
-  
-  const notification = document.createElement('div');
-  notification.id = 'updateNotification';
-  notification.style.cssText = `
+    // Mostra notifica di aggiornamento
+    function showUpdateNotification() {
+      // Rimuovi notifica esistente se presente
+      const existingNotification = document.getElementById('updateNotification');
+      if (existingNotification) {
+        existingNotification.remove();
+      }
+
+      const notification = document.createElement('div');
+      notification.id = 'updateNotification';
+      notification.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
@@ -441,8 +505,8 @@ function showUpdateNotification() {
     max-width: 350px;
     animation: slideInRight 0.3s ease-out;
   `;
-  
-  notification.innerHTML = `
+
+      notification.innerHTML = `
     <div style="flex: 1;">
       <div style="font-weight: 500; margin-bottom: 4px;">🔄 Nuova versione disponibile!</div>
       <div style="font-size: 14px; opacity: 0.9;">Ricarica la pagina per aggiornare l'app</div>
@@ -467,28 +531,28 @@ function showUpdateNotification() {
       opacity: 0.7;
     ">×</button>
   `;
-  
-  document.body.appendChild(notification);
-  
-  // Auto-rimuovi dopo 10 secondi
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.remove();
-    }
-  }, 10000);
-}
 
-// Gestione installazione PWA
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  
-  // Mostra pulsante installazione personalizzato
-  const installBtn = document.createElement('button');
-  installBtn.textContent = '📱 Installa App';
-  installBtn.className = 'btn-install';
-  installBtn.style.cssText = `
+      document.body.appendChild(notification);
+
+      // Auto-rimuovi dopo 10 secondi
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.remove();
+        }
+      }, 10000);
+    }
+
+    // Gestione installazione PWA
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+
+      // Mostra pulsante installazione personalizzato
+      const installBtn = document.createElement('button');
+      installBtn.textContent = '📱 Installa App';
+      installBtn.className = 'btn-install';
+      installBtn.style.cssText = `
     background: #2f6b2f;
     color: white;
     border: none;
@@ -497,45 +561,46 @@ window.addEventListener('beforeinstallprompt', (e) => {
     cursor: pointer;
     margin-left: 8px;
   `;
-  
-  installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      log.info('Risultato installazione:', outcome);
+
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          log.info('Risultato installazione:', outcome);
+          deferredPrompt = null;
+        }
+      });
+
+      // Aggiungi pulsante alla topbar
+      const controls = document.querySelector('.controls-secondary');
+      if (controls) {
+        controls.appendChild(installBtn);
+      }
+    });
+
+    // Gestione installazione completata
+    window.addEventListener('appinstalled', () => {
+      log.info('✅ PWA installata con successo');
       deferredPrompt = null;
-    }
-  });
-  
-  // Aggiungi pulsante alla topbar
-  const controls = document.querySelector('.controls-secondary');
-  if (controls) {
-    controls.appendChild(installBtn);
-  }
-});
+    });
 
-// Gestione installazione completata
-window.addEventListener('appinstalled', () => {
-  log.info('✅ PWA installata con successo');
-  deferredPrompt = null;
-});
+    // Inizializzazione icone personalizzate
+    document.addEventListener('DOMContentLoaded', () => {
+      // Aggiorna tutte le icone del menu
+      if (typeof updateMenuIcons === 'function') {
+        updateMenuIcons();
+      }
 
-// Inizializzazione icone personalizzate
-document.addEventListener('DOMContentLoaded', () => {
-  // Aggiorna tutte le icone del menu
-  if (typeof updateMenuIcons === 'function') {
-    updateMenuIcons();
-  }
-  
-  // Aggiorna icone dinamiche se necessario
-  setTimeout(() => {
-    // Forza aggiornamento icone dopo caricamento completo
-    if (typeof updateMenuIcons === 'function') {
-      updateMenuIcons();
-    }
-  }, 1000);
-});
-</script>
+      // Aggiorna icone dinamiche se necessario
+      setTimeout(() => {
+        // Forza aggiornamento icone dopo caricamento completo
+        if (typeof updateMenuIcons === 'function') {
+          updateMenuIcons();
+        }
+      }, 1000);
+    });
+  </script>
 
 </body>
+
 </html>
