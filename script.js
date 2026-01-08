@@ -1685,13 +1685,17 @@ async function modificaStruttura(id) {
         <input type="url" id="edit-google_maps_link" value="${strutturaCorrente.google_maps_link || ''}" placeholder="https://maps.google.com/...">
       </label>
       
-      <div style="margin-top: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 4px;">
+      <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; background: var(--bg-secondary); border-radius: 4px;">
         <button type="button" id="geocodeBtn" 
-                style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; width: 100%;">
-          🔍 Ottieni Coordinate da Indirizzo
+                style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+          🔍 Da Indirizzo
         </button>
-        <small style="display: block; margin-top: 5px; color: var(--text-secondary); font-size: 12px;">
-          Compila Luogo, Indirizzo e Provincia, poi clicca qui per ottenere le coordinate automaticamente
+        <button type="button" id="centerOnCityBtn" 
+                style="background: #17a2b8; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+          🏢 Su Città
+        </button>
+        <small style="grid-column: 1 / -1; display: block; margin-top: 5px; color: var(--text-secondary); font-size: 11px; text-align: center;">
+          Compila i campi sopra per posizionare automaticamente
         </small>
       </div>
     </fieldset>
@@ -1799,7 +1803,68 @@ async function modificaStruttura(id) {
           alert('Errore durante la geocodifica.');
         } finally {
           geocodeBtn.disabled = false;
-          geocodeBtn.innerHTML = '🔍 Ottieni Coordinate da Indirizzo';
+          geocodeBtn.innerHTML = '🔍 Da Indirizzo';
+        }
+      };
+    }
+
+    // Gestione centerOnCityBtn
+    const centerOnCityBtn = document.getElementById('centerOnCityBtn');
+    if (centerOnCityBtn) {
+      centerOnCityBtn.onclick = async () => {
+        const luogo = document.getElementById('edit-luogo').value.trim();
+        const prov = document.getElementById('edit-prov').value;
+
+        if (!luogo && !prov) {
+          alert('Inserisci almeno un luogo o una provincia.');
+          return;
+        }
+
+        centerOnCityBtn.disabled = true;
+        const originalHtml = centerOnCityBtn.innerHTML;
+        centerOnCityBtn.innerHTML = '🔄...';
+
+        try {
+          // Cerca coordinate medie per la città tra le altre strutture
+          let targetLat = null, targetLng = null;
+          const sameCity = (window.strutture || []).filter(s =>
+            s.Luogo === luogo &&
+            ((s.coordinate && s.coordinate.lat) || s.coordinate_lat)
+          );
+
+          if (sameCity.length > 0) {
+            let sLat = 0, sLng = 0;
+            sameCity.forEach(s => {
+              const l = s.coordinate_lat || s.coordinate.lat;
+              const g = s.coordinate_lng || s.coordinate.lng;
+              sLat += l; sLng += g;
+            });
+            targetLat = sLat / sameCity.length;
+            targetLng = sLng / sameCity.length;
+            console.log(`📍 Posizionamento su città (${luogo}) tramite media di ${sameCity.length} strutture`);
+          } else {
+            // Se non ci sono altre strutture, prova geocoding solo città
+            const result = await geocodificaStruttura({ Luogo: luogo, Prov: prov });
+            if (result) {
+              targetLat = result.lat;
+              targetLng = result.lng;
+            }
+          }
+
+          if (targetLat && targetLng) {
+            latInput.value = targetLat.toFixed(6);
+            lngInput.value = targetLng.toFixed(6);
+            if (window.updateDraggableMarker) {
+              window.updateDraggableMarker(targetLat, targetLng, 14);
+            }
+          } else {
+            alert('Impossibile trovare il centro città.');
+          }
+        } catch (error) {
+          console.error('Errore posizionamento città:', error);
+        } finally {
+          centerOnCityBtn.disabled = false;
+          centerOnCityBtn.innerHTML = originalHtml;
         }
       };
     }
