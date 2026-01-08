@@ -1,4 +1,4 @@
-// === QuoVadiScout v1.3.0 - Cache Bust: 2024-12-19-12-00 ===
+// === QuoVadiScout v1.3.1 - Cache Bust: 2026-01-08-16-15 ===
 
 // === Sistema di Logging Condizionale ===
 const DEBUG = false; // Impostare a true per debug in produzione

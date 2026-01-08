@@ -1,5 +1,5 @@
-// === QuoVadiScout Maps v1.2.1 - Cache Bust: 2024-12-19-11-25 ===
-console.log('🔄 Maps.js caricato con versione v1.2.1 - Cache bust applicato');
+// === QuoVadiScout Maps v1.3.1 - Cache Bust: 2026-01-08-16-15 ===
+console.log('🔄 Maps.js caricato con versione v1.3.1 - Cache bust applicato');
 console.log('🗺️ Debug: Leaflet disponibile al caricamento:', typeof L !== 'undefined');
 
 // Aggiungi script per Leaflet Routing Machine
