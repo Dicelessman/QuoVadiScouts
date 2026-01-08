@@ -1778,8 +1778,12 @@ async function modificaStruttura(id) {
         geocodeBtn.innerHTML = '🔄 Geocodifica in corso...';
 
         try {
-          const query = `${indirizzo ? indirizzo + ', ' : ''}${luogo}, ${prov}, Italia`;
-          const result = await geocodificaStruttura({ ...strutturaCorrente, Indirizzo: query });
+          const result = await geocodificaStruttura({
+            ...strutturaCorrente,
+            Indirizzo: indirizzo,
+            Luogo: luogo,
+            Prov: prov
+          });
 
           if (result) {
             latInput.value = result.lat;
@@ -1884,8 +1888,8 @@ async function salvaModifiche() {
       // 2. Tenta con solo Luogo (Città) se il primo fallisce o non era possibile
       if ((!strutturaConCoordinate || !strutturaConCoordinate.coordinate) && formData.Luogo && formData.Prov) {
         console.log('📍 Tentativo geocoding solo Luogo (città)...');
-        const cityQuery = `${formData.Luogo}, ${formData.Prov}, Italia`;
-        const coord = await geocodificaStruttura({ ...strutturaAggiornata, Indirizzo: cityQuery });
+        // Passiamo un oggetto con Indirizzo nullo per forzare l'uso di Luogo in geocodificaStruttura
+        const coord = await geocodificaStruttura({ ...strutturaAggiornata, Indirizzo: '' });
         if (coord) {
           strutturaConCoordinate = {
             ...strutturaAggiornata,
@@ -10988,15 +10992,25 @@ async function geocodificaStruttura(struttura) {
       return null;
     }
 
-    // Costruisci query di ricerca
+    // Costruisci query di ricerca intelligente
     let query = '';
-    if (struttura.Indirizzo) {
+
+    // Se Indirizzo contiene già Luogo o "Italia", usalo come query principale
+    if (struttura.Indirizzo && (
+      struttura.Indirizzo.toLowerCase().includes('italia') ||
+      (struttura.Luogo && struttura.Indirizzo.toLowerCase().includes(struttura.Luogo.toLowerCase()))
+    )) {
+      query = struttura.Indirizzo;
+    } else if (struttura.Indirizzo) {
+      // Altrimenti combina i campi normalmente
       query = `${struttura.Indirizzo}, ${struttura.Luogo || ''}, ${struttura.Prov || ''}, Italia`;
     } else if (struttura.Luogo) {
+      // Solo luogo e provincia
       query = `${struttura.Luogo}, ${struttura.Prov || ''}, Italia`;
     }
 
-    query = query.replace(/,\s*,/g, ',').replace(/,$/, '').trim();
+    // Pulisci virgole extra e spazi
+    query = query.replace(/,\s*,/g, ',').replace(/,\s*Italia,\s*Italia/gi, ', Italia').replace(/,$/, '').trim();
 
     // Controlla cache
     if (geocodingCache.has(query)) {
