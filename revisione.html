@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="it" class="no-js">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QuoVadiScout - Revisione Dati</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="geolocation-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .revision-header {
+            padding: 20px;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 56px;
+            z-index: 100;
+        }
+
+        .revision-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .revision-tab {
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid var(--border-medium);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .revision-tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .revision-list {
+            padding: 20px;
+            display: grid;
+            gap: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .revision-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 15px;
+            display: grid;
+            gap: 10px;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .revision-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Indicatore incompletezza grave */
+        .revision-card.critical-missing {
+            border-left: 4px solid var(--danger);
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .card-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-location {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .score-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease-out;
+        }
+
+        .score-text {
+            font-size: 0.85rem;
+            font-weight: 600;
+            min-width: 45px;
+            text-align: right;
+        }
+
+        .missing-fields {
+            font-size: 0.8rem;
+            color: var(--danger);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .missing-badge {
+            background: #fee2e2;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .card-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .reviewer-info {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            margin-right: auto;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .empty-message {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        /* Review Status Badge */
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .status-badge.reviewed {
+            background: #dcfce7;
+            color: #166534;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-main">
+            <div class="header-brand">
+                <a href="/" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 24px;">⛺</span>
+                    <h1 class="app-title">Revisione Dati</h1>
+                </a>
+            </div>
+            <div class="header-actions">
+                <a href="/" class="btn-primary" style="text-decoration: none; font-size: 14px; padding: 6px 12px;">
+                    <i class="fas fa-arrow-left"></i> Torna alla Mappa
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="revision-header">
+        <div class="revision-tabs">
+            <button class="revision-tab active" data-tab="todo">Da Revisionare</button>
+            <button class="revision-tab" data-tab="done">Affidabili completi</button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span id="list-counter" style="font-size: 0.9rem; color: var(--text-secondary);">Caricamento...</span>
+            <div class="filter-controls">
+                <label style="font-size: 0.9rem; margin-right: 10px;">
+                    <input type="checkbox" id="show-my-assigned"> Solo assegnati a me
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div id="revision-container" class="revision-list">
+        <!-- Cards injected here -->
+    </div>
+
+    <!-- Modale (riutilizzato da index.html ma gestito da revisione.js) -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <button id="closeModal" class="close"><i class="fas fa-times"></i></button>
+            <h2>Revisiona Struttura</h2>
+            <form id="editForm"></form>
+
+            <!-- Revision Specific Actions -->
+            <div style="margin: 20px 0; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;"
+                id="revision-actions-panel">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="mark-as-reviewed" style="width: 20px; height: 20px;">
+                    <div>
+                        <span style="font-weight: 600; color: #166534;">Segna come Revisionata e Affidabile</span>
+                        <div style="font-size: 0.8rem; color: #15803d;">Confermi che i dati sono completi e corretti
+                            (Score > 80%)</div>
+                    </div>
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button id="saveBtn"><i class="fas fa-save"></i> Salva e Aggiorna</button>
+                <button id="cancelBtn"><i class="fas fa-times"></i> Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared Scripts -->
+    <script>
+        window.FirebaseConfig = null; // Will be loaded dynamically
+    </script>
+    <script src="/api/firebase-config.js"></script>
+    <script src="city-database.js"></script>
+    <script src="maps.js"></script>
+    <script src="error-handler.js"></script>
+    <script type="module" src="revisione.js"></script>
+</body>
+
+</html>
