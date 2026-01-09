@@ -215,8 +215,27 @@ class GeolocationUI {
    * Inizializza o aggiorna la mappa interattiva nel modale
    */
   async initInteractiveMap() {
-    const lat = this.currentStructure?.coordinate?.lat || 45.4642; // Default Milano
-    const lng = this.currentStructure?.coordinate?.lng || 9.1900;
+    let lat = 45.0703; // Default Torino
+    let lng = 7.6869;
+
+    // 1. Prova coordinate strutturate (formato geolocation modal)
+    if (this.currentStructure?.coordinate?.lat && this.currentStructure?.coordinate?.lng) {
+      lat = this.currentStructure.coordinate.lat;
+      lng = this.currentStructure.coordinate.lng;
+    }
+    // 2. Prova coordinate flat (formato script.js)
+    else if (this.currentStructure?.coordinate_lat && this.currentStructure?.coordinate_lng) {
+      lat = this.currentStructure.coordinate_lat;
+      lng = this.currentStructure.coordinate_lng;
+    }
+    // 3. Prova fallback su città
+    else if (this.currentStructure?.Luogo && window.CITY_COORDINATES) {
+      const city = this.currentStructure.Luogo.toUpperCase();
+      if (window.CITY_COORDINATES[city]) {
+        [lat, lng] = window.CITY_COORDINATES[city];
+        console.log(`📍 Posizionamento iniziale su città (${city}) tramite database`);
+      }
+    }
 
     if (!this.draggableMap) {
       if (window.DraggableMarkerMapManager) {
