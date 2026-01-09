@@ -338,7 +338,8 @@ function renderStrutture(lista) {
   if (lista.length > 100 && typeof window.createVirtualScroller === 'function' && container) {
     const buildCardElement = (s) => {
       const card = document.createElement("div");
-      card.className = "card";
+      card.className = "card structure-card";
+      card.dataset.id = s.id;
       const isInElenco = elencoPersonale.includes(s.id);
       if (isListViewMode) {
         card.innerHTML = `
@@ -498,7 +499,8 @@ function renderStrutture(lista) {
 
   listaPagina.forEach((s, idx) => {
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "card structure-card";
+    card.dataset.id = s.id;
     const isInElenco = elencoPersonale.includes(s.id);
     if (isListViewMode) {
       // Modalità elenco - layout orizzontale compatto

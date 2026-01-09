@@ -432,7 +432,17 @@ class MapsManager {
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
-          ">Visualizza Dettagli</button>
+            margin-right: 5px;
+          ">Dettagli</button>
+          <button onclick="window.geolocationUI && window.geolocationUI.showModal(${JSON.stringify(struttura).replace(/"/g, '&quot;')})" style="
+            background: #2f6b2f;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+          ">📍 Riposiziona</button>
         </div>
       </div>
     `;

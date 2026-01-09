@@ -6,8 +6,9 @@
 /* Modale Geolocalizzazione */
 .geolocation-modal {
   max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .geolocation-modal .modal-header {

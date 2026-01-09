@@ -8,7 +8,7 @@ class GeolocationIntegration {
     this.geolocationManager = window.geolocationManager;
     this.geolocationUI = window.geolocationUI;
     this.currentStructure = null;
-    
+
     this.init();
   }
 
@@ -65,9 +65,9 @@ class GeolocationIntegration {
 
     const geolocationBtn = document.createElement('button');
     geolocationBtn.className = 'geolocation-btn btn-small';
-    geolocationBtn.innerHTML = '📍 Posizione';
+    geolocationBtn.innerHTML = '📍 Riposiziona';
     geolocationBtn.title = 'Gestisci posizione';
-    
+
     geolocationBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.openGeolocationForStructure(card);
@@ -82,7 +82,7 @@ class GeolocationIntegration {
   openGeolocationForStructure(card) {
     const structureId = card.dataset.id;
     const structure = this.getStructureById(structureId);
-    
+
     if (structure) {
       this.currentStructure = structure;
       this.geolocationUI.showModal(structure);
@@ -94,7 +94,7 @@ class GeolocationIntegration {
    */
   handleGeolocationSaved(detail) {
     const { structure, result, isEditing } = detail;
-    
+
     if (isEditing && structure) {
       // Aggiorna struttura esistente
       this.updateStructureGeolocation(structure, result);
@@ -102,7 +102,7 @@ class GeolocationIntegration {
       // Crea nuova struttura con geolocalizzazione
       this.createStructureWithGeolocation(result);
     }
-    
+
     this.showSuccessMessage('✅ Posizione salvata con successo!');
   }
 
@@ -116,18 +116,18 @@ class GeolocationIntegration {
     }
     structure.coordinate.lat = result.coordinates.lat;
     structure.coordinate.lng = result.coordinates.lng;
-    
+
     // Aggiorna indirizzo se disponibile
     if (result.formattedAddress) {
       structure.indirizzo = result.formattedAddress;
     }
-    
+
     // Salva nel localStorage
     this.saveStructureToStorage(structure);
-    
+
     // Aggiorna UI
     this.updateStructureCard(structure);
-    
+
     // Aggiorna mappa se visibile
     if (window.map && window.map.updateMarker) {
       window.map.updateMarker(structure);
@@ -150,13 +150,13 @@ class GeolocationIntegration {
       indirizzo: result.formattedAddress,
       dataCreazione: new Date().toISOString()
     };
-    
+
     // Salva struttura
     this.saveStructureToStorage(newStructure);
-    
+
     // Aggiorna UI
     this.refreshStructuresList();
-    
+
     // Mostra messaggio di successo
     this.showSuccessMessage('✅ Struttura creata con posizione!');
   }
@@ -166,7 +166,7 @@ class GeolocationIntegration {
    */
   extractLocationFromAddress(address) {
     if (!address) return '';
-    
+
     const parts = address.split(',');
     if (parts.length >= 2) {
       return parts[parts.length - 2].trim();
@@ -179,7 +179,7 @@ class GeolocationIntegration {
    */
   extractProvinceFromAddress(address) {
     if (!address) return '';
-    
+
     const parts = address.split(',');
     if (parts.length >= 1) {
       const lastPart = parts[parts.length - 1].trim();
@@ -220,13 +220,13 @@ class GeolocationIntegration {
     try {
       const structures = this.getStructuresFromStorage();
       const existingIndex = structures.findIndex(s => s.id === structure.id);
-      
+
       if (existingIndex >= 0) {
         structures[existingIndex] = structure;
       } else {
         structures.push(structure);
       }
-      
+
       localStorage.setItem('strutture', JSON.stringify(structures));
     } catch (error) {
       console.error('Errore salvataggio struttura:', error);
@@ -239,13 +239,13 @@ class GeolocationIntegration {
   updateStructureCard(structure) {
     const card = document.querySelector(`[data-id="${structure.id}"]`);
     if (!card) return;
-    
+
     // Aggiorna coordinate se mostrate
     const coordinateElement = card.querySelector('.coordinate-info');
     if (coordinateElement) {
       coordinateElement.textContent = `${structure.coordinate.lat}, ${structure.coordinate.lng}`;
     }
-    
+
     // Aggiorna indirizzo se mostrato
     const addressElement = card.querySelector('.address-info');
     if (addressElement && structure.indirizzo) {
@@ -281,9 +281,9 @@ class GeolocationIntegration {
       z-index: 10000;
       animation: slideInRight 0.3s ease-out;
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     // Rimuovi dopo 3 secondi
     setTimeout(() => {
       if (notification.parentNode) {
@@ -297,26 +297,26 @@ class GeolocationIntegration {
    */
   async processStructuresWithoutCoordinates() {
     const structures = this.getStructuresFromStorage();
-    const structuresWithoutCoords = structures.filter(s => 
+    const structuresWithoutCoords = structures.filter(s =>
       !s.coordinate || !s.coordinate.lat || !s.coordinate.lng
     );
-    
+
     if (structuresWithoutCoords.length === 0) {
       this.showSuccessMessage('✅ Tutte le strutture hanno già le coordinate!');
       return;
     }
-    
+
     let processed = 0;
     let errors = 0;
-    
+
     for (const structure of structuresWithoutCoords) {
       try {
         // Costruisce indirizzo da struttura
         const address = this.buildAddressFromStructure(structure);
-        
+
         if (address) {
           const result = await this.geolocationManager.geocodeWithGoogleMaps(address);
-          
+
           if (result.success) {
             structure.coordinate = result.coordinates;
             structure.indirizzo = result.formattedAddress;
@@ -333,10 +333,10 @@ class GeolocationIntegration {
         errors++;
       }
     }
-    
+
     // Aggiorna UI
     this.refreshStructuresList();
-    
+
     // Mostra risultati
     this.showSuccessMessage(
       `✅ Geocoding completato: ${processed} successi, ${errors} errori`
@@ -348,17 +348,17 @@ class GeolocationIntegration {
    */
   buildAddressFromStructure(structure) {
     const parts = [];
-    
+
     if (structure.indirizzo) {
       parts.push(structure.indirizzo);
     } else {
       if (structure.via) parts.push(structure.via);
       if (structure.numero) parts.push(structure.numero);
     }
-    
+
     if (structure.luogo) parts.push(structure.luogo);
     if (structure.provincia) parts.push(structure.provincia);
-    
+
     return parts.length > 0 ? parts.join(', ') : null;
   }
 
@@ -370,7 +370,7 @@ class GeolocationIntegration {
       alert('❌ Geolocalizzazione non supportata');
       return;
     }
-    
+
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -378,21 +378,21 @@ class GeolocationIntegration {
           timeout: 10000
         });
       });
-      
+
       const userLat = position.coords.latitude;
       const userLng = position.coords.longitude;
-      
+
       const structures = this.getStructuresFromStorage();
       const nearbyStructures = this.geolocationManager.findNearbyStructures(
         userLat, userLng, structures, 50 // 50km raggio
       );
-      
+
       if (nearbyStructures.length > 0) {
         this.showNearbyStructures(nearbyStructures);
       } else {
         this.showSuccessMessage('📍 Nessuna struttura trovata nelle vicinanze');
       }
-      
+
     } catch (error) {
       alert(`❌ Errore geolocalizzazione: ${error.message}`);
     }
@@ -426,7 +426,7 @@ class GeolocationIntegration {
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(modal);
   }
 

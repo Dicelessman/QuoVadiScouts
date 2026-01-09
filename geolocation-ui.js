@@ -8,7 +8,8 @@ class GeolocationUI {
     this.geolocationManager = window.geolocationManager;
     this.currentStructure = null;
     this.isEditing = false;
-    
+    this.draggableMap = null;
+
     this.init();
   }
 
@@ -85,6 +86,13 @@ class GeolocationUI {
                 <button id="validateCoordinates" class="btn-secondary">✅ Valida</button>
                 <button id="getCurrentLocation" class="btn-accent">📍 Posizione Attuale</button>
               </div>
+            </section>
+
+            <!-- Metodo 4: Mappa Interattiva -->
+            <section class="geolocation-method">
+              <h3>📍 Riposiziona sulla Mappa</h3>
+              <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Trascina il segnaposto blu sulla posizione corretta.</p>
+              <div id="geolocationMap" style="height: 300px; width: 100%; border-radius: 8px; border: 1px solid #e0e0e0;"></div>
             </section>
 
             <!-- Risultati e Anteprima -->
@@ -185,19 +193,50 @@ class GeolocationUI {
   showModal(structure = null) {
     this.currentStructure = structure;
     this.isEditing = !!structure;
-    
+
     const modal = document.getElementById('geolocationModal');
     modal.classList.remove('hidden');
-    
+
     // Popola campi se in modalità editing
     if (structure && structure.coordinate) {
       this.populateFields(structure);
     } else {
       this.clearFields();
     }
-    
+
     // Focus sul primo campo
     document.getElementById('googleMapsSearch').focus();
+
+    // Inizializza mappa interattiva
+    this.initInteractiveMap();
+  }
+
+  /**
+   * Inizializza o aggiorna la mappa interattiva nel modale
+   */
+  async initInteractiveMap() {
+    const lat = this.currentStructure?.coordinate?.lat || 45.4642; // Default Milano
+    const lng = this.currentStructure?.coordinate?.lng || 9.1900;
+
+    if (!this.draggableMap) {
+      if (window.DraggableMarkerMapManager) {
+        this.draggableMap = new window.DraggableMarkerMapManager();
+        await this.draggableMap.initialize('geolocationMap', lat, lng, {
+          onPositionChange: (newLat, newLng) => {
+            document.getElementById('manualLat').value = newLat.toFixed(6);
+            document.getElementById('manualLng').value = newLng.toFixed(6);
+
+            // Simula click su valida per aggiornare l'anteprima
+            this.validateManualCoordinates();
+          }
+        });
+      } else {
+        console.error('❌ DraggableMarkerMapManager non trovato');
+      }
+    } else {
+      // Aggiorna marker esistente
+      this.draggableMap.updateMarkerPosition(lat, lng, 15);
+    }
   }
 
   /**
@@ -218,7 +257,7 @@ class GeolocationUI {
       document.getElementById('manualLat').value = structure.coordinate.lat;
       document.getElementById('manualLng').value = structure.coordinate.lng;
     }
-    
+
     if (structure.indirizzo) {
       const parts = structure.indirizzo.split(',');
       if (parts.length >= 2) {
@@ -258,7 +297,7 @@ class GeolocationUI {
 
     try {
       const result = await this.geolocationManager.geocodeWithGoogleMaps(query);
-      
+
       if (result.success) {
         this.displayGoogleMapsResults([result]);
       } else {
@@ -274,7 +313,7 @@ class GeolocationUI {
    */
   displayGoogleMapsResults(results) {
     const container = document.getElementById('googleMapsResults');
-    
+
     const resultsHTML = results.map((result, index) => `
       <div class="search-result-item" data-result='${JSON.stringify(result)}'>
         <div class="result-address">${result.formattedAddress}</div>
@@ -293,7 +332,7 @@ class GeolocationUI {
   selectGoogleMapsResult(index) {
     const resultItem = document.querySelectorAll('.search-result-item')[index];
     const result = JSON.parse(resultItem.dataset.result);
-    
+
     this.updatePreview(result);
     this.enableSaveButton();
   }
@@ -313,10 +352,10 @@ class GeolocationUI {
     }
 
     const addressData = { via, numero, luogo, provincia };
-    
+
     try {
       const result = await this.geolocationManager.geocodeWithConcatenation(addressData);
-      
+
       if (result.success) {
         this.updatePreview(result);
         this.enableSaveButton();
@@ -341,7 +380,7 @@ class GeolocationUI {
     }
 
     const validation = this.geolocationManager.validateCoordinates(lat, lng);
-    
+
     if (validation.valid) {
       const result = {
         success: true,
@@ -349,7 +388,7 @@ class GeolocationUI {
         formattedAddress: 'Coordinate manuali',
         accuracy: 'Manuale'
       };
-      
+
       this.updatePreview(result);
       this.enableSaveButton();
     } else {
@@ -383,7 +422,7 @@ class GeolocationUI {
 
       // Prova reverse geocoding
       const reverseResult = await this.geolocationManager.reverseGeocode(lat, lng);
-      
+
       const result = {
         success: true,
         coordinates: { lat, lng },
@@ -393,7 +432,7 @@ class GeolocationUI {
 
       this.updatePreview(result);
       this.enableSaveButton();
-      
+
     } catch (error) {
       alert(`❌ Errore geolocalizzazione: ${error.message}`);
     }
@@ -404,7 +443,7 @@ class GeolocationUI {
    */
   updatePreview(result) {
     document.getElementById('previewAddress').textContent = result.formattedAddress;
-    document.getElementById('previewCoordinates').textContent = 
+    document.getElementById('previewCoordinates').textContent =
       `${result.coordinates.lat}, ${result.coordinates.lng}`;
     document.getElementById('previewAccuracy').textContent = result.accuracy;
 
@@ -423,10 +462,10 @@ class GeolocationUI {
     document.getElementById('previewAddress').textContent = '-';
     document.getElementById('previewCoordinates').textContent = '-';
     document.getElementById('previewAccuracy').textContent = '-';
-    
+
     document.getElementById('openInGoogleMaps').disabled = true;
     document.getElementById('getDirections').disabled = true;
-    
+
     this.currentResult = null;
   }
 
@@ -464,13 +503,13 @@ class GeolocationUI {
    */
   openInGoogleMaps() {
     if (!this.currentResult) return;
-    
+
     const url = this.geolocationManager.generateGoogleMapsUrl(
       this.currentResult.coordinates.lat,
       this.currentResult.coordinates.lng,
       this.currentResult.formattedAddress
     );
-    
+
     window.open(url, '_blank');
   }
 
@@ -479,13 +518,13 @@ class GeolocationUI {
    */
   getDirections() {
     if (!this.currentResult) return;
-    
+
     const url = this.geolocationManager.generateNavigationUrl(
       this.currentResult.coordinates.lat,
       this.currentResult.coordinates.lng,
       this.currentResult.formattedAddress
     );
-    
+
     window.open(url, '_blank');
   }
 }
