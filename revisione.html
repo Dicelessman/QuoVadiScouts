@@ -208,26 +208,33 @@
     <!-- Modale (riutilizzato da index.html ma gestito da revisione.js) -->
     <div id="modal" class="modal hidden">
         <div class="modal-content">
-            <button id="closeModal" class="close"><i class="fas fa-times"></i></button>
-            <h2>Revisiona Struttura</h2>
-            <form id="editForm"></form>
-
-            <!-- Revision Specific Actions -->
-            <div style="margin: 20px 0; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;"
-                id="revision-actions-panel">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" id="mark-as-reviewed" style="width: 20px; height: 20px;">
-                    <div>
-                        <span style="font-weight: 600; color: #166534;">Segna come Revisionata e Affidabile</span>
-                        <div style="font-size: 0.8rem; color: #15803d;">Confermi che i dati sono completi e corretti
-                            (Score > 80%)</div>
-                    </div>
-                </label>
+            <div class="modal-header">
+                <h2 class="modal-title">Revisiona Struttura</h2>
+                <button id="closeModal" class="modal-close"><i class="fas fa-times"></i></button>
             </div>
 
-            <div class="modal-actions">
-                <button id="saveBtn"><i class="fas fa-save"></i> Salva e Aggiorna</button>
-                <button id="cancelBtn"><i class="fas fa-times"></i> Annulla</button>
+            <div class="modal-body">
+                <form id="editForm"></form>
+
+                <!-- Revision Specific Actions -->
+                <div style="margin: 20px 0; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-lg);"
+                    id="revision-actions-panel">
+                    <label style="display: flex; align-items: start; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="mark-as-reviewed"
+                            style="width: 20px; height: 20px; margin-top: 2px;">
+                        <div>
+                            <span style="font-weight: 600; color: #166534;">Segna come Revisionata e Affidabile</span>
+                            <div style="font-size: 0.8rem; color: #15803d; margin-top: 4px;">Confermi che i dati sono
+                                completi e corretti
+                                (Score > 80%)</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="saveBtn" class="btn btn-primary"><i class="fas fa-save"></i> Salva e Aggiorna</button>
+                <button id="cancelBtn" class="btn btn-secondary"><i class="fas fa-times"></i> Annulla</button>
             </div>
         </div>
     </div>
