@@ -5,7 +5,9 @@ import {
   matchesQuickFilter,
   cleanPhoneNumber,
   calculatePagination,
-  searchStrutture
+  searchStrutture,
+  formatStructureShareText,
+  getWhatsAppShareUrl
 } from '../utils/structure.js';
 
 test('normalizeStructureCoordinates adds coordinate_lat/lng from coordinate', () => {
@@ -32,6 +34,30 @@ test('matchesQuickFilter checks casa and terreno correctly', () => {
   assert.equal(matchesQuickFilter(terreno, 'casa'), false);
 });
 
+test('matchesQuickFilter checks scout branches branco, reparto, clan', () => {
+  const perBranco = { id: 'b1', Branco: true, Casa: true };
+  const perReparto = { id: 'r1', Reparto: true, Terreno: true };
+  const perClan = { id: 'cl1', Compagnia: true, Info: 'Ideale per route e bivacchi' };
+
+  assert.equal(matchesQuickFilter(perBranco, 'branco'), true);
+  assert.equal(matchesQuickFilter(perReparto, 'reparto'), true);
+  assert.equal(matchesQuickFilter(perClan, 'clan'), true);
+
+  assert.equal(matchesQuickFilter(perReparto, 'branco'), false);
+  assert.equal(matchesQuickFilter(perBranco, 'clan'), false);
+});
+
+test('matchesQuickFilter checks radius filters with user location', () => {
+  // Centro di Milano (45.4642, 9.1900)
+  const userLoc = { lat: 45.4642, lng: 9.1900 };
+  const nearMilano = { id: 'nm', coordinate_lat: 45.5000, coordinate_lng: 9.2000 }; // ~4km
+  const farRome = { id: 'fr', coordinate_lat: 41.9028, coordinate_lng: 12.4964 }; // ~477km
+
+  assert.equal(matchesQuickFilter(nearMilano, 'raggio-25', [], userLoc), true);
+  assert.equal(matchesQuickFilter(farRome, 'raggio-25', [], userLoc), false);
+  assert.equal(matchesQuickFilter(farRome, 'raggio-500', [], userLoc), true);
+});
+
 test('matchesQuickFilter checks beds and favorites', () => {
   const bigHouse = { id: 'bh', Casa: true, Letti: '45' };
   const smallHouse = { id: 'sh', Casa: true, Letti: '15' };
@@ -47,6 +73,30 @@ test('cleanPhoneNumber formats phone correctly for tel: protocol', () => {
   assert.equal(cleanPhoneNumber('347 12 34 567'), '3471234567');
   assert.equal(cleanPhoneNumber(null), '');
   assert.equal(cleanPhoneNumber(''), '');
+});
+
+test('formatStructureShareText and getWhatsAppShareUrl generate rich text', () => {
+  const s = {
+    Struttura: 'Base Scout Brownsea',
+    Luogo: 'Colle Brianza',
+    Prov: 'LC',
+    Casa: true,
+    Terreno: true,
+    Letti: 40,
+    Referente: 'Akela',
+    Contatto: '333-1122334',
+    coordinate: { lat: 45.75, lng: 9.35 }
+  };
+  const text = formatStructureShareText(s);
+  assert.ok(text.includes('Base Scout Brownsea'));
+  assert.ok(text.includes('Colle Brianza (LC)'));
+  assert.ok(text.includes('40 posti letto'));
+  assert.ok(text.includes('333-1122334'));
+  assert.ok(text.includes('google.com/maps?q=45.75,9.35'));
+
+  const waUrl = getWhatsAppShareUrl(s);
+  assert.ok(waUrl.startsWith('https://api.whatsapp.com/send?text='));
+  assert.ok(waUrl.includes('Base%20Scout%20Brownsea'));
 });
 
 test('calculatePagination computes correct boundaries and navigation flags', () => {

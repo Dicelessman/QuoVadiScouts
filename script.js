@@ -55,9 +55,11 @@ import {
   cleanPhoneNumber,
   matchesQuickFilter,
   calculatePagination,
-  searchStrutture
+  searchStrutture,
+  formatStructureShareText,
+  getWhatsAppShareUrl
 } from "./utils/structure.js";
-import { extractCoordinatesFromGoogleMapsLink } from "./utils/geo.js";
+import { extractCoordinatesFromGoogleMapsLink, calculateDistanceKm } from "./utils/geo.js";
 
 window.normalizeStructureCoordinates = normalizeStructureCoordinates;
 window.cleanPhoneNumber = cleanPhoneNumber;
@@ -65,6 +67,68 @@ window.matchesQuickFilter = matchesQuickFilter;
 window.calculatePagination = calculatePagination;
 window.searchStrutture = searchStrutture;
 window.extractCoordinatesFromGoogleMapsLink = extractCoordinatesFromGoogleMapsLink;
+window.calculateDistanceKm = calculateDistanceKm;
+window.formatStructureShareText = formatStructureShareText;
+window.getWhatsAppShareUrl = getWhatsAppShareUrl;
+
+/**
+ * Condivide la scheda struttura tramite Web Share API o WhatsApp.
+ */
+function condividiStruttura(s) {
+  if (!s) return;
+  const shareText = formatStructureShareText(s);
+  if (navigator.share) {
+    navigator.share({
+      title: s.Struttura || 'Struttura Scout',
+      text: shareText,
+      url: window.location.href
+    }).catch(err => {
+      if (err.name !== 'AbortError') {
+        const waUrl = getWhatsAppShareUrl(s);
+        window.open(waUrl, '_blank');
+      }
+    });
+  } else {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareText).catch(() => {});
+    }
+    const waUrl = getWhatsAppShareUrl(s);
+    window.open(waUrl, '_blank');
+    if (typeof showCustomNotification === 'function') {
+      showCustomNotification('💬 Scheda aperta su WhatsApp e copiata negli appunti!', 'success');
+    }
+  }
+}
+window.condividiStruttura = condividiStruttura;
+
+/**
+ * Mostra le card skeleton durante il caricamento per evitare salti di layout.
+ */
+function renderSkeletonCards(count = 6) {
+  const container = document.getElementById("results");
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const card = document.createElement("div");
+    card.className = "skeleton-card";
+    card.innerHTML = `
+      <div class="skeleton-shimmer skeleton-title"></div>
+      <div class="skeleton-shimmer skeleton-row short"></div>
+      <div class="skeleton-shimmer skeleton-row"></div>
+      <div class="skeleton-badges">
+        <div class="skeleton-shimmer skeleton-badge-item"></div>
+        <div class="skeleton-shimmer skeleton-badge-item"></div>
+      </div>
+      <div class="skeleton-actions">
+        <div class="skeleton-shimmer skeleton-btn"></div>
+        <div class="skeleton-shimmer skeleton-btn"></div>
+        <div class="skeleton-shimmer skeleton-btn"></div>
+      </div>
+    `;
+    container.appendChild(card);
+  }
+}
+window.renderSkeletonCards = renderSkeletonCards;
 
 // === Configurazione Firebase ===
 // 🔒 SICUREZZA: Credenziali caricate dinamicamente da firebase-config.js
@@ -325,6 +389,9 @@ function getCardActionsHTML(s) {
       <button class="card-action-btn map-pin-action" data-lat="${coordLat}" data-lng="${coordLng}" title="Mostra su mappa">
         <i class="fas fa-map-marker-alt"></i> Mappa
       </button>` : ''}
+      <button class="card-action-btn share-action" data-id="${s.id}" title="Condividi scheda su WhatsApp">
+        <i class="fab fa-whatsapp"></i> Condividi
+      </button>
     </div>
   `;
 }
@@ -408,6 +475,7 @@ function renderStrutture(lista) {
             ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
             ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
             ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
             ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
             ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
           </div>
@@ -454,6 +522,7 @@ function renderStrutture(lista) {
             ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
             ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
             ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
             ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
             ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
           </div>
@@ -572,6 +641,7 @@ function renderStrutture(lista) {
             ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
             ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
             ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
             ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
             ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
           </div>
@@ -620,6 +690,7 @@ function renderStrutture(lista) {
             ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
             ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
             ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
             ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
             ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
           </div>
@@ -1644,14 +1715,32 @@ function filtra(lista) {
     }
 
     // Filtro rapido (Quick Filter Chips)
+    const userLoc = window.userLocation || (window.currentPosition ? {
+      lat: window.currentPosition.coords?.latitude,
+      lng: window.currentPosition.coords?.longitude
+    } : null);
+
+    if (userLoc && userLoc.lat && userLoc.lng) {
+      const lat = s.coordinate?.lat || s.coordinate_lat;
+      const lng = s.coordinate?.lng || s.coordinate_lng;
+      if (lat && lng) {
+        s.distanzaKm = calculateDistanceKm(userLoc.lat, userLoc.lng, lat, lng);
+      }
+    }
+
     const currentQuickFilter = window.activeQuickFilter || activeQuickFilter || 'all';
-    const matchQuick = matchesQuickFilter(s, currentQuickFilter, elencoPersonale);
+    const matchQuick = matchesQuickFilter(s, currentQuickFilter, elencoPersonale, userLoc);
 
     return matchTesto && matchProv && matchCasa && matchTerreno && matchStato && matchAvanzati && matchQuick;
   });
 
-  // Applica ordinamento
-  const sortBy = document.getElementById("sort-by").value;
+  // Se ordinamento per vicinanza
+  const currentFilterForSort = window.activeQuickFilter || activeQuickFilter || 'all';
+  if ((currentFilterForSort === 'vicine' || currentFilterForSort.startsWith('raggio-')) && (window.userLocation || window.currentPosition)) {
+    filtrata.sort((a, b) => (a.distanzaKm ?? 9999) - (b.distanzaKm ?? 9999));
+  } else {
+    // Applica ordinamento standard
+    const sortBy = document.getElementById("sort-by").value;
   filtrata.sort((a, b) => {
     switch (sortBy) {
       case 'struttura':
@@ -11926,9 +12015,9 @@ function initializeUIEventListeners() {
       chip.addEventListener('click', async () => {
         const filterType = chip.dataset.filter;
 
-        // Se si clicca su "vicine a me", attiva la geolocalizzazione utente
-        if (filterType === 'vicine') {
-          if (typeof window.trovaVicinoAMe === 'function') {
+        // Se si clicca su "vicine a me" o raggio km, attiva la geolocalizzazione utente
+        if (filterType === 'vicine' || filterType.startsWith('raggio-')) {
+          if (!window.userLocation && typeof window.trovaVicinoAMe === 'function') {
             await window.trovaVicinoAMe();
             return;
           }
@@ -12063,6 +12152,18 @@ function initializeUIEventListeners() {
         const structureId = viewBtn.dataset.id || viewBtn.closest('.structure-card')?.dataset.id;
         if (structureId) {
           mostraSchedaCompleta(structureId);
+        }
+        return;
+      }
+
+      // Click pulsante Condividi su card
+      const shareBtn = e.target.closest('.share-action');
+      if (shareBtn) {
+        e.stopPropagation();
+        const structureId = shareBtn.dataset.id || shareBtn.closest('.structure-card')?.dataset.id;
+        const targetStruttura = Array.isArray(strutture) ? strutture.find(s => s.id === structureId) : null;
+        if (targetStruttura) {
+          condividiStruttura(targetStruttura);
         }
         return;
       }

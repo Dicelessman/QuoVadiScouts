@@ -15,7 +15,6 @@ const STATIC_ASSETS = [
   '/script.js',
   '/utils/geo.js',
   '/utils/structure.js',
-  '/dist/script.js',
   '/dashboard.html',
   '/dashboard.css',
   '/dashboard.js',

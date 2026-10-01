@@ -1,3 +1,5 @@
+import { calculateDistanceKm } from './geo.js';
+
 export function normalizeStructureCoordinates(struttura) {
   const s = { ...struttura };
   if (s.coordinate && s.coordinate.lat && s.coordinate.lng) {
@@ -14,10 +16,74 @@ export function cleanPhoneNumber(phone) {
   return phone.replace(/[^0-9+]/g, '');
 }
 
-export function matchesQuickFilter(s, filterType, elencoPersonale = []) {
+/**
+ * Genera il testo formattato da condividere con i capi scout (via WhatsApp o Web Share).
+ */
+export function formatStructureShareText(s) {
+  if (!s) return '';
+  const nome = s.Struttura || 'Struttura scout';
+  const luogo = [s.Luogo, s.Prov].filter(Boolean).join(' (');
+  const luogoStr = luogo ? `${luogo})` : '';
+  const tipologia = [s.Casa ? '🏠 Casa' : '', s.Terreno ? '🌲 Terreno' : ''].filter(Boolean).join(' + ');
+  const letti = s.Letti ? `🛌 ${s.Letti} posti letto` : '';
+  const contatto = s.Contatto ? `📞 ${s.Contatto}` : '';
+  const referente = s.Referente ? `👤 ${s.Referente}` : '';
+  
+  const lat = s.coordinate?.lat || s.coordinate_lat;
+  const lng = s.coordinate?.lng || s.coordinate_lng;
+  const mapsUrl = (lat && lng)
+    ? `https://www.google.com/maps?q=${lat},${lng}`
+    : (s.google_maps_link || '');
+
+  const righe = [
+    `⚜️ *${nome}*`,
+    luogoStr ? `📍 ${luogoStr}` : '',
+    tipologia ? `🏷️ ${tipologia}` : '',
+    letti,
+    referente,
+    contatto,
+    mapsUrl ? `🗺️ Mappa: ${mapsUrl}` : '',
+    '',
+    `Condiviso tramite QuoVadiScout`
+  ].filter(Boolean);
+
+  return righe.join('\n');
+}
+
+/**
+ * Genera il link per aprire direttamente WhatsApp con il testo precompilato.
+ */
+export function getWhatsAppShareUrl(s) {
+  const text = formatStructureShareText(s);
+  return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+}
+
+export function matchesQuickFilter(s, filterType, elencoPersonale = [], userLocation = null, maxRadiusKm = null) {
   if (!s || !filterType || filterType === 'all') return true;
+
   if (filterType === 'casa') return s.Casa === true;
   if (filterType === 'terreno') return s.Terreno === true;
+
+  // Branche scout
+  if (filterType === 'branco') {
+    return Boolean(
+      s.Branco === true || s.Branco === 'true' || s.Branco === 'S' || s.Branco === 'Si' || s.Branco === 'Sì' ||
+      s.Casa === true
+    );
+  }
+  if (filterType === 'reparto') {
+    return Boolean(
+      s.Reparto === true || s.Reparto === 'true' || s.Reparto === 'S' || s.Reparto === 'Si' || s.Reparto === 'Sì' ||
+      s.Terreno === true
+    );
+  }
+  if (filterType === 'clan') {
+    return Boolean(
+      s.Compagnia === true || s.Compagnia === 'true' || s.Clan === true || s.Compagnia === 'S' || s.Compagnia === 'Si' ||
+      (s.Info && /clan|rover|route|bivacco/i.test(s.Info))
+    );
+  }
+
   if (filterType === 'letti-30') {
     const letti = parseInt(s.Letti || s.PostiLetto || 0, 10);
     return !isNaN(letti) && letti >= 30;
@@ -26,8 +92,30 @@ export function matchesQuickFilter(s, filterType, elencoPersonale = []) {
     return Array.isArray(elencoPersonale) && elencoPersonale.includes(s.id);
   }
   if (filterType === 'vicine') {
-    return Boolean(s.coordinate?.lat || s.coordinate_lat);
+    const lat = s.coordinate?.lat || s.coordinate_lat;
+    const lng = s.coordinate?.lng || s.coordinate_lng;
+    if (!lat || !lng) return false;
+
+    // Se abbiamo posizione utente e raggio specificato, filtriamo per distanza
+    if (userLocation && userLocation.lat && userLocation.lng && maxRadiusKm) {
+      const dist = calculateDistanceKm(userLocation.lat, userLocation.lng, lat, lng);
+      return dist !== null && dist <= maxRadiusKm;
+    }
+    return true;
   }
+
+  // Filtri per raggio diretto (es. 'raggio-50', 'raggio-100')
+  if (filterType.startsWith('raggio-')) {
+    const radius = parseInt(filterType.replace('raggio-', ''), 10);
+    if (!isNaN(radius) && userLocation && userLocation.lat && userLocation.lng) {
+      const lat = s.coordinate?.lat || s.coordinate_lat;
+      const lng = s.coordinate?.lng || s.coordinate_lng;
+      if (!lat || !lng) return false;
+      const dist = calculateDistanceKm(userLocation.lat, userLocation.lng, lat, lng);
+      return dist !== null && dist <= radius;
+    }
+  }
+
   return true;
 }
 

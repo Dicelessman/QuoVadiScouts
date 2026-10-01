@@ -202,11 +202,15 @@
     </div>
     <div class="quick-filter-bar" id="quickFilterBar" role="tablist" aria-label="Filtri rapidi">
       <button class="filter-chip active" data-filter="all" role="tab" aria-selected="true">🏠 Tutte</button>
+      <button class="filter-chip" data-filter="branco" role="tab" aria-selected="false">🐺 Branco</button>
+      <button class="filter-chip" data-filter="reparto" role="tab" aria-selected="false">🏕️ Reparto</button>
+      <button class="filter-chip" data-filter="clan" role="tab" aria-selected="false">🥾 Clan / Rover</button>
       <button class="filter-chip" data-filter="casa" role="tab" aria-selected="false">🏡 Case</button>
-      <button class="filter-chip" data-filter="terreno" role="tab" aria-selected="false">🌲 Terreni / Tende</button>
+      <button class="filter-chip" data-filter="terreno" role="tab" aria-selected="false">🌲 Terreni</button>
       <button class="filter-chip" data-filter="letti-30" role="tab" aria-selected="false">🛌 &gt;30 Posti</button>
       <button class="filter-chip" data-filter="preferiti" role="tab" aria-selected="false">⭐ Preferiti</button>
       <button class="filter-chip" data-filter="vicine" role="tab" aria-selected="false">📍 Vicine a me</button>
+      <button class="filter-chip" data-filter="raggio-50" role="tab" aria-selected="false">🧭 Entro 50 km</button>
     </div>
   </div>
 
@@ -590,47 +594,65 @@
       }, 10000);
     }
 
-    // Gestione installazione PWA
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
+    <!-- PWA Install Banner -->
+    <aside id="pwaInstallBanner" class="pwa-install-banner hidden" role="dialog" aria-label="Installa QuoVadiScout">
+      <div class="pwa-install-content">
+        <div class="pwa-install-icon">⚜️</div>
+        <div class="pwa-install-text">
+          <strong>Installa QuoVadiScout</strong>
+          <p>Usa l'app a schermo intero anche offline durante le uscite scout.</p>
+        </div>
+      </div>
+      <div class="pwa-install-actions">
+        <button id="pwaDismissBtn" class="btn btn-ghost" type="button">Più tardi</button>
+        <button id="pwaInstallBtn" class="btn btn-primary" type="button">Installa</button>
+      </div>
+    </aside>
 
-      // Mostra pulsante installazione personalizzato
-      const installBtn = document.createElement('button');
-      installBtn.textContent = '📱 Installa App';
-      installBtn.className = 'btn-install';
-      installBtn.style.cssText = `
-    background: #2f6b2f;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-left: 8px;
-  `;
+    <script>
+      // Gestione installazione PWA
+      let deferredPrompt = null;
+      const pwaBanner = document.getElementById('pwaInstallBanner');
+      const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+      const pwaDismissBtn = document.getElementById('pwaDismissBtn');
 
-      installBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          log.info('Risultato installazione:', outcome);
-          deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const dismissedUntil = localStorage.getItem('pwa_banner_dismissed_until');
+        if (!dismissedUntil || Date.now() > parseInt(dismissedUntil, 10)) {
+          if (pwaBanner) pwaBanner.classList.remove('hidden');
         }
       });
 
-      // Aggiungi pulsante alla topbar
-      const controls = document.querySelector('.controls-secondary');
-      if (controls) {
-        controls.appendChild(installBtn);
+      if (pwaInstallBtn) {
+        pwaInstallBtn.addEventListener('click', async () => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+              if (pwaBanner) pwaBanner.classList.add('hidden');
+            }
+            deferredPrompt = null;
+          }
+        });
       }
-    });
 
-    // Gestione installazione completata
-    window.addEventListener('appinstalled', () => {
-      log.info('✅ PWA installata con successo');
-      deferredPrompt = null;
-    });
+      if (pwaDismissBtn) {
+        pwaDismissBtn.addEventListener('click', () => {
+          if (pwaBanner) pwaBanner.classList.add('hidden');
+          localStorage.setItem('pwa_banner_dismissed_until', String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        });
+      }
+
+      window.addEventListener('appinstalled', () => {
+        if (pwaBanner) pwaBanner.classList.add('hidden');
+        deferredPrompt = null;
+        if (typeof showCustomNotification === 'function') {
+          showCustomNotification('✅ App installata con successo!', 'success');
+        }
+      });
+    </script>
 
     // Inizializzazione icone personalizzate
     document.addEventListener('DOMContentLoaded', () => {
