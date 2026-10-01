@@ -9,3 +9,20 @@ export function normalizeStructureCoordinates(struttura) {
   return s;
 }
 
+export function matchesQuickFilter(s, filterType, elencoPersonale = []) {
+  if (!s || !filterType || filterType === 'all') return true;
+  if (filterType === 'casa') return s.Casa === true;
+  if (filterType === 'terreno') return s.Terreno === true;
+  if (filterType === 'letti-30') {
+    const letti = parseInt(s.Letti || s.PostiLetto || 0, 10);
+    return !isNaN(letti) && letti >= 30;
+  }
+  if (filterType === 'preferiti') {
+    return Array.isArray(elencoPersonale) && elencoPersonale.includes(s.id);
+  }
+  if (filterType === 'vicine') {
+    return Boolean(s.coordinate?.lat || s.coordinate_lat);
+  }
+  return true;
+}
+

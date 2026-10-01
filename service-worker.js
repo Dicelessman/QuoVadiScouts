@@ -1,9 +1,9 @@
-// Service Worker per QuoVadiScout PWA v1.3.1
-const CACHE_NAME = 'quovadiscout-v1.3.1';
-const STATIC_CACHE = 'static-v1.3.1';
-const DYNAMIC_CACHE = 'dynamic-v1.3.1';
-const IMAGE_CACHE = 'images-v1.3.1';
-const FREQUENTLY_USED_CACHE = 'frequently-used-v1';
+// Service Worker per QuoVadiScout PWA v1.4.0
+const CACHE_NAME = 'quovadiscout-v1.4.0';
+const STATIC_CACHE = 'static-v1.4.0';
+const DYNAMIC_CACHE = 'dynamic-v1.4.0';
+const IMAGE_CACHE = 'images-v1.4.0';
+const FREQUENTLY_USED_CACHE = 'frequently-used-v1.4.0';
 const MAX_CACHED_STRUCTURES = 50;
 
 // Risorse da cachare staticamente
@@ -72,7 +72,7 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE && cacheName !== FREQUENTLY_USED_CACHE) {
+            if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE && cacheName !== IMAGE_CACHE && cacheName !== FREQUENTLY_USED_CACHE) {
               console.log('🗑️ Service Worker: Rimozione cache obsoleta:', cacheName);
               return caches.delete(cacheName);
             }

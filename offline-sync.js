@@ -12,12 +12,18 @@ class OfflineSyncManager {
     // Event listeners per stato connessione
     window.addEventListener('online', () => {
       this.isOnline = true;
+      if (typeof window.showSuccess === 'function') {
+        window.showSuccess('Connessione ripristinata. Sincronizzazione in corso...', { title: 'Online 📶' });
+      }
       this.syncWhenOnline();
     });
     
     window.addEventListener('offline', () => {
       this.isOnline = false;
-      console.log('📱 OfflineSync: Disconnesso - modalità offline attivata');
+      if (typeof window.showWarning === 'function') {
+        window.showWarning('Sei offline. Puoi continuare a visualizzare le strutture salvate.', { title: 'Offline 📵' });
+      }
+      if (window.log) window.log.info('📱 OfflineSync: Disconnesso - modalità offline attivata');
     });
   }
   
