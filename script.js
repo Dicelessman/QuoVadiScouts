@@ -288,6 +288,30 @@ let isListViewMode = false;
 let activeQuickFilter = 'all';
 window.activeQuickFilter = 'all';
 
+// === Helper per le azioni rapide della scheda struttura ===
+function getCardActionsHTML(s) {
+  const coordLat = s.coordinate?.lat || s.coordinate_lat;
+  const coordLng = s.coordinate?.lng || s.coordinate_lng;
+  const hasCoords = coordLat && coordLng;
+  const cleanPhone = s.Contatto ? String(s.Contatto).replace(/[^0-9+]/g, '') : '';
+
+  return `
+    <div class="card-footer-actions">
+      <button class="card-action-btn view-details" data-id="${s.id}" title="Apri scheda dettagliata">
+        <i class="fas fa-info-circle"></i> Scheda
+      </button>
+      ${cleanPhone ? `
+      <a href="tel:${cleanPhone}" class="card-action-btn call-action" title="Chiama ${s.Contatto}" onclick="event.stopPropagation()">
+        <i class="fas fa-phone-alt"></i> Chiama
+      </a>` : ''}
+      ${hasCoords ? `
+      <button class="card-action-btn map-pin-action" data-lat="${coordLat}" data-lng="${coordLng}" title="Mostra su mappa">
+        <i class="fas fa-map-marker-alt"></i> Mappa
+      </button>` : ''}
+    </div>
+  `;
+}
+
 function renderStrutture(lista) {
   // Log solo se DEBUG è attivo
   if (DEBUG) {
@@ -381,6 +405,7 @@ function renderStrutture(lista) {
             <span class="card-field-icon">ℹ️</span>
             <span class="card-field-value">${s.Info.length > 100 ? s.Info.substring(0, 100) + '...' : s.Info}</span>
           </div>` : ''}
+          ${getCardActionsHTML(s)}
         </div>
       `;
       } else {
@@ -451,6 +476,7 @@ function renderStrutture(lista) {
             <span class="card-field-icon">📅</span>
             <span class="card-field-value">Ultimo controllo: ${s['Ultimo controllo']}</span>
           </div>` : ''}
+          ${getCardActionsHTML(s)}
         </div>
       `;
       }
@@ -544,6 +570,7 @@ function renderStrutture(lista) {
             <span class="card-field-value">${s.Info.length > 100 ? s.Info.substring(0, 100) + '...' : s.Info}</span>
           </div>` : ''}
           ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx === 0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
+          ${getCardActionsHTML(s)}
         </div>
       `;
     } else {
@@ -616,6 +643,7 @@ function renderStrutture(lista) {
             <span class="card-field-icon">📅</span>
             <span class="card-field-value">Ultimo controllo: ${s['Ultimo controllo']}</span>
           </div>` : ''}
+          ${getCardActionsHTML(s)}
         </div>
       `;
     }
@@ -11970,6 +11998,127 @@ function initializeUIEventListeners() {
       if (typeof window.resetFiltri === 'function') {
         window.resetFiltri();
       }
+    });
+  }
+
+  // Pulsante reset dall'empty state
+  const resetFiltersEmpty = document.getElementById('resetFiltersEmpty');
+  if (resetFiltersEmpty) {
+    resetFiltersEmpty.addEventListener('click', () => {
+      if (typeof window.resetFiltri === 'function') {
+        window.resetFiltri();
+      }
+    });
+  }
+
+  const addBtnEmpty = document.getElementById('addBtnEmpty');
+  if (addBtnEmpty) {
+    addBtnEmpty.addEventListener('click', () => {
+      if (typeof window.aggiungiStruttura === 'function') {
+        window.aggiungiStruttura();
+      }
+    });
+  }
+
+  // Delegazione eventi per azioni rapide delle card (Mappa e Dettagli)
+  const resultsContainer = document.getElementById('results');
+  if (resultsContainer) {
+    resultsContainer.addEventListener('click', (e) => {
+      // Click pulsante Mappa su card
+      const mapPinBtn = e.target.closest('.map-pin-action');
+      if (mapPinBtn) {
+        e.stopPropagation();
+        const lat = parseFloat(mapPinBtn.dataset.lat);
+        const lng = parseFloat(mapPinBtn.dataset.lng);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const mapContainer = document.getElementById('mainMapContainer');
+          if (mapContainer && mapContainer.classList.contains('collapsed')) {
+            const mapTitleBtn = document.getElementById('mapTitleBtn');
+            if (mapTitleBtn) mapTitleBtn.click();
+          }
+          mapContainer?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (window.mapsManager && window.mapsManager.map) {
+            setTimeout(() => {
+              try {
+                window.mapsManager.map.invalidateSize();
+                window.mapsManager.map.setView([lat, lng], 15);
+              } catch (err) {
+                console.warn('Errore puntamento mappa:', err);
+              }
+            }, 300);
+          }
+        }
+        return;
+      }
+
+      // Click pulsante Scheda su card
+      const viewBtn = e.target.closest('.view-details');
+      if (viewBtn) {
+        e.stopPropagation();
+        const structureId = viewBtn.dataset.id || viewBtn.closest('.structure-card')?.dataset.id;
+        if (structureId) {
+          mostraSchedaCompleta(structureId);
+        }
+        return;
+      }
+    });
+  }
+
+  // Mobile Bottom Navigation Bar
+  const navItemHome = document.getElementById('navItemHome');
+  const navItemMap = document.getElementById('navItemMap');
+  const navItemFav = document.getElementById('navItemFav');
+  const navItemAdd = document.getElementById('navItemAdd');
+  const navItemMenu = document.getElementById('navItemMenu');
+
+  function setActiveBottomNav(activeItem) {
+    document.querySelectorAll('.bottom-nav-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    if (activeItem) activeItem.classList.add('active');
+  }
+
+  if (navItemHome) {
+    navItemHome.addEventListener('click', () => {
+      setActiveBottomNav(navItemHome);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (navItemMap) {
+    navItemMap.addEventListener('click', () => {
+      setActiveBottomNav(navItemMap);
+      const mapContainer = document.getElementById('mainMapContainer');
+      if (mapContainer && mapContainer.classList.contains('collapsed')) {
+        const mapTitleBtn = document.getElementById('mapTitleBtn');
+        if (mapTitleBtn) mapTitleBtn.click();
+      }
+      mapContainer?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  if (navItemFav) {
+    navItemFav.addEventListener('click', () => {
+      setActiveBottomNav(navItemFav);
+      const favChip = document.querySelector('.filter-chip[data-filter="preferiti"]');
+      if (favChip) favChip.click();
+    });
+  }
+
+  if (navItemAdd) {
+    navItemAdd.addEventListener('click', () => {
+      setActiveBottomNav(navItemAdd);
+      if (typeof window.aggiungiStruttura === 'function') {
+        window.aggiungiStruttura();
+      }
+    });
+  }
+
+  if (navItemMenu) {
+    navItemMenu.addEventListener('click', () => {
+      setActiveBottomNav(navItemMenu);
+      const menuToggle = document.getElementById('menuToggle');
+      if (menuToggle) menuToggle.click();
     });
   }
 

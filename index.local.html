@@ -282,12 +282,38 @@
       <span class="loading-text">Caricamento...</span>
     </div>
     <div id="emptyState" class="empty-state hidden">
-      <div class="empty-icon"><i class="fas fa-search"></i></div>
+      <div class="empty-icon">🏕️</div>
       <h3 class="empty-title">Nessuna struttura trovata</h3>
-      <p class="empty-description">Prova a modificare i filtri o aggiungi una nuova struttura</p>
-      <button id="addBtnEmpty" class="btn-primary"><i class="fas fa-plus"></i> Aggiungi Struttura</button>
+      <p class="empty-description">Nessuna struttura corrisponde ai criteri attuali. Prova ad azzerare i filtri o aggiungerne una nuova.</p>
+      <div class="empty-actions">
+        <button id="resetFiltersEmpty" class="btn btn-secondary"><i class="fas fa-undo"></i> Azzera filtri</button>
+        <button id="addBtnEmpty" class="btn btn-primary"><i class="fas fa-plus"></i> Aggiungi Struttura</button>
+      </div>
     </div>
   </main>
+
+  <nav class="mobile-bottom-nav" aria-label="Navigazione mobile">
+    <button class="bottom-nav-item active" id="navItemHome" title="Esplora strutture">
+      <i class="fas fa-compass"></i>
+      <span>Esplora</span>
+    </button>
+    <button class="bottom-nav-item" id="navItemMap" title="Apri mappa">
+      <i class="fas fa-map-marked-alt"></i>
+      <span>Mappa</span>
+    </button>
+    <button class="bottom-nav-item" id="navItemFav" title="Preferiti">
+      <i class="fas fa-star"></i>
+      <span>Salvati</span>
+    </button>
+    <button class="bottom-nav-item" id="navItemAdd" title="Aggiungi struttura">
+      <i class="fas fa-plus-circle"></i>
+      <span>Aggiungi</span>
+    </button>
+    <button class="bottom-nav-item" id="navItemMenu" title="Menu principale">
+      <i class="fas fa-bars"></i>
+      <span>Menu</span>
+    </button>
+  </nav>
 
   <div id="modal" class="modal hidden">
     <div class="modal-content">
