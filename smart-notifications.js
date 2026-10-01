@@ -20,19 +20,19 @@ class SmartNotificationManager {
   deferLocationUntilUserGesture() {
     const start = () => {
       this.initializeLocationTracking();
-      window.removeEventListener('click', start, { capture: true });
       const centerBtn = document.getElementById('centerMapBtn');
       if (centerBtn) centerBtn.removeEventListener('click', start);
     };
-    // Qualsiasi primo click o il pulsante “centra mappa” sbloccano la geolocalizzazione
-    window.addEventListener('click', start, { once: true, capture: true });
+    // Sblocca la geolocalizzazione solo su richiesta esplicita (es. pulsante "Centro su di me")
     const centerBtn = document.getElementById('centerMapBtn');
-    if (centerBtn) centerBtn.addEventListener('click', start, { once: true });
+    if (centerBtn) {
+      centerBtn.addEventListener('click', start, { once: true });
+    }
   }
 
   async initializeLocationTracking() {
     if (!navigator.geolocation) {
-      console.log('📍 Geolocalizzazione non supportata');
+      if (window.log) window.log.info('📍 Geolocalizzazione non supportata dal browser');
       return;
     }
 
@@ -46,13 +46,13 @@ class SmartNotificationManager {
         timestamp: Date.now()
       };
       
-      console.log('📍 Posizione utente rilevata:', this.userLocation);
+      if (window.log) window.log.info('📍 Posizione utente rilevata:', this.userLocation);
       
       // Avvia monitoraggio continuo (solo se l'utente ha dato il consenso)
       this.startLocationWatching();
       
     } catch (error) {
-      console.log('📍 Errore geolocalizzazione:', error.message);
+      if (window.log) window.log.info('📍 Geolocalizzazione non disponibile:', error.message);
     }
   }
 

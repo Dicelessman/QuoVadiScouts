@@ -2533,6 +2533,14 @@ input:checked + .toggle-slider:before {
   transition: var(--transition-normal);
 }
 
+.main-map-container.collapsed {
+  min-height: 0;
+}
+
+.main-map-container.collapsed .map-header {
+  border-bottom: none;
+}
+
 .main-map-container.collapsed .main-map {
   height: 0;
   overflow: hidden;
