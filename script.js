@@ -283,8 +283,10 @@ async function caricaStruttureLocali() {
 let paginaCorrente = 1;
 let elementiPerPagina = 20;
 
-// === Gestione modalità visualizzazione ===
+// === Gestione modalità visualizzazione e filtri rapidi ===
 let isListViewMode = false;
+let activeQuickFilter = 'all';
+window.activeQuickFilter = 'all';
 
 function renderStrutture(lista) {
   // Log solo se DEBUG è attivo
@@ -1596,7 +1598,23 @@ function filtra(lista) {
       }
     }
 
-    return matchTesto && matchProv && matchCasa && matchTerreno && matchStato && matchAvanzati;
+    // Filtro rapido (Quick Filter Chips)
+    let matchQuick = true;
+    const currentQuickFilter = window.activeQuickFilter || activeQuickFilter || 'all';
+    if (currentQuickFilter === 'casa') {
+      matchQuick = s.Casa === true;
+    } else if (currentQuickFilter === 'terreno') {
+      matchQuick = s.Terreno === true;
+    } else if (currentQuickFilter === 'letti-30') {
+      const lettiNum = parseInt(s.Letti || s.PostiLetto || 0, 10);
+      matchQuick = !isNaN(lettiNum) && lettiNum >= 30;
+    } else if (currentQuickFilter === 'preferiti') {
+      matchQuick = Array.isArray(elencoPersonale) && elencoPersonale.includes(s.id);
+    } else if (currentQuickFilter === 'vicine') {
+      matchQuick = Boolean(s.coordinate?.lat || s.coordinate_lat || (s.coordinate && typeof s.coordinate === 'object'));
+    }
+
+    return matchTesto && matchProv && matchCasa && matchTerreno && matchStato && matchAvanzati && matchQuick;
   });
 
   // Applica ordinamento
@@ -3470,17 +3488,69 @@ function setupMainMapControls() {
     });
   }
 
-  // Pulsante mostra/nascondi mappa
+  // Gestione mostra/nascondi mappa tramite pulsante o titolo cliccabile
   const toggleMapBtn = document.getElementById('toggleMapBtn');
-  if (toggleMapBtn) {
-    toggleMapBtn.addEventListener('click', () => {
-      const mapContainer = document.getElementById('mainMapContainer');
-      if (mapContainer) {
-        mapContainer.classList.toggle('collapsed');
-        // Cambia icona
-        toggleMapBtn.textContent = mapContainer.classList.contains('collapsed') ? '👁️' : '🙈';
+  const mapTitleBtn = document.getElementById('mapTitleBtn');
+  const mapTitleText = document.getElementById('mapTitleText');
+  const mapContainer = document.getElementById('mainMapContainer');
+
+  function setMapCollapsedState(collapsed) {
+    if (!mapContainer) return;
+    if (collapsed) {
+      mapContainer.classList.add('collapsed');
+      if (mapTitleText) mapTitleText.textContent = 'Mostra la mappa delle strutture';
+      if (mapTitleBtn) {
+        mapTitleBtn.setAttribute('aria-expanded', 'false');
+        mapTitleBtn.setAttribute('title', 'Mostra la mappa delle strutture');
       }
+      if (toggleMapBtn) {
+        toggleMapBtn.textContent = '👁️';
+        toggleMapBtn.setAttribute('title', 'Mostra la mappa delle strutture');
+      }
+    } else {
+      mapContainer.classList.remove('collapsed');
+      if (mapTitleText) mapTitleText.textContent = 'Mappa delle strutture';
+      if (mapTitleBtn) {
+        mapTitleBtn.setAttribute('aria-expanded', 'true');
+        mapTitleBtn.setAttribute('title', 'Nascondi la mappa');
+      }
+      if (toggleMapBtn) {
+        toggleMapBtn.textContent = '🙈';
+        toggleMapBtn.setAttribute('title', 'Nascondi la mappa');
+      }
+      // Ricalcola le dimensioni della mappa Leaflet
+      if (window.mapsManager && window.mapsManager.map) {
+        setTimeout(() => {
+          try {
+            window.mapsManager.map.invalidateSize();
+          } catch (err) {
+            console.warn('Errore invalidateSize:', err);
+          }
+        }, 200);
+      }
+    }
+  }
+
+  function toggleMap() {
+    if (!mapContainer) return;
+    const isNowCollapsed = !mapContainer.classList.contains('collapsed');
+    setMapCollapsedState(isNowCollapsed);
+  }
+
+  if (mapTitleBtn) {
+    mapTitleBtn.addEventListener('click', toggleMap);
+  }
+
+  if (toggleMapBtn) {
+    toggleMapBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMap();
     });
+  }
+
+  // All'avvio la mappa è collassata di default
+  if (mapContainer && mapContainer.classList.contains('collapsed')) {
+    setMapCollapsedState(true);
   }
 }
 
@@ -9612,9 +9682,26 @@ function toggleViewMode() {
 
 // === Reset filtri ===
 function resetFiltri() {
-  document.getElementById('search').value = '';
+  const searchEl = document.getElementById('search');
+  if (searchEl) searchEl.value = '';
   const provEl = document.getElementById('filter-prov');
   if (provEl) provEl.value = '';
+
+  // Reset filtri rapidi
+  window.activeQuickFilter = 'all';
+  activeQuickFilter = 'all';
+  const filterChips = document.querySelectorAll('.filter-chip');
+  if (filterChips) {
+    filterChips.forEach((chip, idx) => {
+      if (idx === 0) {
+        chip.classList.add('active');
+        chip.setAttribute('aria-selected', 'true');
+      } else {
+        chip.classList.remove('active');
+        chip.setAttribute('aria-selected', 'false');
+      }
+    });
+  }
 
   // Reset filtri avanzati
   window.filtriAvanzatiAttivi = null;
@@ -11776,14 +11863,9 @@ function initializeUIEventListeners() {
       }
     };
 
-    searchInput.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase();
-      const filtered = strutture.filter(s =>
-        s.Struttura?.toLowerCase().includes(query) ||
-        s.Luogo?.toLowerCase().includes(query) ||
-        s.Provincia?.toLowerCase().includes(query)
-      );
-      renderStrutture(filtered);
+    searchInput.addEventListener('input', () => {
+      paginaCorrente = 1;
+      renderStrutture(filtra(strutture));
       updateClearButton();
     });
 
@@ -11797,11 +11879,40 @@ function initializeUIEventListeners() {
       if (searchInput) {
         searchInput.value = '';
         searchInput.focus();
-        // Trigger evento input per aggiornare i risultati
-        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-        // Mostra tutte le strutture
+        updateClearButton();
+        paginaCorrente = 1;
         renderStrutture(filtra(strutture));
       }
+    });
+  }
+
+  // Quick Filter Chips Bar
+  const filterChips = document.querySelectorAll('.filter-chip');
+  if (filterChips && filterChips.length > 0) {
+    filterChips.forEach(chip => {
+      chip.addEventListener('click', async () => {
+        const filterType = chip.dataset.filter;
+
+        // Se si clicca su "vicine a me", attiva la geolocalizzazione utente
+        if (filterType === 'vicine') {
+          if (typeof window.trovaVicinoAMe === 'function') {
+            await window.trovaVicinoAMe();
+            return;
+          }
+        }
+
+        filterChips.forEach(c => {
+          c.classList.remove('active');
+          c.setAttribute('aria-selected', 'false');
+        });
+        chip.classList.add('active');
+        chip.setAttribute('aria-selected', 'true');
+
+        window.activeQuickFilter = filterType;
+        activeQuickFilter = filterType;
+        paginaCorrente = 1;
+        renderStrutture(filtra(strutture));
+      });
     });
   }
 

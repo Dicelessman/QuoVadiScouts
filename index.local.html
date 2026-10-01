@@ -123,11 +123,23 @@
     <div class="search-container">
       <input id="search" class="search-input" placeholder="Cerca strutture..." />
     </div>
+    <div class="quick-filter-bar" id="quickFilterBar" role="tablist" aria-label="Filtri rapidi">
+      <button class="filter-chip active" data-filter="all" role="tab" aria-selected="true">🏠 Tutte</button>
+      <button class="filter-chip" data-filter="casa" role="tab" aria-selected="false">🏡 Case</button>
+      <button class="filter-chip" data-filter="terreno" role="tab" aria-selected="false">🌲 Terreni / Tende</button>
+      <button class="filter-chip" data-filter="letti-30" role="tab" aria-selected="false">🛌 &gt;30 Posti</button>
+      <button class="filter-chip" data-filter="preferiti" role="tab" aria-selected="false">⭐ Preferiti</button>
+      <button class="filter-chip" data-filter="vicine" role="tab" aria-selected="false">📍 Vicine a me</button>
+    </div>
   </div>
 
-  <div id="mainMapContainer" class="main-map-container">
+  <div id="mainMapContainer" class="main-map-container collapsed">
     <div class="map-header">
-      <h3 class="map-title">🗺️ Mappa Strutture</h3>
+      <button id="mapTitleBtn" class="map-title-btn" aria-expanded="false" aria-controls="mainMap" title="Clicca per mostrare o nascondere la mappa">
+        <span class="map-title-icon">🗺️</span>
+        <span id="mapTitleText" class="map-title-text">Mostra la mappa delle strutture</span>
+        <span id="mapToggleIndicator" class="map-toggle-indicator">▼</span>
+      </button>
       <div class="map-controls">
         <button id="centerMapBtn" class="btn-map-control" title="Centro su di me">📍</button>
         <button id="toggleMapBtn" class="btn-map-control" title="Mostra/Nascondi mappa">👁️</button>
