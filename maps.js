@@ -3,17 +3,22 @@ console.log('🔄 Maps.js caricato con versione v1.3.1 - Cache bust applicato');
 console.log('🗺️ Debug: Leaflet disponibile al caricamento:', typeof L !== 'undefined');
 
 // Aggiungi script per Leaflet Routing Machine
-const routingScript = document.createElement('script');
-routingScript.src = 'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js';
-routingScript.onload = () => {
-  console.log('✅ Leaflet Routing Machine caricato');
-};
-document.head.appendChild(routingScript);
+(function() {
+  if (window._leafletRoutingMachineLoaded) return;
+  window._leafletRoutingMachineLoaded = true;
 
-const routingCSS = document.createElement('link');
-routingCSS.rel = 'stylesheet';
-routingCSS.href = 'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css';
-document.head.appendChild(routingCSS);
+  const routingScript = document.createElement('script');
+  routingScript.src = 'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js';
+  routingScript.onload = () => {
+    console.log('✅ Leaflet Routing Machine caricato');
+  };
+  document.head.appendChild(routingScript);
+
+  const routingCSS = document.createElement('link');
+  routingCSS.rel = 'stylesheet';
+  routingCSS.href = 'https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css';
+  document.head.appendChild(routingCSS);
+})();
 // Maps integration for QuoVadiScout a
 // Leaflet + OpenStreetMap implementation
 
