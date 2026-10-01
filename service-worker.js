@@ -13,6 +13,8 @@ const STATIC_ASSETS = [
   '/index.local.html',
   '/styles.css',
   '/script.js',
+  '/utils/geo.js',
+  '/utils/structure.js',
   '/dist/script.js',
   '/dashboard.html',
   '/dashboard.css',

@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeStructureCoordinates, matchesQuickFilter } from '../utils/structure.js';
+import {
+  normalizeStructureCoordinates,
+  matchesQuickFilter,
+  cleanPhoneNumber,
+  calculatePagination,
+  searchStrutture
+} from '../utils/structure.js';
 
 test('normalizeStructureCoordinates adds coordinate_lat/lng from coordinate', () => {
   const inObj = { coordinate: { lat: 10, lng: 20 } };
@@ -36,3 +42,50 @@ test('matchesQuickFilter checks beds and favorites', () => {
   assert.equal(matchesQuickFilter(smallHouse, 'preferiti', ['bh']), false);
 });
 
+test('cleanPhoneNumber formats phone correctly for tel: protocol', () => {
+  assert.equal(cleanPhoneNumber('+39 011 / 123.456-78'), '+3901112345678');
+  assert.equal(cleanPhoneNumber('347 12 34 567'), '3471234567');
+  assert.equal(cleanPhoneNumber(null), '');
+  assert.equal(cleanPhoneNumber(''), '');
+});
+
+test('calculatePagination computes correct boundaries and navigation flags', () => {
+  const p1 = calculatePagination(55, 1, 20);
+  assert.equal(p1.totalPages, 3);
+  assert.equal(p1.currentPage, 1);
+  assert.equal(p1.startIndex, 0);
+  assert.equal(p1.endIndex, 20);
+  assert.equal(p1.hasPrev, false);
+  assert.equal(p1.hasNext, true);
+
+  const pLast = calculatePagination(55, 3, 20);
+  assert.equal(pLast.currentPage, 3);
+  assert.equal(pLast.startIndex, 40);
+  assert.equal(pLast.endIndex, 55);
+  assert.equal(pLast.hasPrev, true);
+  assert.equal(pLast.hasNext, false);
+
+  const pOutOfBounds = calculatePagination(55, 999, 20);
+  assert.equal(pOutOfBounds.currentPage, 3);
+
+  const pEmpty = calculatePagination(0, 1, 20);
+  assert.equal(pEmpty.totalPages, 1);
+  assert.equal(pEmpty.currentPage, 1);
+  assert.equal(pEmpty.startIndex, 0);
+  assert.equal(pEmpty.endIndex, 0);
+});
+
+test('searchStrutture filters by name, location, and info accurately', () => {
+  const sample = [
+    { id: '1', Struttura: 'Base Scout Brownsea', Luogo: 'Colle Brianza', Prov: 'LC', Info: 'Ottima per lupetti' },
+    { id: '2', Struttura: 'Chalet delle Aquile', Luogo: 'Gressoney', Prov: 'AO', Info: 'Alta quota' },
+    { id: '3', Struttura: 'Cascina San Giorgio', Luogo: 'Asti', Prov: 'AT', Referente: 'Mario Rossi' }
+  ];
+
+  assert.equal(searchStrutture(sample, '').length, 3);
+  assert.equal(searchStrutture(sample, 'brownsea').length, 1);
+  assert.equal(searchStrutture(sample, 'brownsea')[0].id, '1');
+  assert.equal(searchStrutture(sample, 'AO').length, 1);
+  assert.equal(searchStrutture(sample, 'mario').length, 1);
+  assert.equal(searchStrutture(sample, 'inesistente').length, 0);
+});

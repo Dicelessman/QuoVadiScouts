@@ -49,6 +49,23 @@ import {
   listAll
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
 
+// === Utility Modulari QuoVadiScout ===
+import {
+  normalizeStructureCoordinates,
+  cleanPhoneNumber,
+  matchesQuickFilter,
+  calculatePagination,
+  searchStrutture
+} from "./utils/structure.js";
+import { extractCoordinatesFromGoogleMapsLink } from "./utils/geo.js";
+
+window.normalizeStructureCoordinates = normalizeStructureCoordinates;
+window.cleanPhoneNumber = cleanPhoneNumber;
+window.matchesQuickFilter = matchesQuickFilter;
+window.calculatePagination = calculatePagination;
+window.searchStrutture = searchStrutture;
+window.extractCoordinatesFromGoogleMapsLink = extractCoordinatesFromGoogleMapsLink;
+
 // === Configurazione Firebase ===
 // 🔒 SICUREZZA: Credenziali caricate dinamicamente da firebase-config.js
 // Il file firebase-config.js deve essere escluso dal repository (.gitignore)
@@ -293,7 +310,7 @@ function getCardActionsHTML(s) {
   const coordLat = s.coordinate?.lat || s.coordinate_lat;
   const coordLng = s.coordinate?.lng || s.coordinate_lng;
   const hasCoords = coordLat && coordLng;
-  const cleanPhone = s.Contatto ? String(s.Contatto).replace(/[^0-9+]/g, '') : '';
+  const cleanPhone = cleanPhoneNumber(s.Contatto);
 
   return `
     <div class="card-footer-actions">
@@ -1627,20 +1644,8 @@ function filtra(lista) {
     }
 
     // Filtro rapido (Quick Filter Chips)
-    let matchQuick = true;
     const currentQuickFilter = window.activeQuickFilter || activeQuickFilter || 'all';
-    if (currentQuickFilter === 'casa') {
-      matchQuick = s.Casa === true;
-    } else if (currentQuickFilter === 'terreno') {
-      matchQuick = s.Terreno === true;
-    } else if (currentQuickFilter === 'letti-30') {
-      const lettiNum = parseInt(s.Letti || s.PostiLetto || 0, 10);
-      matchQuick = !isNaN(lettiNum) && lettiNum >= 30;
-    } else if (currentQuickFilter === 'preferiti') {
-      matchQuick = Array.isArray(elencoPersonale) && elencoPersonale.includes(s.id);
-    } else if (currentQuickFilter === 'vicine') {
-      matchQuick = Boolean(s.coordinate?.lat || s.coordinate_lat || (s.coordinate && typeof s.coordinate === 'object'));
-    }
+    const matchQuick = matchesQuickFilter(s, currentQuickFilter, elencoPersonale);
 
     return matchTesto && matchProv && matchCasa && matchTerreno && matchStato && matchAvanzati && matchQuick;
   });
