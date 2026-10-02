@@ -4,6 +4,7 @@ import {
   normalizeStructureCoordinates,
   matchesQuickFilter,
   cleanPhoneNumber,
+  escapeHtml,
   calculatePagination,
   searchStrutture,
   formatStructureShareText,
@@ -151,3 +152,12 @@ test('searchStrutture filters by name, location, and info accurately', () => {
   assert.equal(searchStrutture(sample, 'mario').length, 1);
   assert.equal(searchStrutture(sample, 'inesistente').length, 0);
 });
+
+test('escapeHtml neutralizes XSS characters and handles null/undefined', () => {
+  assert.equal(escapeHtml('<script>alert("xss")</script>'), '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+  assert.equal(escapeHtml("Hello 'world' & <friends>"), 'Hello &#39;world&#39; &amp; &lt;friends&gt;');
+  assert.equal(escapeHtml(null), '');
+  assert.equal(escapeHtml(undefined), '');
+  assert.equal(escapeHtml(123), '123');
+});
+

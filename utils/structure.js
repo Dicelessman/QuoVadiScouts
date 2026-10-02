@@ -17,6 +17,19 @@ export function cleanPhoneNumber(phone) {
 }
 
 /**
+ * Sanitizza una stringa per prevenire vulnerabilità XSS (Cross-Site Scripting).
+ */
+export function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Genera il testo formattato da condividere con i capi scout (via WhatsApp o Web Share).
  */
 export function formatStructureShareText(s) {

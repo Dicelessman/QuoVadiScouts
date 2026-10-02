@@ -53,12 +53,14 @@ import {
 import {
   normalizeStructureCoordinates,
   cleanPhoneNumber,
+  escapeHtml,
   matchesQuickFilter,
   calculatePagination,
   searchStrutture,
   formatStructureShareText,
   getWhatsAppShareUrl
 } from "./utils/structure.js";
+window.escapeHtml = escapeHtml;
 import {
   extractCoordinatesFromGoogleMapsLink,
   calculateDistanceKm,
@@ -523,6 +525,21 @@ function buildStructureCardElement(s, isList, isInElenco, idx) {
   const hasCoords = coordLat && coordLng;
   const cleanPhone = cleanPhoneNumber(s.Contatto);
 
+  // Sanitizzazione campi utente anti-XSS
+  const safeStruttura = escapeHtml(s.Struttura || "Suggerisci nome");
+  const safeLuogo = escapeHtml(s.Luogo || "Luogo non specificato");
+  const safeProv = escapeHtml(s.Prov || "-");
+  const safeInfo = escapeHtml(s.Info || "");
+  const safeReferente = escapeHtml(s.Referente || "");
+  const safeContatto = escapeHtml(s.Contatto || "");
+  const safeLetti = escapeHtml(s.Letti || "");
+  const safeBranco = escapeHtml(s.Branco || "");
+  const safeReparto = escapeHtml(s.Reparto || "");
+  const safeCompagnia = escapeHtml(s.Compagnia || "");
+  const safeEmail = escapeHtml(s.Email || "");
+  const safeSito = escapeHtml(s.Sito || "");
+  const safeUltimoControllo = escapeHtml(s['Ultimo controllo'] || "");
+
   if (isList) {
     // --- MODALITÀ ELENCO (LIST VIEW): Riga orizzontale compatta ---
     let typeClass = 'house';
@@ -543,19 +560,19 @@ function buildStructureCardElement(s, isList, isInElenco, idx) {
           </div>
           <div class="list-details">
             <div class="list-title-row">
-              <h3 class="list-title clickable-title" data-id="${s.id}" title="${s.Struttura || ''}">${s.Struttura || "Suggerisci nome"}</h3>
+              <h3 class="list-title clickable-title" data-id="${s.id}" title="${safeStruttura}">${safeStruttura}</h3>
               ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
               ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
               ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
               ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
             </div>
             <div class="list-meta-row">
-              <span class="list-meta-item"><i class="fas fa-map-marker-alt"></i> ${s.Luogo || 'Luogo non specificato'} (${s.Prov || '-'})</span>
-              ${s.Letti ? `<span class="list-meta-item"><i class="fas fa-bed"></i> ${s.Letti} posti</span>` : ''}
-              ${s.Branco ? `<span class="list-meta-item" title="Posti Branco">🐺 ${s.Branco}</span>` : ''}
-              ${s.Reparto ? `<span class="list-meta-item" title="Posti Reparto">⚜️ ${s.Reparto}</span>` : ''}
-              ${s.Compagnia ? `<span class="list-meta-item" title="Posti Clan/Compagnia">🥾 ${s.Compagnia}</span>` : ''}
-              ${cleanPhone ? `<span class="list-meta-item"><i class="fas fa-phone"></i> ${s.Contatto}</span>` : ''}
+              <span class="list-meta-item"><i class="fas fa-map-marker-alt"></i> ${safeLuogo} (${safeProv})</span>
+              ${s.Letti ? `<span class="list-meta-item"><i class="fas fa-bed"></i> ${safeLetti} posti</span>` : ''}
+              ${s.Branco ? `<span class="list-meta-item" title="Posti Branco">🐺 ${safeBranco}</span>` : ''}
+              ${s.Reparto ? `<span class="list-meta-item" title="Posti Reparto">⚜️ ${safeReparto}</span>` : ''}
+              ${s.Compagnia ? `<span class="list-meta-item" title="Posti Clan/Compagnia">🥾 ${safeCompagnia}</span>` : ''}
+              ${cleanPhone ? `<span class="list-meta-item"><i class="fas fa-phone"></i> ${safeContatto}</span>` : ''}
             </div>
           </div>
         </div>
@@ -564,7 +581,7 @@ function buildStructureCardElement(s, isList, isInElenco, idx) {
             <i class="fas fa-info-circle"></i> Scheda
           </button>
           ${cleanPhone ? `
-          <a href="tel:${cleanPhone}" class="list-action-btn call-action" title="Chiama ${s.Contatto}" onclick="event.stopPropagation()">
+          <a href="tel:${cleanPhone}" class="list-action-btn call-action" title="Chiama ${safeContatto}" onclick="event.stopPropagation()">
             <i class="fas fa-phone-alt"></i>
           </a>` : ''}
           ${hasCoords ? `
@@ -584,7 +601,7 @@ function buildStructureCardElement(s, isList, isInElenco, idx) {
     // --- MODALITÀ SCHEDE (CARD VIEW): Card verticale ricca di dettagli ---
     card.innerHTML = `
       <div class="card-header">
-        <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
+        <h3 class="card-title clickable-title" data-id="${s.id}">${safeStruttura}</h3>
         <div class="card-actions">
           <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}" title="${isInElenco ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}">
             ${isInElenco ? '⭐' : '☆'}
@@ -598,12 +615,12 @@ function buildStructureCardElement(s, isList, isInElenco, idx) {
       <div class="card-content">
         <div class="card-field">
           <span class="card-field-icon">📍</span>
-          <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
+          <span class="card-field-value">${safeLuogo}, ${safeProv}</span>
         </div>
         
         ${s.Info ? `<div class="card-field">
           <span class="card-field-icon">ℹ️</span>
-          <span class="card-field-value">${s.Info}</span>
+          <span class="card-field-value">${safeInfo}</span>
         </div>` : ''}
         
         <div class="card-badges">
@@ -619,38 +636,38 @@ function buildStructureCardElement(s, isList, isInElenco, idx) {
         <div class="card-field">
           <span class="card-field-icon">🏕️</span>
           <span class="card-field-value">
-            ${s.Letti ? `Letti: ${s.Letti}` : ''}
-            ${s.Branco ? ` • Branco: ${s.Branco}` : ''}
-            ${s.Reparto ? ` • Reparto: ${s.Reparto}` : ''}
-            ${s.Compagnia ? ` • Compagnia: ${s.Compagnia}` : ''}
+            ${s.Letti ? `Letti: ${safeLetti}` : ''}
+            ${s.Branco ? ` • Branco: ${safeBranco}` : ''}
+            ${s.Reparto ? ` • Reparto: ${safeReparto}` : ''}
+            ${s.Compagnia ? ` • Compagnia: ${safeCompagnia}` : ''}
           </span>
         </div>` : ''}
         
         ${s.Referente ? `<div class="card-field">
           <span class="card-field-icon">👤</span>
-          <span class="card-field-value">${s.Referente}</span>
+          <span class="card-field-value">${safeReferente}</span>
         </div>` : ''}
         
         ${s.Email ? `<div class="card-field">
           <span class="card-field-icon">📧</span>
-          <span class="card-field-value">${s.Email}</span>
+          <span class="card-field-value">${safeEmail}</span>
         </div>` : ''}
         
         ${s.Sito ? `<div class="card-field">
           <span class="card-field-icon">🌐</span>
-          <span class="card-field-value">${s.Sito}</span>
+          <span class="card-field-value">${safeSito}</span>
         </div>` : ''}
         
         ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx === 0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
         
         ${s.Contatto ? `<div class="card-field">
           <span class="card-field-icon">📞</span>
-          <span class="card-field-value">${s.Contatto}</span>
+          <span class="card-field-value">${safeContatto}</span>
         </div>` : ''}
         
         ${s['Ultimo controllo'] ? `<div class="card-field">
           <span class="card-field-icon">📅</span>
-          <span class="card-field-value">Ultimo controllo: ${s['Ultimo controllo']}</span>
+          <span class="card-field-value">Ultimo controllo: ${safeUltimoControllo}</span>
         </div>` : ''}
         ${getCardActionsHTML(s)}
       </div>

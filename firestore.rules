@@ -2,9 +2,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper: verifica se l'utente ha privilegi amministrativi
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.ruolo in ['Admin', 'admin', 'Superadmin', 'superadmin', 'Gestore'])
+      );
+    }
+
     // ============================================
     // COLLEZIONE: strutture
-    // Lettura pubblica, scrittura solo autenticati
+    // Lettura pubblica, creazione/aggiornamento autenticati validati, eliminazione solo admin
     // ============================================
     match /strutture/{structureId} {
       // Lettura: Accesso pubblico per visualizzazione
@@ -12,48 +21,45 @@ service cloud.firestore {
       allow get: if true;
       allow list: if true;
 
-      // Creazione: Solo utenti autenticati
-      allow create: if request.auth != null;
+      // Creazione: Solo utenti autenticati con campi minimi validi
+      allow create: if request.auth != null &&
+                      request.resource.data.Struttura is string &&
+                      request.resource.data.Struttura.size() > 0 &&
+                      request.resource.data.Struttura.size() <= 200;
       
-      // Aggiornamento: Solo utenti autenticati
-      allow update: if request.auth != null;
+      // Aggiornamento: Solo utenti autenticati con validazione di sicurezza
+      allow update: if request.auth != null &&
+                      (!('Struttura' in request.resource.data) || (request.resource.data.Struttura is string && request.resource.data.Struttura.size() <= 200)) &&
+                      (!('Luogo' in request.resource.data) || (request.resource.data.Luogo is string && request.resource.data.Luogo.size() <= 200));
       
-      // Eliminazione: Solo utenti autenticati (esplicito per sicurezza)
-      allow delete: if request.auth != null;
+      // Eliminazione: Riservata esclusivamente agli utenti con ruolo amministrativo
+      allow delete: if isAdmin();
     }
 
     // ============================================
     // COLLEZIONE: users
-    // Solo il proprio profilo con validazioni rigorose
+    // Solo il proprio profilo con validazione email
     // ============================================
     match /users/{userId} {
       // Lettura: Solo il proprio profilo
-      allow read: if request.auth != null && 
-                    request.auth.uid == userId &&
-                    request.auth.token.email_verified == true;
+      allow read: if request.auth != null && request.auth.uid == userId;
 
-      // Scrittura: Solo il proprio profilo con validazioni
+      // Scrittura: Solo il proprio profilo con email coerente
       allow write: if request.auth != null && 
                      request.auth.uid == userId &&
-                     request.auth.token.email_verified == true &&
-                     // Verifica che i dati siano coerenti
                      (request.resource.data.email == request.auth.token.email);
     }
 
     // ============================================
     // COLLEZIONE: userLists (elenchi personali)
-    // Solo il proprietario con validazioni rigorose
+    // Solo il proprietario
     // ============================================
     match /userLists/{listId} {
       // Lettura: Solo il proprietario
-      allow read: if request.auth != null &&
-                    request.auth.token.email_verified == true &&
-                    resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
 
       // Scrittura: Solo il proprietario
-      allow write: if request.auth != null &&
-                     request.auth.token.email_verified == true &&
-                     request.resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
     // ============================================

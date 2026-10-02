@@ -22,10 +22,20 @@ console.log('🗺️ Debug: Leaflet disponibile al caricamento:', typeof L !== '
 // Maps integration for QuoVadiScout a
 // Leaflet + OpenStreetMap implementation
 
-console.log('🗺️ Maps.js caricato correttamente');
+// Funzione helper per sanitizzazione anti-XSS nei popup mappa
+function escapeHtml(str) {
+  if (window.escapeHtml && typeof window.escapeHtml === 'function') {
+    return window.escapeHtml(str);
+  }
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-// Database locale di coordinate per i comuni principali (focus Nord Italia)
-// CITY_COORDINATES rimosso: ora caricato da city-database.js
 
 
 class MapsManager {
@@ -336,22 +346,31 @@ class MapsManager {
       iconAnchor: [11, 11]
     });
 
+    const safeStruttura = escapeHtml(struttura.Struttura || 'Struttura senza nome');
+    const safeLuogo = escapeHtml(struttura.Luogo || 'Non specificato');
+    const safeProv = escapeHtml(struttura.Prov || 'Non specificata');
+    const safeReferente = escapeHtml(struttura.Referente || '');
+    const safeContatto = escapeHtml(struttura.Contatto || '');
+    const safeEmail = escapeHtml(struttura.Email || '');
+    const safeInfo = escapeHtml(struttura.Info || '');
+    const safeId = escapeHtml(struttura.id || '');
+
     // Crea marker con popup personalizzato
     const marker = L.marker([finalLat, finalLng], { icon })
       .bindPopup(`
         <div style="min-width: 200px;">
-          <h4 style="margin: 0 0 8px 0; color: #2c5530;">${struttura.Struttura || 'Struttura senza nome'}</h4>
-          <p style="margin: 4px 0;"><strong>📍 Luogo:</strong> ${struttura.Luogo || 'Non specificato'}, ${struttura.Prov || 'Non specificata'}</p>
+          <h4 style="margin: 0 0 8px 0; color: #2c5530;">${safeStruttura}</h4>
+          <p style="margin: 4px 0;"><strong>📍 Luogo:</strong> ${safeLuogo}, ${safeProv}</p>
           <p style="margin: 4px 0; color: #856404; background: #fff3cd; padding: 4px; border-radius: 4px; font-size: 12px;">
             <strong>⚠️ Posizione approssimativa</strong><br>
             Coordinate basate su: ${isCityFallback ? 'Città (media)' : 'Provincia'}
           </p>
-          ${struttura.Referente ? `<p style="margin: 4px 0;"><strong>👤 Referente:</strong> ${struttura.Referente}</p>` : ''}
-          ${struttura.Contatto ? `<p style="margin: 4px 0;"><strong>📞 Contatto:</strong> ${struttura.Contatto}</p>` : ''}
-          ${struttura.Email ? `<p style="margin: 4px 0;"><strong>📧 Email:</strong> ${struttura.Email}</p>` : ''}
-          ${struttura.Info ? `<p style="margin: 4px 0;"><strong>ℹ️ Info:</strong> ${struttura.Info}</p>` : ''}
+          ${safeReferente ? `<p style="margin: 4px 0;"><strong>👤 Referente:</strong> ${safeReferente}</p>` : ''}
+          ${safeContatto ? `<p style="margin: 4px 0;"><strong>📞 Contatto:</strong> ${safeContatto}</p>` : ''}
+          ${safeEmail ? `<p style="margin: 4px 0;"><strong>📧 Email:</strong> ${safeEmail}</p>` : ''}
+          ${safeInfo ? `<p style="margin: 4px 0;"><strong>ℹ️ Info:</strong> ${safeInfo}</p>` : ''}
           <div style="margin-top: 8px;">
-            <button onclick="window.mostraSchedaCompleta('${struttura.id}')" style="
+            <button onclick="window.mostraSchedaCompleta('${safeId}')" style="
               background: #28a745;
               color: white;
               border: none;
@@ -416,23 +435,31 @@ class MapsManager {
   }
 
   createStructurePopup(struttura) {
+    const safeStruttura = escapeHtml(struttura.Struttura || 'Struttura senza nome');
+    const safeLuogo = escapeHtml(struttura.Luogo || 'N/A');
+    const safeProv = escapeHtml(struttura.Prov || 'N/A');
+    const safeReferente = escapeHtml(struttura.Referente || '');
+    const safeContatto = escapeHtml(struttura.Contatto || '');
+    const safeEmail = escapeHtml(struttura.Email || '');
+    const safeId = escapeHtml(struttura.id || '');
+
     const popupContent = `
       <div style="min-width: 200px;">
-        <h4 style="margin: 0 0 8px 0; color: #2f6b2f;">${struttura.Struttura || 'Struttura senza nome'}</h4>
+        <h4 style="margin: 0 0 8px 0; color: #2f6b2f;">${safeStruttura}</h4>
         <p style="margin: 0 0 8px 0; color: #666;">
-          📍 ${struttura.Luogo || 'N/A'}, ${struttura.Prov || 'N/A'}
+          📍 ${safeLuogo}, ${safeProv}
         </p>
         <div style="margin: 8px 0;">
           ${struttura.Casa ? '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-right: 4px;">🏠 Casa</span>' : ''}
           ${struttura.Terreno ? '<span style="background: #17a2b8; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-right: 4px;">🌱 Terreno</span>' : ''}
           ${struttura.stato ? `<span style="background: ${this.getStateColor(struttura.stato)}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px;">${this.getStateIcon(struttura.stato)} ${this.getStateLabel(struttura.stato)}</span>` : ''}
         </div>
-        ${struttura.Referente ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Referente:</strong> ${struttura.Referente}</p>` : ''}
-        ${struttura.Contatto ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Contatto:</strong> ${struttura.Contatto}</p>` : ''}
-        ${struttura.Email ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Email:</strong> ${struttura.Email}</p>` : ''}
+        ${safeReferente ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Referente:</strong> ${safeReferente}</p>` : ''}
+        ${safeContatto ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Contatto:</strong> ${safeContatto}</p>` : ''}
+        ${safeEmail ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Email:</strong> ${safeEmail}</p>` : ''}
         ${struttura.rating?.average ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Rating:</strong> ⭐ ${struttura.rating.average.toFixed(1)}/5</p>` : ''}
         <div style="margin-top: 8px;">
-          <button onclick="window.mostraSchedaCompleta('${struttura.id}')" style="
+          <button onclick="window.mostraSchedaCompleta('${safeId}')" style="
             background: #007bff;
             color: white;
             border: none;
