@@ -58,6 +58,18 @@ test('matchesQuickFilter checks radius filters with user location', () => {
   assert.equal(matchesQuickFilter(farRome, 'raggio-500', [], userLoc), true);
 });
 
+test('matchesQuickFilter checks radius filters with searched city location (Entro 50km da)', () => {
+  // Centro di Torino (45.0703, 7.6869)
+  const torinoCenter = { lat: 45.0703, lng: 7.6869, name: 'Torino' };
+  const avigliana = { id: 'av', Luogo: 'Avigliana', coordinate_lat: 45.0789, coordinate_lng: 7.3975 }; // ~23km da Torino
+  const asti = { id: 'at', Luogo: 'Asti', coordinate_lat: 44.9008, coordinate_lng: 8.2065 }; // ~45km da Torino
+  const cuneo = { id: 'cn', Luogo: 'Cuneo', coordinate_lat: 44.3845, coordinate_lng: 7.5427 }; // ~78km da Torino
+
+  assert.equal(matchesQuickFilter(avigliana, 'raggio-50', [], torinoCenter), true);
+  assert.equal(matchesQuickFilter(asti, 'raggio-50', [], torinoCenter), true);
+  assert.equal(matchesQuickFilter(cuneo, 'raggio-50', [], torinoCenter), false);
+});
+
 test('matchesQuickFilter checks beds and favorites', () => {
   const bigHouse = { id: 'bh', Casa: true, Letti: '45' };
   const smallHouse = { id: 'sh', Casa: true, Letti: '15' };

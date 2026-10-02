@@ -138,8 +138,8 @@
   </noscript>
   <!-- Cloudinary SDK -->
   <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript" defer></script>
-  <!-- Runtime config (Vercel serverless) -->
-  <script src="/api/firebase-config.js" defer></script>
+  <!-- Runtime config (Vercel serverless con fallback locale) -->
+  <script src="/api/firebase-config.js" defer onerror="this.onerror=null;this.src='firebase-config.local.js'"></script>
   <script src="/api/cloudinary-config.js" defer></script>
   <!-- Export libraries caricati on-demand in export.js -->
   <!-- Maps libraries -->
@@ -210,7 +210,7 @@
       <button class="filter-chip" data-filter="letti-30" role="tab" aria-selected="false">🛌 &gt;30 Posti</button>
       <button class="filter-chip" data-filter="preferiti" role="tab" aria-selected="false">⭐ Preferiti</button>
       <button class="filter-chip" data-filter="vicine" role="tab" aria-selected="false">📍 Vicine a me</button>
-      <button class="filter-chip" data-filter="raggio-50" role="tab" aria-selected="false">🧭 Entro 50 km</button>
+      <button class="filter-chip" data-filter="raggio-50" id="chipRadiusCity" role="tab" aria-selected="false" title="Cerca strutture entro 50km dalla località digitata">🧭 Entro 50km da...</button>
     </div>
   </div>
 

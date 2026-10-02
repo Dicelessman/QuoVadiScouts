@@ -122,6 +122,7 @@
   <div class="search-section" role="search">
     <div class="search-container">
       <input id="search" class="search-input" placeholder="Cerca strutture..." />
+      <button id="clearSearch" class="search-clear-btn" aria-label="Cancella ricerca" style="display: none;">✕</button>
     </div>
     <div class="quick-filter-bar" id="quickFilterBar" role="tablist" aria-label="Filtri rapidi">
       <button class="filter-chip active" data-filter="all" role="tab" aria-selected="true">🏠 Tutte</button>
@@ -133,7 +134,7 @@
       <button class="filter-chip" data-filter="letti-30" role="tab" aria-selected="false">🛌 &gt;30 Posti</button>
       <button class="filter-chip" data-filter="preferiti" role="tab" aria-selected="false">⭐ Preferiti</button>
       <button class="filter-chip" data-filter="vicine" role="tab" aria-selected="false">📍 Vicine a me</button>
-      <button class="filter-chip" data-filter="raggio-50" role="tab" aria-selected="false">🧭 Entro 50 km</button>
+      <button class="filter-chip" data-filter="raggio-50" id="chipRadiusCity" role="tab" aria-selected="false" title="Cerca strutture entro 50km dalla località digitata">🧭 Entro 50km da...</button>
     </div>
   </div>
 
@@ -342,29 +343,27 @@
     })();
   </script>
 
-  <script src="dist/maps.js" defer></script>
-  <script src="dist/export.js" defer></script>
-  <script src="dist/push-notifications.js" defer></script>
-  <script src="dist/offline-sync.js" defer></script>
-  <script src="dist/media-manager.js" defer></script>
-  <script src="dist/virtual-scroll.js" defer></script>
-  <script src="dist/integrations.js" defer></script>
-  <script src="dist/gestures.js" defer></script>
-  <script src="dist/smart-notifications.js" defer></script>
-  <script src="dist/analytics.js" defer></script>
-  <script src="dist/backup-sync.js" defer></script>
-  <script src="dist/config.js" defer></script>
-  <script src="dist/test-systems.js" defer></script>
-  <script src="dist/toast-notifications.js" defer></script>
-  <script src="dist/geolocation-config.js" defer></script>
-  <script src="dist/geolocation.js" defer></script>
-  <script src="dist/geolocation-ui.js" defer></script>
-  <script src="dist/geolocation-integration.js" defer></script>
-  <script src="dist/icons-config.js" defer></script>
-  <!-- Sentry (opzionale) -->
-  <!-- Sentry disabilitato in locale (DSN vuoto) -->
-  <script src="sentry-config.local.js" defer></script>
-  <script src="dist/error-handler.js" defer></script>
-  <script type="module" src="dist/script.js"></script>
+  <script src="city-database.js" defer></script>
+  <script src="maps.js" defer></script>
+  <script src="export.js" defer></script>
+  <script src="push-notifications.js" defer></script>
+  <script src="offline-sync.js" defer></script>
+  <script src="media-manager.js" defer></script>
+  <script src="virtual-scroll.js" defer></script>
+  <script src="integrations.js" defer></script>
+  <script src="gestures.js" defer></script>
+  <script src="smart-notifications.js" defer></script>
+  <script src="analytics.js" defer></script>
+  <script src="backup-sync.js" defer></script>
+  <script src="config.js" defer></script>
+  <script src="test-systems.js" defer></script>
+  <script src="toast-notifications.js" defer></script>
+  <script src="geolocation-config.js" defer></script>
+  <script src="geolocation.js" defer></script>
+  <script src="geolocation-ui.js" defer></script>
+  <script src="geolocation-integration.js" defer></script>
+  <script src="icons-config.js" defer></script>
+  <script src="error-handler.js" defer></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

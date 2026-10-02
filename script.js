@@ -59,7 +59,11 @@ import {
   formatStructureShareText,
   getWhatsAppShareUrl
 } from "./utils/structure.js";
-import { extractCoordinatesFromGoogleMapsLink, calculateDistanceKm } from "./utils/geo.js";
+import {
+  extractCoordinatesFromGoogleMapsLink,
+  calculateDistanceKm,
+  findCityCoordinates
+} from "./utils/geo.js";
 
 window.normalizeStructureCoordinates = normalizeStructureCoordinates;
 window.cleanPhoneNumber = cleanPhoneNumber;
@@ -68,8 +72,57 @@ window.calculatePagination = calculatePagination;
 window.searchStrutture = searchStrutture;
 window.extractCoordinatesFromGoogleMapsLink = extractCoordinatesFromGoogleMapsLink;
 window.calculateDistanceKm = calculateDistanceKm;
+window.findCityCoordinates = findCityCoordinates;
 window.formatStructureShareText = formatStructureShareText;
 window.getWhatsAppShareUrl = getWhatsAppShareUrl;
+
+/**
+ * Risolve le coordinate per una città o località (usando database locale o fallback online Nominatim).
+ */
+export async function resolveLocationCoordinates(cityName) {
+  if (!cityName || typeof cityName !== 'string') return null;
+  const raw = cityName.trim();
+  if (!raw) return null;
+
+  // 1. Risoluzione locale istantanea tramite database comuni o strutture note
+  const db = window.CITY_COORDINATES || (typeof CITY_COORDINATES !== 'undefined' ? CITY_COORDINATES : {});
+  const localRes = findCityCoordinates(raw, db, window.strutture || strutture || []);
+  if (localRes) {
+    return localRes;
+  }
+
+  // 2. Fallback online geocoding tramite OpenStreetMap Nominatim
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(raw)}&countrycodes=it&limit=1`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const item = data[0];
+        const lat = parseFloat(item.lat);
+        const lng = parseFloat(item.lon);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const displayName = (item.name || item.display_name.split(',')[0]).trim();
+          return {
+            lat,
+            lng,
+            name: displayName || raw
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Geocoding online non riuscito per', raw, err);
+  }
+
+  return null;
+}
+window.resolveLocationCoordinates = resolveLocationCoordinates;
 
 /**
  * Condivide la scheda struttura tramite Web Share API o WhatsApp.
@@ -199,19 +252,34 @@ try {
     console.log('⚠️ Service Worker attivo - potrebbe interferire con Firebase');
   }
 } catch (error) {
-  console.error('❌ Errore validazione configurazione Firebase:', error);
-  throw error;
+  console.warn('⚠️ Validazione configurazione Firebase:', error);
 }
 
 const firebaseConfig = FirebaseConfig;
 
 // === Inizializzazione Firebase ===
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const storage = getStorage(app);
-const googleProvider = new GoogleAuthProvider();
-const colRef = collection(db, "strutture");
+let app = null;
+let db = null;
+let auth = null;
+let storage = null;
+let googleProvider = null;
+let colRef = null;
+
+if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey.length > 5 && !firebaseConfig.apiKey.includes('YOUR_')) {
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    storage = getStorage(app);
+    googleProvider = new GoogleAuthProvider();
+    colRef = collection(db, "strutture");
+    console.log('✅ Firebase inizializzato con successo');
+  } catch (err) {
+    console.warn('⚠️ Inizializzazione Firebase fallita:', err);
+  }
+} else {
+  console.warn('⚠️ FirebaseConfig privo di apiKey (ambiente locale o offline): attivo fallback locale.');
+}
 
 // Esponi Storage globalmente per media-manager.js
 window.firebaseStorage = storage;
@@ -237,11 +305,14 @@ window.firestore = {
   orderBy
 };
 
-// === Caricamento dati da Firestore ===
 async function caricaStrutture() {
-  // 🔒 SICUREZZA: Verifica autenticazione PRIMA di caricare dati
+  if (!colRef || !auth) {
+    console.log('🔄 Firebase non configurato in questo ambiente, carico strutture locali...');
+    return await caricaStruttureLocali();
+  }
 
-  if (!auth || !auth.currentUser) {
+  // 🔒 SICUREZZA: Verifica autenticazione PRIMA di caricare dati
+  if (!auth.currentUser) {
     console.log('🔒 Accesso negato: autenticazione richiesta');
     mostraSchermataLogin();
     return [];
@@ -328,8 +399,23 @@ async function caricaStruttureLocali() {
       throw new Error('File data.json non trovato');
     }
     const dati = await response.json();
-    console.log(`Caricate ${dati.length} strutture da file locale`);
-    return dati;
+    const cityDb = window.CITY_COORDINATES || (typeof CITY_COORDINATES !== 'undefined' ? CITY_COORDINATES : {});
+    const arricchite = (dati || []).map(s => {
+      if (!s.coordinate && !s.coordinate_lat && s.Luogo) {
+        const c = findCityCoordinates(s.Luogo, cityDb);
+        if (c) {
+          s.coordinate = { lat: c.lat, lng: c.lng };
+          s.coordinate_lat = c.lat;
+          s.coordinate_lng = c.lng;
+        }
+      } else if (s.coordinate && !s.coordinate_lat) {
+        s.coordinate_lat = s.coordinate.lat;
+        s.coordinate_lng = s.coordinate.lng;
+      }
+      return s;
+    });
+    console.log(`Caricate ${arricchite.length} strutture da file locale`);
+    return arricchite;
   } catch (error) {
     console.error('Errore nel caricamento locale:', error);
     // Dati di esempio se tutto fallisce
@@ -1609,19 +1695,33 @@ function filtra(lista) {
   const terrenoEl = document.getElementById("filter-terreno");
   const statoEl = document.getElementById("filter-stato");
 
-  const q = searchEl ? searchEl.value.toLowerCase() : "";
+  const q = searchEl ? searchEl.value.toLowerCase().trim() : "";
   const prov = provEl ? provEl.value : "";
   const casa = casaEl ? casaEl.checked : false;
   const terreno = terrenoEl ? terrenoEl.checked : false;
   const stato = statoEl ? statoEl.value : "";
 
+  const currentQuickFilter = window.activeQuickFilter || activeQuickFilter || 'all';
+  const isRadiusCityFilter = currentQuickFilter === 'raggio-50' && Boolean(window.searchedLocation);
+
+  const effectiveOrigin = isRadiusCityFilter
+    ? window.searchedLocation
+    : (window.userLocation || (window.currentPosition ? {
+        lat: window.currentPosition.coords?.latitude,
+        lng: window.currentPosition.coords?.longitude
+      } : null));
+
   let filtrata = lista.filter((s) => {
-    // Filtri base
-    const matchTesto =
-      s.Struttura?.toLowerCase().includes(q) ||
-      s.Luogo?.toLowerCase().includes(q) ||
-      s.Info?.toLowerCase().includes(q) ||
-      s.Referente?.toLowerCase().includes(q);
+    // Filtri base:
+    // Se è attiva la ricerca entro 50km da una località digitata, il testo nella barra è il centro del raggio,
+    // quindi non filtriamo il nome della struttura come testo
+    const matchTesto = isRadiusCityFilter
+      ? true
+      : (!q ||
+         s.Struttura?.toLowerCase().includes(q) ||
+         s.Luogo?.toLowerCase().includes(q) ||
+         s.Info?.toLowerCase().includes(q) ||
+         s.Referente?.toLowerCase().includes(q));
     const matchProv = !prov || s.Prov === prov;
     const matchCasa = !casa || s.Casa === true;
     const matchTerreno = !terreno || s.Terreno === true;
@@ -1685,7 +1785,6 @@ function filtra(lista) {
           } else if (campo === 'distance_km') {
             // Calcola distanza se coordinate disponibili
             if (s.coordinate?.lat && s.coordinate?.lng) {
-              // Implementa calcolo distanza se necessario
               matchAvanzati = matchAvanzati && true; // Placeholder
             }
           }
@@ -1708,35 +1807,32 @@ function filtra(lista) {
         } else if (campo === 'has_reports') {
           matchAvanzati = matchAvanzati && s.segnalazioni && s.segnalazioni.length > 0;
         } else if (campo === 'near_me') {
-          // Implementa geolocalizzazione se necessario
           matchAvanzati = matchAvanzati && true; // Placeholder
         }
       }
     }
 
-    // Filtro rapido (Quick Filter Chips)
-    const userLoc = window.userLocation || (window.currentPosition ? {
-      lat: window.currentPosition.coords?.latitude,
-      lng: window.currentPosition.coords?.longitude
-    } : null);
-
-    if (userLoc && userLoc.lat && userLoc.lng) {
+    // Filtro rapido (Quick Filter Chips) e calcolo distanza
+    if (effectiveOrigin && effectiveOrigin.lat && effectiveOrigin.lng) {
       const lat = s.coordinate?.lat || s.coordinate_lat;
       const lng = s.coordinate?.lng || s.coordinate_lng;
       if (lat && lng) {
-        s.distanzaKm = calculateDistanceKm(userLoc.lat, userLoc.lng, lat, lng);
+        s.distanzaKm = calculateDistanceKm(effectiveOrigin.lat, effectiveOrigin.lng, lat, lng);
+      } else {
+        s.distanzaKm = null;
       }
+    } else {
+      s.distanzaKm = null;
     }
 
-    const currentQuickFilter = window.activeQuickFilter || activeQuickFilter || 'all';
-    const matchQuick = matchesQuickFilter(s, currentQuickFilter, elencoPersonale, userLoc);
+    const matchQuick = matchesQuickFilter(s, currentQuickFilter, elencoPersonale, effectiveOrigin);
 
     return matchTesto && matchProv && matchCasa && matchTerreno && matchStato && matchAvanzati && matchQuick;
   });
 
   // Se ordinamento per vicinanza
   const currentFilterForSort = window.activeQuickFilter || activeQuickFilter || 'all';
-  if ((currentFilterForSort === 'vicine' || currentFilterForSort.startsWith('raggio-')) && (window.userLocation || window.currentPosition)) {
+  if ((currentFilterForSort === 'vicine' || currentFilterForSort.startsWith('raggio-')) && effectiveOrigin) {
     filtrata.sort((a, b) => (a.distanzaKm ?? 9999) - (b.distanzaKm ?? 9999));
   } else {
     // Applica ordinamento standard
@@ -5518,6 +5614,22 @@ class InputSanitizer {
 
 // Inizializza il sistema di autenticazione
 function inizializzaAuth() {
+  if (!auth) {
+    console.warn('⚠️ Auth non disponibile: caricamento strutture locali per preview/test...');
+    caricaStruttureLocali().then(dati => {
+      strutture = (dati || []).map(s => {
+        if (s.coordinate_lat && s.coordinate_lng && !s.coordinate) {
+          s.coordinate = { lat: s.coordinate_lat, lng: s.coordinate_lng };
+        }
+        return s;
+      });
+      window.strutture = strutture;
+      nascondiSchermataLogin();
+      renderStrutture(filtra(strutture));
+    });
+    return;
+  }
+
   onAuthStateChanged(auth, async (user) => {
     console.log('🔐 Auth state changed:', user ? 'User logged in' : 'User logged out');
     if (user) {
@@ -6347,6 +6459,11 @@ function mostraSchermataLogin() {
               style="background: transparent; color: #007bff; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; width: 100%; text-decoration: underline;">
         🔑 Password dimenticata?
       </button>
+
+      <button id="guestDemoBtn" 
+              style="background: transparent; color: #2f6b2f; border: 1.5px dashed #2f6b2f; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; width: 100%; margin-top: 8px; font-weight: 600;">
+        🏕️ Esplora come Ospite (senza account)
+      </button>
     </div>
     
     <div id="registerForm" style="margin-bottom: 20px; display: none;">
@@ -6479,6 +6596,25 @@ function setupAuthEventListeners() {
     document.getElementById('resetPasswordForm').style.display = 'block';
     hideError();
   };
+
+  // Continua come ospite
+  const guestBtn = document.getElementById('guestDemoBtn');
+  if (guestBtn) {
+    guestBtn.onclick = async () => {
+      nascondiSchermataLogin();
+      if (!strutture || strutture.length === 0) {
+        const dati = await caricaStruttureLocali();
+        strutture = (dati || []).map(s => {
+          if (s.coordinate_lat && s.coordinate_lng && !s.coordinate) {
+            s.coordinate = { lat: s.coordinate_lat, lng: s.coordinate_lng };
+          }
+          return s;
+        });
+        window.strutture = strutture;
+        renderStrutture(filtra(strutture));
+      }
+    };
+  }
 
   // Login con email/password
   document.getElementById('loginBtn').onclick = async () => {
@@ -9811,9 +9947,19 @@ function resetFiltri() {
   const provEl = document.getElementById('filter-prov');
   if (provEl) provEl.value = '';
 
-  // Reset filtri rapidi
+  // Reset filtri rapidi e raggio località
   window.activeQuickFilter = 'all';
   activeQuickFilter = 'all';
+  window.searchedLocation = null;
+  const chipRadius = document.getElementById('chipRadiusCity');
+  if (chipRadius) {
+    chipRadius.textContent = '🧭 Entro 50km da...';
+  }
+  const clearSearchBtn = document.getElementById('clearSearch');
+  if (clearSearchBtn) {
+    clearSearchBtn.style.display = 'none';
+  }
+
   const filterChips = document.querySelectorAll('.filter-chip');
   if (filterChips) {
     filterChips.forEach((chip, idx) => {
@@ -10807,7 +10953,7 @@ async function pulisciCacheOffline_DISABLED() {
 }
 
 // === Inizializzazione pagina ===
-window.addEventListener("DOMContentLoaded", async () => {
+async function bootstrapApp() {
   try {
     mostraCaricamento();
 
@@ -11089,7 +11235,13 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (_) { }
   }
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener("DOMContentLoaded", bootstrapApp);
+} else {
+  bootstrapApp();
+}
 
 // === Gestione Filtri Salvati Dropdown ===
 async function caricaFiltriSalvatiDropdown() {
@@ -11974,6 +12126,21 @@ function initializeUIEventListeners() {
   // Search functionality
   const searchInput = document.getElementById('search');
   const clearSearchBtn = document.getElementById('clearSearch');
+  const chipRadiusCity = document.getElementById('chipRadiusCity');
+
+  // Aggiorna l'etichetta del chip "Entro 50km da..." in tempo reale
+  const updateRadiusCityChipLabel = () => {
+    if (!chipRadiusCity) return;
+    const raw = searchInput ? searchInput.value.trim() : '';
+    if (raw.length > 0) {
+      const displayName = (window.searchedLocation && window.searchedLocation.rawQuery === raw.toLowerCase())
+        ? (window.searchedLocation.name || raw)
+        : raw;
+      chipRadiusCity.textContent = `🧭 Entro 50km da ${displayName}`;
+    } else {
+      chipRadiusCity.textContent = '🧭 Entro 50km da...';
+    }
+  };
 
   if (searchInput) {
     // Funzione per aggiornare la visibilità del pulsante clear
@@ -11987,14 +12154,53 @@ function initializeUIEventListeners() {
       }
     };
 
+    let searchDebounceTimer = null;
     searchInput.addEventListener('input', () => {
       paginaCorrente = 1;
-      renderStrutture(filtra(strutture));
       updateClearButton();
+      updateRadiusCityChipLabel();
+
+      // Se è attivo il filtro rapido raggio-50, risolvi dinamicamente la nuova località
+      if (window.activeQuickFilter === 'raggio-50') {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(async () => {
+          const query = searchInput.value.trim();
+          if (!query) {
+            window.searchedLocation = null;
+            renderStrutture(filtra(strutture));
+            return;
+          }
+          const loc = await resolveLocationCoordinates(query);
+          if (loc) {
+            window.searchedLocation = { ...loc, rawQuery: query.toLowerCase() };
+            updateRadiusCityChipLabel();
+            renderStrutture(filtra(strutture));
+          }
+        }, 400);
+      } else {
+        renderStrutture(filtra(strutture));
+      }
     });
 
-    // Inizializza visibilità pulsante clear
+    searchInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const query = searchInput.value.trim();
+        if (window.activeQuickFilter === 'raggio-50' && query) {
+          const loc = await resolveLocationCoordinates(query);
+          if (loc) {
+            window.searchedLocation = { ...loc, rawQuery: query.toLowerCase() };
+            updateRadiusCityChipLabel();
+            paginaCorrente = 1;
+            renderStrutture(filtra(strutture));
+          }
+        }
+      }
+    });
+
+    // Inizializza visibilità pulsante clear ed etichetta chip
     updateClearButton();
+    updateRadiusCityChipLabel();
   }
 
   // Funzionalità pulsante clear
@@ -12004,6 +12210,27 @@ function initializeUIEventListeners() {
         searchInput.value = '';
         searchInput.focus();
         updateClearButton();
+        updateRadiusCityChipLabel();
+
+        // Se era attivo il filtro per raggio località, reimposta su 'all'
+        if (window.activeQuickFilter === 'raggio-50') {
+          window.searchedLocation = null;
+          window.activeQuickFilter = 'all';
+          activeQuickFilter = 'all';
+          const filterChips = document.querySelectorAll('.filter-chip');
+          if (filterChips) {
+            filterChips.forEach(c => {
+              if (c.dataset.filter === 'all') {
+                c.classList.add('active');
+                c.setAttribute('aria-selected', 'true');
+              } else {
+                c.classList.remove('active');
+                c.setAttribute('aria-selected', 'false');
+              }
+            });
+          }
+        }
+
         paginaCorrente = 1;
         renderStrutture(filtra(strutture));
       }
@@ -12017,11 +12244,53 @@ function initializeUIEventListeners() {
       chip.addEventListener('click', async () => {
         const filterType = chip.dataset.filter;
 
-        // Se si clicca su "vicine a me" o raggio km, attiva la geolocalizzazione utente
-        if (filterType === 'vicine' || filterType.startsWith('raggio-')) {
-          if (!window.userLocation && typeof window.trovaVicinoAMe === 'function') {
-            await window.trovaVicinoAMe();
+        // Gestione specifica: "Entro 50km da" (raggio-50 calcolato sulla località digitata nella barra)
+        if (filterType === 'raggio-50') {
+          const query = searchInput ? searchInput.value.trim() : '';
+          if (!query) {
+            const msg = '📍 Inserisci prima una città o località nella barra di ricerca!';
+            if (typeof window.showInfo === 'function') {
+              window.showInfo(msg);
+            } else if (typeof window.showToast === 'function') {
+              window.showToast(msg, { type: 'info' });
+            } else {
+              alert(msg);
+            }
+            if (searchInput) searchInput.focus();
             return;
+          }
+
+          const prevText = chip.textContent;
+          chip.textContent = '🧭 Localizzazione...';
+
+          const loc = await resolveLocationCoordinates(query);
+          if (!loc) {
+            chip.textContent = prevText;
+            const msg = `Impossibile individuare le coordinate per "${query}". Prova con una città vicina o provincia.`;
+            if (typeof window.showWarning === 'function') {
+              window.showWarning(msg);
+            } else {
+              alert(msg);
+            }
+            if (searchInput) searchInput.focus();
+            return;
+          }
+
+          window.searchedLocation = { ...loc, rawQuery: query.toLowerCase() };
+          chip.textContent = `🧭 Entro 50km da ${loc.name || query}`;
+          if (typeof window.showSuccess === 'function') {
+            window.showSuccess(`Filtro attivo: entro 50km da ${loc.name || query}`);
+          }
+        } else {
+          // Se si seleziona un altro filtro, disattiva il raggio della località cercata
+          window.searchedLocation = null;
+
+          // Se si clicca su "vicine a me", attiva la geolocalizzazione GPS utente
+          if (filterType === 'vicine') {
+            if (!window.userLocation && typeof window.trovaVicinoAMe === 'function') {
+              await window.trovaVicinoAMe();
+              return;
+            }
           }
         }
 

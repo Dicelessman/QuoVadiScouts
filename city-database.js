@@ -12402,3 +12402,8 @@ const CITY_COORDINATES = {
     9.4184
   ]
 };
+
+if (typeof window !== 'undefined') {
+  window.CITY_COORDINATES = CITY_COORDINATES;
+}
+
