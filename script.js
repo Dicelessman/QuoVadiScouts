@@ -69,6 +69,12 @@ import {
   highlightMatch,
   formatCityDisplayName
 } from "./utils/autocomplete.js";
+import {
+  cloneStructureSnapshot,
+  hasStructureChanges,
+  restoreStructureSnapshot,
+  mostraPopupConfermaSalvataggio
+} from "./utils/unsaved-changes.js";
 
 window.normalizeStructureCoordinates = normalizeStructureCoordinates;
 window.cleanPhoneNumber = cleanPhoneNumber;
@@ -83,6 +89,10 @@ window.highlightMatch = highlightMatch;
 window.formatCityDisplayName = formatCityDisplayName;
 window.formatStructureShareText = formatStructureShareText;
 window.getWhatsAppShareUrl = getWhatsAppShareUrl;
+window.cloneStructureSnapshot = cloneStructureSnapshot;
+window.hasStructureChanges = hasStructureChanges;
+window.restoreStructureSnapshot = restoreStructureSnapshot;
+window.mostraPopupConfermaSalvataggio = mostraPopupConfermaSalvataggio;
 
 /**
  * Risolve le coordinate per una città o località (usando database locale o fallback online Nominatim).
@@ -8003,6 +8013,30 @@ let isEditMode = false;
 // Mappa per memorizzare strutture temporanee non ancora salvate
 let struttureTemporanee = new Map();
 
+// Gestione stato history e popstate per navigazione smartphone e chiusura modale
+window._isModalHistoryActive = false;
+window._isClosingModalIntentionally = false;
+window._onSchedaBackAction = null;
+window._hasActiveUnsavedChanges = null;
+
+window.addEventListener('popstate', () => {
+  if (window._isClosingModalIntentionally) {
+    window._isClosingModalIntentionally = false;
+    return;
+  }
+  if (typeof window._onSchedaBackAction === 'function') {
+    window._onSchedaBackAction();
+  }
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (typeof window._hasActiveUnsavedChanges === 'function' && window._hasActiveUnsavedChanges()) {
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  }
+});
+
 async function mostraSchedaCompleta(strutturaId) {
   // Prima cerca nell'array normale
   let struttura = strutture.find(s => s.id === strutturaId);
@@ -8047,7 +8081,127 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   // Rimuovi modal esistente se presente
   if (modalScheda) {
     modalScheda.remove();
+    modalScheda = null;
   }
+
+  // Snapshot originale per tracciare e ripristinare modifiche
+  let initialStrutturaSnapshot = cloneStructureSnapshot(struttura);
+  let isFormDirty = false;
+
+  const checkUnsavedChanges = () => {
+    if (!isEditMode) return false;
+    return hasStructureChanges(initialStrutturaSnapshot, struttura, isNewStructure, isFormDirty);
+  };
+
+  const ripristinaDatiOriginali = () => {
+    restoreStructureSnapshot(struttura, initialStrutturaSnapshot);
+    isFormDirty = false;
+  };
+
+  window._hasActiveUnsavedChanges = () => checkUnsavedChanges();
+
+  // Attiva history state per il supporto al tasto Indietro dello smartphone
+  window._isClosingModalIntentionally = false;
+  window._isModalHistoryActive = true;
+  try {
+    window.history.pushState({ modal: 'schedaStruttura', id: strutturaId }, '');
+  } catch (e) {
+    console.warn('Impossibile pushare lo stato della scheda nella history:', e);
+  }
+
+  function chiudiScheda(skipHistoryBack = false) {
+    window._hasActiveUnsavedChanges = null;
+    window._onSchedaBackAction = null;
+    document.removeEventListener('keydown', onKeyDownEscape);
+
+    if (window._isModalHistoryActive && !skipHistoryBack) {
+      window._isClosingModalIntentionally = true;
+      window._isModalHistoryActive = false;
+      try {
+        window.history.back();
+      } catch (e) {}
+    } else {
+      window._isModalHistoryActive = false;
+    }
+
+    if (modalScheda) {
+      modalScheda.remove();
+      modalScheda = null;
+    }
+  }
+
+  function gestisciUscitaConConferma(onContinueExit) {
+    if (isEditMode && checkUnsavedChanges()) {
+      mostraPopupConfermaSalvataggio({
+        title: 'Modifiche non salvate',
+        message: isNewStructure
+          ? 'Stai inserendo una nuova struttura scout. Vuoi salvarla prima di abbandonare la pagina?'
+          : `Hai apportato modifiche a "${struttura.Struttura || 'questa struttura'}" che non sono state ancora salvate. Vuoi salvarle prima di abbandonare la pagina?`,
+        saveText: isNewStructure ? '💾 Crea e continua' : '💾 Salva ed esci',
+        discardText: '⚠️ Esci senza salvare',
+        cancelText: '↩️ Continua a modificare',
+        onSave: async () => {
+          const ok = await salvaModificheScheda(strutturaId);
+          if (ok) {
+            if (typeof onContinueExit === 'function') {
+              onContinueExit();
+            } else {
+              chiudiScheda();
+            }
+          }
+        },
+        onDiscard: () => {
+          ripristinaDatiOriginali();
+          if (isNewStructure) {
+            struttureTemporanee.delete(strutturaId);
+          }
+          if (typeof onContinueExit === 'function') {
+            onContinueExit();
+          } else {
+            chiudiScheda();
+          }
+        },
+        onCancel: () => {
+          // Rimani a modificare
+        }
+      });
+      return true;
+    }
+    return false;
+  }
+
+  window._onSchedaBackAction = () => {
+    if (isEditMode && checkUnsavedChanges()) {
+      // Re-push state in history perché il browser ha già fatto back
+      try {
+        window.history.pushState({ modal: 'schedaStruttura', id: strutturaId }, '');
+        window._isModalHistoryActive = true;
+      } catch (e) {}
+
+      gestisciUscitaConConferma(() => {
+        chiudiScheda();
+      });
+    } else {
+      if (isNewStructure) {
+        struttureTemporanee.delete(strutturaId);
+      }
+      chiudiScheda(true);
+    }
+  };
+
+  const onKeyDownEscape = (e) => {
+    if (e.key === 'Escape') {
+      if (document.querySelector('.unsaved-confirm-overlay')) return;
+      const intercettato = gestisciUscitaConConferma(() => chiudiScheda());
+      if (!intercettato) {
+        if (isNewStructure) {
+          struttureTemporanee.delete(strutturaId);
+        }
+        chiudiScheda();
+      }
+    }
+  };
+  document.addEventListener('keydown', onKeyDownEscape);
 
   // Crea modal per scheda completa
   modalScheda = document.createElement('div');
@@ -8080,6 +8234,9 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     position: relative;
     border: 1px solid var(--border-light);
   `;
+
+  modalContent.addEventListener('input', () => { isFormDirty = true; });
+  modalContent.addEventListener('change', () => { isFormDirty = true; });
 
   // Header con titolo e controlli
   const header = document.createElement('div');
@@ -8148,11 +8305,21 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   `;
   cancelBtn.onclick = () => {
     if (isNewStructure) {
-      // Rimuovi la struttura temporanea dalla mappa
-      struttureTemporanee.delete(strutturaId);
-      modalScheda.remove();
+      const intercettato = gestisciUscitaConConferma(() => {
+        struttureTemporanee.delete(strutturaId);
+        chiudiScheda();
+      });
+      if (!intercettato) {
+        struttureTemporanee.delete(strutturaId);
+        chiudiScheda();
+      }
     } else {
-      toggleEditMode();
+      const intercettato = gestisciUscitaConConferma(() => {
+        toggleEditMode();
+      });
+      if (!intercettato) {
+        toggleEditMode();
+      }
     }
   };
 
@@ -8171,11 +8338,13 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     justify-content: center;
   `;
   closeBtn.onclick = () => {
-    if (isNewStructure) {
-      // Rimuovi la struttura temporanea dalla mappa
-      struttureTemporanee.delete(strutturaId);
+    const intercettato = gestisciUscitaConConferma(() => chiudiScheda());
+    if (!intercettato) {
+      if (isNewStructure) {
+        struttureTemporanee.delete(strutturaId);
+      }
+      chiudiScheda();
     }
-    modalScheda.remove();
   };
 
   const mapBtn = document.createElement('button');
@@ -8190,14 +8359,20 @@ async function mostraSchedaCompletaConStruttura(struttura) {
     font-size: 14px;
   `;
   mapBtn.onclick = () => {
-    // Chiudi la scheda
-    modalScheda.remove();
-    // Apri la mappa
-    mostraMappa();
-    // Centra sulla struttura (aumentato timeout per inizializzazione completa)
-    setTimeout(() => {
-      centerMapOnStructure(strutturaId);
-    }, 1500);
+    const intercettato = gestisciUscitaConConferma(() => {
+      chiudiScheda();
+      mostraMappa();
+      setTimeout(() => {
+        centerMapOnStructure(strutturaId);
+      }, 1500);
+    });
+    if (!intercettato) {
+      chiudiScheda();
+      mostraMappa();
+      setTimeout(() => {
+        centerMapOnStructure(strutturaId);
+      }, 1500);
+    }
   };
 
   controls.appendChild(editBtn);
@@ -8536,12 +8711,14 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             // Campo checkbox
             const input = document.createElement('input');
             input.type = 'checkbox';
+            input.dataset.campo = campo;
             input.checked = struttura[campo] === true || struttura[campo] === 'true' || struttura[campo] === 'Sì' || struttura[campo] === 'sì';
             input.style.cssText = `
               margin-left: 10px;
               transform: scale(1.2);
             `;
             input.onchange = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.checked;
             };
 
@@ -8550,6 +8727,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           } else if (isStateField) {
             // Campo select per stato
             const select = document.createElement('select');
+            select.dataset.campo = campo;
             select.style.cssText = `
               width: 100%;
               padding: 8px;
@@ -8577,6 +8755,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             });
 
             select.onchange = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.value;
             };
 
@@ -8587,6 +8766,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             const input = document.createElement('input');
             input.type = 'number';
             input.step = 'any';
+            input.dataset.campo = campo;
             input.value = struttura[campo] || '';
             input.placeholder = campo === 'coordinate_lat' ? 'es. 45.123456' : 'es. 9.123456';
             input.style.cssText = `
@@ -8599,6 +8779,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               color: var(--text-primary);
             `;
             input.onchange = (e) => {
+              isFormDirty = true;
+              struttura[campo] = e.target.value ? parseFloat(e.target.value) : null;
+            };
+            input.oninput = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.value ? parseFloat(e.target.value) : null;
             };
 
@@ -8749,6 +8934,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             // Campo URL
             const input = document.createElement('input');
             input.type = 'url';
+            input.dataset.campo = campo;
             input.value = struttura[campo] || '';
             input.placeholder = campo === 'google_maps_link' ? 'https://maps.google.com/...' : 'https://...';
             input.style.cssText = `
@@ -8761,6 +8947,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               color: var(--text-primary);
             `;
             input.onchange = (e) => {
+              isFormDirty = true;
+              struttura[campo] = e.target.value;
+            };
+            input.oninput = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.value;
             };
 
@@ -8777,6 +8968,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
             const input = document.createElement('input');
             input.type = 'url';
+            input.dataset.campo = campo;
             input.value = struttura[campo] || '';
             input.placeholder = 'https://www.esempio.com';
             input.style.cssText = `
@@ -8789,6 +8981,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               color: var(--text-primary);
             `;
             input.onchange = (e) => {
+              isFormDirty = true;
+              struttura[campo] = e.target.value;
+            };
+            input.oninput = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.value;
             };
 
@@ -8833,6 +9030,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
             const input = document.createElement('input');
             input.type = 'email';
+            input.dataset.campo = campo;
             input.value = struttura[campo] || '';
             input.placeholder = 'email@esempio.com';
             input.style.cssText = `
@@ -8845,6 +9043,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               color: var(--text-primary);
             `;
             input.onchange = (e) => {
+              isFormDirty = true;
+              struttura[campo] = e.target.value;
+            };
+            input.oninput = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.value;
             };
 
@@ -8891,6 +9094,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
             const input = document.createElement('input');
             input.type = 'tel';
+            input.dataset.campo = campo;
             input.value = struttura[campo] || '';
             input.placeholder = 'Numero di telefono';
             input.style.cssText = `
@@ -8903,6 +9107,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               color: var(--text-primary);
             `;
             input.onchange = (e) => {
+              isFormDirty = true;
+              struttura[campo] = e.target.value;
+            };
+            input.oninput = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.value;
             };
 
@@ -8992,6 +9201,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
             // Campo di testo normale
             const input = document.createElement('input');
             input.type = 'text';
+            input.dataset.campo = campo;
             input.value = struttura[campo] || '';
             input.placeholder = 'Non specificato';
             input.style.cssText = `
@@ -9004,6 +9214,11 @@ async function mostraSchedaCompletaConStruttura(struttura) {
               color: var(--text-primary);
             `;
             input.onchange = (e) => {
+              isFormDirty = true;
+              struttura[campo] = e.target.value;
+            };
+            input.oninput = (e) => {
+              isFormDirty = true;
               struttura[campo] = e.target.value;
             };
 
@@ -9525,7 +9740,13 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         background: var(--bg-primary);
         color: var(--text-primary);
       `;
+      textarea.dataset.campo = 'Note';
       textarea.onchange = (e) => {
+        isFormDirty = true;
+        struttura.Note = e.target.value;
+      };
+      textarea.oninput = (e) => {
+        isFormDirty = true;
         struttura.Note = e.target.value;
       };
 
@@ -9683,6 +9904,12 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   // Funzione per alternare modalità
   async function toggleEditMode() {
     isEditMode = !isEditMode;
+    if (isEditMode) {
+      initialStrutturaSnapshot = cloneStructureSnapshot(struttura);
+      isFormDirty = false;
+    } else {
+      isFormDirty = false;
+    }
     editBtn.style.display = isEditMode ? 'none' : 'inline-block';
     saveBtn.style.display = isEditMode ? 'inline-block' : 'none';
     cancelBtn.style.display = isEditMode ? 'inline-block' : 'none';
@@ -9701,8 +9928,21 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   // Funzione per salvare modifiche
   async function salvaModificheScheda(strutturaId) {
     try {
-      // I dati del form vengono già aggiornati direttamente nell'oggetto struttura
-      // tramite gli event handler onchange dei campi, quindi non serve leggerli dal form
+      // Sincronizza i valori attuali dei campi del form nell'oggetto struttura
+      if (content) {
+        const allFormInputs = content.querySelectorAll('input, select, textarea');
+        allFormInputs.forEach(el => {
+          const campo = el.dataset.campo;
+          if (!campo) return;
+          if (el.type === 'checkbox') {
+            struttura[campo] = el.checked;
+          } else if (el.type === 'number') {
+            struttura[campo] = el.value !== '' ? parseFloat(el.value) : null;
+          } else {
+            struttura[campo] = el.value;
+          }
+        });
+      }
 
       // Determina se è una nuova struttura basandosi sull'ID corrente (non sulla variabile locale)
       // Se l'ID inizia con 'new_', è una nuova struttura, altrimenti è un aggiornamento
@@ -9734,8 +9974,8 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
           if (strutturaEsistente) {
             alert('⚠️ Una struttura identica esiste già!');
-            modalScheda.remove();
-            return;
+            chiudiScheda();
+            return false;
           }
         }
 
@@ -9795,8 +10035,9 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           // Non bloccare l'utente per errori di sincronizzazione
         }
 
-        modalScheda.remove();
-        return; // Esci dalla funzione dopo la creazione
+        isFormDirty = false;
+        chiudiScheda();
+        return true; // Esci con successo dopo la creazione
       } else {
         // Salva versione precedente prima di modificare
         await salvaVersione(struttura, getCurrentUser()?.uid);
@@ -9858,12 +10099,16 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           // Non bloccare l'utente per errori di sincronizzazione
         }
 
+        initialStrutturaSnapshot = cloneStructureSnapshot(struttura);
+        isFormDirty = false;
         toggleEditMode();
+        return true;
       }
 
     } catch (error) {
       console.error('❌ Errore nel salvataggio:', error);
       alert('❌ Errore nel salvataggio: ' + error.message);
+      return false;
     }
   }
 
@@ -9898,16 +10143,18 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   // Chiudi modal cliccando fuori
   modalScheda.addEventListener('click', (e) => {
     if (e.target === modalScheda) {
-      if (isNewStructure) {
-        // Rimuovi la struttura temporanea
-        const index = strutture.findIndex(s => s.id === strutturaId);
-        if (index !== -1) {
-          strutture.splice(index, 1);
-          // Aggiorna le strutture globali
-          window.strutture = strutture;
+      const intercettato = gestisciUscitaConConferma(() => chiudiScheda());
+      if (!intercettato) {
+        if (isNewStructure) {
+          struttureTemporanee.delete(strutturaId);
+          const index = strutture.findIndex(s => s.id === strutturaId);
+          if (index !== -1) {
+            strutture.splice(index, 1);
+            window.strutture = strutture;
+          }
         }
+        chiudiScheda();
       }
-      modalScheda.remove();
     }
   });
 }

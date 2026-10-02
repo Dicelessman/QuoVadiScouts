@@ -3485,3 +3485,185 @@ input:checked + .toggle-slider:before {
   }
 }
 
+/* === POPUP CONFERMA MODIFICHE NON SALVATE === */
+.unsaved-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10050;
+  padding: 16px;
+  animation: unsavedOverlayFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes unsavedOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.unsaved-confirm-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-medium, #e2e8f0);
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: unsavedCardPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes unsavedCardPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+[data-theme="dark"] .unsaved-confirm-card {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+.unsaved-confirm-icon-box {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fef3c7;
+  color: #d97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin-bottom: 16px;
+  box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.12);
+}
+
+[data-theme="dark"] .unsaved-confirm-icon-box {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.08);
+}
+
+.unsaved-confirm-title {
+  margin: 0 0 8px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+[data-theme="dark"] .unsaved-confirm-title {
+  color: #f8fafc;
+}
+
+.unsaved-confirm-desc {
+  margin: 0 0 24px 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #64748b);
+}
+
+[data-theme="dark"] .unsaved-confirm-desc {
+  color: #94a3b8;
+}
+
+.unsaved-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.unsaved-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-decoration: none;
+  outline: none;
+}
+
+.unsaved-confirm-btn:active {
+  transform: scale(0.98);
+}
+
+/* 1. Pulsante Salva (Primary Green) */
+.unsaved-confirm-btn-save {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
+}
+
+.unsaved-confirm-btn-save:hover {
+  background: linear-gradient(135deg, #15803d, #166534);
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.45);
+  transform: translateY(-1px);
+}
+
+/* 2. Pulsante Abbandona (Danger/Outline) */
+.unsaved-confirm-btn-discard {
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+.unsaved-confirm-btn-discard:hover {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+[data-theme="dark"] .unsaved-confirm-btn-discard {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="dark"] .unsaved-confirm-btn-discard:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+/* 3. Pulsante Annulla (Neutral) */
+.unsaved-confirm-btn-cancel {
+  background: var(--bg-secondary, #f1f5f9);
+  color: var(--text-primary, #334155);
+  border: 1px solid var(--border-medium, #cbd5e1);
+}
+
+.unsaved-confirm-btn-cancel:hover {
+  background: var(--border-light, #e2e8f0);
+}
+
+[data-theme="dark"] .unsaved-confirm-btn-cancel {
+  background: #334155;
+  color: #cbd5e1;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .unsaved-confirm-btn-cancel:hover {
+  background: #475569;
+  color: #f8fafc;
+}
+
