@@ -6985,8 +6985,12 @@ async function loginWithGoogle() {
 
     if (error.code === 'auth/popup-closed-by-user') {
       showError('❌ Login annullato');
+    } else if (error.code === 'auth/unauthorized-domain') {
+      showError('⚠️ Dominio non autorizzato per Google Sign-In. Accedi dal dominio principale: https://quovadiscout.vercel.app');
+    } else if (error.code === 'auth/popup-blocked') {
+      showError('⚠️ Finestra popup bloccata dal browser. Consenti i popup per questo sito.');
     } else {
-      showError('❌ Errore durante il login con Google');
+      showError(`❌ Errore durante il login con Google (${error.code || error.message || 'sconosciuto'})`);
     }
   } finally {
     showLoading(false);
