@@ -224,3 +224,26 @@ test('script.js wires up toggleMarkerLegend and markerLegendBtn', () => {
   assert.ok(scriptJs.includes('toggleMarkerLegend'), 'Must define toggleMarkerLegend');
   assert.ok(scriptJs.includes('window.toggleMarkerLegend = toggleMarkerLegend'), 'Must expose toggleMarkerLegend');
 });
+
+test('index.html and index.local.html have Scout compass menu button with badge and styles', () => {
+  const indexHtml = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const localHtml = fs.readFileSync(path.join(projectRoot, 'index.local.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'styles.css'), 'utf8');
+
+  // HTML
+  assert.ok(indexHtml.includes('btn-menu--scout'), 'index.html must have btn-menu--scout');
+  assert.ok(indexHtml.includes('scout-compass-icon'), 'index.html must have compass icon');
+  assert.ok(indexHtml.includes('scout-menu-badge'), 'index.html must have scout badge');
+
+  // Parity
+  assert.ok(localHtml.includes('btn-menu--scout'), 'index.local.html must have btn-menu--scout');
+  assert.ok(localHtml.includes('scout-compass-icon'), 'index.local.html must have compass icon');
+  assert.ok(localHtml.includes('scout-menu-badge'), 'index.local.html must have scout badge');
+
+  // CSS
+  assert.ok(css.includes('.btn-menu--scout'), 'styles.css must style .btn-menu--scout');
+  assert.ok(css.includes('compass-wobble'), 'styles.css must have compass-wobble animation');
+  assert.ok(css.includes('.scout-menu-badge'), 'styles.css must style .scout-menu-badge');
+  assert.ok(css.includes('.btn-menu--scout[aria-expanded="true"]'), 'styles.css must handle open state');
+});
+

@@ -320,6 +320,181 @@ body {
   top: 0;
 }
 
+/* === SCOUT COMPASS MENU BUTTON === */
+.btn-menu--scout {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto !important;
+  min-width: 42px;
+  height: 40px;
+  padding: 0 14px 0 10px;
+  border-radius: var(--radius-full, 9999px);
+  background: rgba(47, 107, 47, 0.1);
+  border: 1.5px solid rgba(47, 107, 47, 0.35);
+  color: var(--primary, #2f6b2f);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 6px rgba(47, 107, 47, 0.12);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  user-select: none;
+}
+
+.btn-menu--scout:hover {
+  background: rgba(47, 107, 47, 0.2);
+  border-color: var(--primary, #2f6b2f);
+  color: var(--primary, #2f6b2f);
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 14px rgba(47, 107, 47, 0.22);
+}
+
+.btn-menu--scout:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Icon Container */
+.scout-menu-compass {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scout-compass-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+  display: inline-block;
+  color: var(--primary, #2f6b2f);
+}
+
+/* Micro-animazione oscillazione bussola stile ago magnetico scout su hover */
+.btn-menu--scout:hover .scout-compass-icon {
+  animation: compass-wobble 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite alternate;
+}
+
+@keyframes compass-wobble {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-32deg); }
+  60% { transform: rotate(26deg); }
+  85% { transform: rotate(-12deg); }
+  100% { transform: rotate(8deg); }
+}
+
+.scout-close-icon {
+  position: absolute;
+  font-size: 1.15rem;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.4) rotate(-90deg);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+  display: inline-block;
+}
+
+/* Testo Menu */
+.scout-menu-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* Badge indicatore scout */
+.scout-menu-badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 6px rgba(245, 158, 11, 0.6);
+  flex-shrink: 0;
+  animation: scout-badge-pulse 2.2s infinite ease-in-out;
+  transition: background-color 0.2s ease;
+}
+
+@keyframes scout-badge-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.8; }
+}
+
+/* Stato Aperto (aria-expanded="true") */
+.btn-menu--scout[aria-expanded="true"] {
+  background: var(--primary, #2f6b2f) !important;
+  border-color: var(--primary, #2f6b2f) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(47, 107, 47, 0.35);
+}
+
+.btn-menu--scout[aria-expanded="true"] .scout-compass-icon {
+  opacity: 0;
+  transform: scale(0.3) rotate(180deg);
+}
+
+.btn-menu--scout[aria-expanded="true"] .scout-close-icon {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  color: #ffffff;
+}
+
+.btn-menu--scout[aria-expanded="true"] .scout-menu-badge {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 6px rgba(34, 197, 94, 0.7);
+}
+
+/* Dark Theme */
+[data-theme="dark"] .btn-menu--scout {
+  background: rgba(96, 165, 250, 0.12) !important;
+  border-color: rgba(96, 165, 250, 0.35) !important;
+  color: var(--primary, #60a5fa) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .btn-menu--scout .scout-compass-icon {
+  color: var(--primary, #60a5fa);
+}
+
+[data-theme="dark"] .btn-menu--scout:hover {
+  background: rgba(96, 165, 250, 0.24) !important;
+  border-color: var(--primary, #60a5fa) !important;
+  color: var(--primary, #60a5fa) !important;
+  box-shadow: 0 4px 16px rgba(96, 165, 250, 0.25);
+}
+
+[data-theme="dark"] .btn-menu--scout[aria-expanded="true"] {
+  background: var(--primary, #3b82f6) !important;
+  border-color: var(--primary, #3b82f6) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+}
+
+[data-theme="dark"] .btn-menu--scout[aria-expanded="true"] .scout-close-icon {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .scout-menu-badge {
+  box-shadow: 0 0 0 2px rgba(26, 32, 44, 0.9), 0 0 6px rgba(245, 158, 11, 0.7);
+}
+
+@media (max-width: 420px) {
+  .btn-menu--scout {
+    padding: 0 10px 0 8px;
+    gap: 6px;
+  }
+  .scout-menu-label {
+    font-size: 0.78rem;
+  }
+}
+
 /* === SEARCH SECTION === */
 .search-section {
   background-color: var(--bg-primary);
