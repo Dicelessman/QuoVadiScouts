@@ -174,3 +174,53 @@ test('MTB legend has shield info + difficulty indicator', () => {
   assert.ok(types.includes('mtb-shield-info'));
   assert.ok(types.includes('mtb-difficulty'));
 });
+
+test('index.html contains markerLegendBtn and mapMarkerLegend with sections for type, state, combinations and fallbacks', () => {
+  const indexHtml = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  assert.ok(indexHtml.includes('id="markerLegendBtn"'), 'Must have marker legend button');
+  assert.ok(indexHtml.includes('id="mapMarkerLegend"'), 'Must have mapMarkerLegend container');
+  assert.ok(indexHtml.includes('id="markerLegendCloseBtn"'), 'Must have close button for marker legend');
+  assert.ok(indexHtml.includes('marker-swatch--house'), 'Must have house swatch');
+  assert.ok(indexHtml.includes('marker-swatch--land'), 'Must have land swatch');
+  assert.ok(indexHtml.includes('marker-swatch--both'), 'Must have both (casa+terreno) swatch');
+  assert.ok(indexHtml.includes('marker-swatch--stato-attiva'), 'Must have active state swatch');
+  assert.ok(indexHtml.includes('marker-swatch--stato-sospesa'), 'Must have suspended state swatch');
+  assert.ok(indexHtml.includes('marker-swatch--stato-chiusa'), 'Must have closed state swatch');
+  assert.ok(indexHtml.includes('marker-swatch--fallback-city'), 'Must have fallback city swatch (C)');
+  assert.ok(indexHtml.includes('marker-swatch--fallback-prov'), 'Must have fallback province swatch (P)');
+  assert.ok(indexHtml.includes('marker-swatch--user-location'), 'Must have user location swatch');
+});
+
+test('index.local.html has parity with markerLegendBtn and mapMarkerLegend', () => {
+  const localHtml = fs.readFileSync(path.join(projectRoot, 'index.local.html'), 'utf8');
+  assert.ok(localHtml.includes('id="markerLegendBtn"'), 'index.local.html must have markerLegendBtn');
+  assert.ok(localHtml.includes('id="mapMarkerLegend"'), 'index.local.html must have mapMarkerLegend');
+  assert.ok(localHtml.includes('id="markerLegendCloseBtn"'), 'index.local.html must have markerLegendCloseBtn');
+});
+
+test('styles.css contains rules for map-marker-legend and marker-swatches', () => {
+  const css = fs.readFileSync(path.join(projectRoot, 'styles.css'), 'utf8');
+  assert.ok(css.includes('.map-marker-legend'), 'Must have .map-marker-legend');
+  assert.ok(css.includes('.map-marker-legend.hidden'), 'Must have .map-marker-legend.hidden');
+  assert.ok(css.includes('.main-map-container.collapsed #mapMarkerLegend'), 'Must hide when map collapsed');
+  assert.ok(css.includes('.main-map-container.collapsed #markerLegendBtn'), 'Must hide button when map collapsed');
+  assert.ok(css.includes('.marker-swatch'), 'Must have .marker-swatch base class');
+  assert.ok(css.includes('.marker-swatch--attiva'), 'Must have .marker-swatch--attiva');
+  assert.ok(css.includes('.marker-swatch--sospesa'), 'Must have .marker-swatch--sospesa');
+  assert.ok(css.includes('.marker-swatch--chiusa'), 'Must have .marker-swatch--chiusa');
+  assert.ok(css.includes('.marker-swatch--fallback-city'), 'Must have .marker-swatch--fallback-city');
+  assert.ok(css.includes('.marker-swatch--fallback-prov'), 'Must have .marker-swatch--fallback-prov');
+});
+
+test('maps.js uses unified fallback marker icons (C for city, P for province)', () => {
+  const mapsJs = fs.readFileSync(path.join(projectRoot, 'maps.js'), 'utf8');
+  assert.ok(mapsJs.includes("const fallbackColor = isCityFallback ? '#f97316' : '#8b5cf6'"), 'Must use distinct colors for C and P');
+  assert.ok(mapsJs.includes("const fallbackLetter = isCityFallback ? 'C' : 'P'"), 'Must use C and P letters');
+});
+
+test('script.js wires up toggleMarkerLegend and markerLegendBtn', () => {
+  const scriptJs = fs.readFileSync(path.join(projectRoot, 'script.js'), 'utf8');
+  assert.ok(scriptJs.includes('markerLegendBtn'), 'Must reference markerLegendBtn');
+  assert.ok(scriptJs.includes('toggleMarkerLegend'), 'Must define toggleMarkerLegend');
+  assert.ok(scriptJs.includes('window.toggleMarkerLegend = toggleMarkerLegend'), 'Must expose toggleMarkerLegend');
+});

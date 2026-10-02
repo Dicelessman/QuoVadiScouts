@@ -2938,7 +2938,8 @@ input:checked + .toggle-slider:before {
   overflow: hidden;
 }
 
-.main-map-container.collapsed #mapOverlayLegend {
+.main-map-container.collapsed #mapOverlayLegend,
+.main-map-container.collapsed #mapMarkerLegend {
   display: none !important;
 }
 
@@ -3007,6 +3008,7 @@ input:checked + .toggle-slider:before {
 }
 
 .main-map-container.collapsed #layersMenuBtn,
+.main-map-container.collapsed #markerLegendBtn,
 .main-map-container.collapsed #centerMapBtn,
 .main-map-container.collapsed .map-layers-dropdown {
   display: none !important;
@@ -3050,6 +3052,13 @@ input:checked + .toggle-slider:before {
   transform: scale(0.95);
 }
 
+.btn-map-control.active {
+  background: var(--primary);
+  color: var(--text-inverse);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(47, 107, 47, 0.3);
+}
+
 .main-map {
   width: 100%;
   height: 400px;
@@ -3085,9 +3094,11 @@ input:checked + .toggle-slider:before {
   border-color: var(--border-medium);
 }
 
-[data-theme="dark"] .btn-map-control:hover {
-  background: var(--primary);
-  border-color: var(--primary);
+[data-theme="dark"] .btn-map-control:hover,
+[data-theme="dark"] .btn-map-control.active {
+  background: var(--primary, #3b82f6);
+  border-color: var(--primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
 }
 
 /* === LAYER MENU DROPDOWN === */
@@ -3649,6 +3660,149 @@ input:checked + .toggle-slider:before {
     bottom: 12px;
     left: 8px;
     max-width: calc(100% - 16px);
+  }
+}
+
+/* === MAP MARKER LEGEND (SEGNALINI STRUTTURE & TERRENI) === */
+.map-marker-legend {
+  position: absolute;
+  top: 72px;
+  right: 16px;
+  z-index: 995;
+  max-width: 320px;
+  width: calc(100% - 32px);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  font-size: 0.82rem;
+  pointer-events: auto;
+}
+
+[data-theme="dark"] .map-marker-legend {
+  background: rgba(26, 32, 44, 0.95);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}
+
+.map-marker-legend.hidden {
+  display: none !important;
+}
+
+.map-marker-legend.minimized {
+  width: auto;
+  max-width: 220px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.map-marker-legend.minimized .legend-body {
+  display: none;
+}
+
+.marker-legend-header {
+  background: rgba(47, 107, 47, 0.08);
+}
+
+[data-theme="dark"] .marker-legend-header {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+/* Marker Swatches */
+.marker-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  border: 2px solid #ffffff;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.marker-swatch i {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Stili per tipo icona */
+.marker-swatch--attiva {
+  background-color: #28a745;
+}
+
+.marker-swatch--sospesa {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.marker-swatch--chiusa {
+  background-color: #dc3545;
+}
+
+/* Stili per cerchi di stato pieno */
+.marker-swatch--stato-attiva {
+  background-color: #28a745;
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.marker-swatch--stato-sospesa {
+  background-color: #ffc107;
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.marker-swatch--stato-chiusa {
+  background-color: #dc3545;
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+/* Swatch speciali e fallback */
+.marker-swatch--fallback-city {
+  background-color: #f97316;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.marker-swatch--fallback-prov {
+  background-color: #8b5cf6;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.marker-swatch--user-location {
+  background-color: #007bff;
+  font-size: 12px;
+}
+
+.marker-swatch--draggable {
+  background-color: #e91e63;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .map-marker-legend {
+    top: 60px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100% - 80px);
   }
 }
 

@@ -3794,6 +3794,58 @@ function setupMainMapControls() {
     updateDynamicMapLegend();
   }
 
+  // === Gestione Legenda Segnalini Mappa (Strutture & Terreni) ===
+  const markerLegendBtn = document.getElementById('markerLegendBtn');
+  const mapMarkerLegend = document.getElementById('mapMarkerLegend');
+  const markerLegendCloseBtn = document.getElementById('markerLegendCloseBtn');
+
+  function toggleMarkerLegend(forceState) {
+    if (!mapMarkerLegend) return;
+    const isCurrentlyOpen = !mapMarkerLegend.classList.contains('hidden');
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !isCurrentlyOpen;
+
+    if (shouldOpen) {
+      mapMarkerLegend.classList.remove('hidden');
+      if (markerLegendBtn) {
+        markerLegendBtn.classList.add('active');
+        markerLegendBtn.setAttribute('aria-expanded', 'true');
+        markerLegendBtn.setAttribute('title', 'Nascondi legenda segnalini');
+      }
+    } else {
+      mapMarkerLegend.classList.add('hidden');
+      if (markerLegendBtn) {
+        markerLegendBtn.classList.remove('active');
+        markerLegendBtn.setAttribute('aria-expanded', 'false');
+        markerLegendBtn.setAttribute('title', 'Legenda segnalini mappa');
+      }
+    }
+  }
+
+  if (markerLegendBtn) {
+    markerLegendBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMarkerLegend();
+    });
+  }
+
+  if (markerLegendCloseBtn) {
+    markerLegendCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMarkerLegend(false);
+    });
+  }
+
+  // Click fuori dalla legenda per chiuderla se aperta
+  document.addEventListener('click', (e) => {
+    if (mapMarkerLegend && !mapMarkerLegend.classList.contains('hidden')) {
+      if (!mapMarkerLegend.contains(e.target) && e.target !== markerLegendBtn && (!markerLegendBtn || !markerLegendBtn.contains(e.target))) {
+        toggleMarkerLegend(false);
+      }
+    }
+  });
+
+  window.toggleMarkerLegend = toggleMarkerLegend;
+
   // Pulsante centro su di me
   const centerMapBtn = document.getElementById('centerMapBtn');
   if (centerMapBtn) {
@@ -3827,6 +3879,7 @@ function setupMainMapControls() {
         toggleMapBtn.textContent = '👁️';
         toggleMapBtn.setAttribute('title', 'Mostra la mappa delle strutture');
       }
+      toggleMarkerLegend(false);
     } else {
       mapContainer.classList.remove('collapsed');
       if (mapTitleText) mapTitleText.textContent = 'Mappa delle strutture';

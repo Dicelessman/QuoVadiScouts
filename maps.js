@@ -325,10 +325,13 @@ class MapsManager {
     const finalLat = lat + offsetLat;
     const finalLng = lng + offsetLng;
 
-    // Crea icona personalizzata per marker di fallback
+    // Crea icona personalizzata per marker di fallback (C = città, P = provincia)
+    const fallbackColor = isCityFallback ? '#f97316' : '#8b5cf6';
+    const fallbackLetter = isCityFallback ? 'C' : 'P';
+    const fallbackTitle = isCityFallback ? 'Posizione approx. città' : 'Posizione approx. provincia';
     const icon = L.divIcon({
       className: 'custom-div-icon',
-      html: `<div style="background-color: ${isCityFallback ? '#ff9800' : '#ffc107'}; color: #000; border: 2px solid #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${isCityFallback ? 'C' : '?'}</div>`,
+      html: `<div title="${fallbackTitle}" style="background-color: ${fallbackColor}; color: #ffffff; border: 2px solid #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${fallbackLetter}</div>`,
       iconSize: [22, 22],
       iconAnchor: [11, 11]
     });

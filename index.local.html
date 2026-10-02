@@ -176,6 +176,10 @@
             </div>
           </div>
         </div>
+        <!-- Pulsante Legenda Marker -->
+        <button id="markerLegendBtn" class="btn-map-control btn-map-control--legend" title="Legenda segnalini mappa" aria-expanded="false" aria-controls="mapMarkerLegend">
+          📌
+        </button>
         <button id="centerMapBtn" class="btn-map-control" title="Centro su di me">📍</button>
         <button id="toggleMapBtn" class="btn-map-control" title="Mostra/Nascondi mappa">👁️</button>
       </div>
@@ -203,6 +207,124 @@
         <div class="legend-footer">
           <span class="legend-live-indicator">●</span>
           <span>Dati live OpenStreetMap &amp; Waymarked Trails</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legenda segnalini strutture (marker mappa) -->
+    <div id="mapMarkerLegend" class="map-marker-legend hidden" role="region" aria-label="Legenda segnalini mappa">
+      <div class="legend-header marker-legend-header" id="markerLegendHeader" title="Clicca per ridurre o espandere">
+        <div class="legend-title-wrapper">
+          <span class="legend-icon">📌</span>
+          <span class="legend-title">Legenda Segnalini</span>
+        </div>
+        <div class="legend-actions">
+          <button id="markerLegendCloseBtn" class="legend-btn-toggle" type="button" aria-label="Chiudi legenda segnalini" title="Chiudi">
+            <span>×</span>
+          </button>
+        </div>
+      </div>
+      <div class="legend-body">
+        <div class="legend-content">
+
+          <!-- Sezione Tipo Struttura -->
+          <div class="legend-group">
+            <div class="legend-group-title"><span>Tipo di struttura</span></div>
+            <div class="legend-group-items">
+              <div class="legend-item" title="Solo abitazione / appartamento">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--house marker-swatch--attiva"><i class="fas fa-home"></i></span>
+                </span>
+                <span class="legend-item-text">Solo Casa</span>
+              </div>
+              <div class="legend-item" title="Solo terreno agricolo o edificabile">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--land marker-swatch--attiva"><i class="fas fa-seedling"></i></span>
+                </span>
+                <span class="legend-item-text">Solo Terreno</span>
+              </div>
+              <div class="legend-item" title="Struttura con casa e terreno">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--both marker-swatch--attiva"><i class="fas fa-building"></i></span>
+                </span>
+                <span class="legend-item-text">Casa + Terreno</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sezione Stato Struttura -->
+          <div class="legend-group">
+            <div class="legend-group-title"><span>Stato di disponibilità</span></div>
+            <div class="legend-group-items">
+              <div class="legend-item" title="Struttura attualmente disponibile">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--stato-attiva"></span>
+                </span>
+                <span class="legend-item-text"><strong style="color:#28a745">Verde</strong> — Attiva</span>
+              </div>
+              <div class="legend-item" title="Disponibilità sospesa temporaneamente">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--stato-sospesa"></span>
+                </span>
+                <span class="legend-item-text"><strong style="color:#e6a817">Giallo</strong> — Temporaneamente sospesa</span>
+              </div>
+              <div class="legend-item" title="Struttura non più disponibile">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--stato-chiusa"></span>
+                </span>
+                <span class="legend-item-text"><strong style="color:#dc3545">Rosso</strong> — Non più attiva</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sezione Combinazioni tipo + stato -->
+          <div class="legend-group">
+            <div class="legend-group-title"><span>Esempi combinati</span></div>
+            <div class="legend-group-items">
+              <div class="legend-item">
+                <span class="legend-swatch"><span class="marker-swatch marker-swatch--house marker-swatch--attiva"><i class="fas fa-home"></i></span></span>
+                <span class="legend-item-text">Casa — attiva</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch"><span class="marker-swatch marker-swatch--house marker-swatch--sospesa"><i class="fas fa-home"></i></span></span>
+                <span class="legend-item-text">Casa — sospesa</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch"><span class="marker-swatch marker-swatch--land marker-swatch--chiusa"><i class="fas fa-seedling"></i></span></span>
+                <span class="legend-item-text">Terreno — non attiva</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sezione Marker speciali -->
+          <div class="legend-group">
+            <div class="legend-group-title"><span>Segnalini speciali</span></div>
+            <div class="legend-group-items">
+              <div class="legend-item" title="Posizione approssimativa basata sulla città">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--fallback-city">C</span>
+                </span>
+                <span class="legend-item-text">Posizione approx. città</span>
+              </div>
+              <div class="legend-item" title="Posizione approssimativa basata sulla provincia">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--fallback-prov">P</span>
+                </span>
+                <span class="legend-item-text">Posizione approx. provincia</span>
+              </div>
+              <div class="legend-item" title="La tua posizione GPS attuale">
+                <span class="legend-swatch">
+                  <span class="marker-swatch marker-swatch--user-location">📍</span>
+                </span>
+                <span class="legend-item-text">La tua posizione</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="legend-footer">
+          <span>💡</span>
+          <span>I segnalini con bordo bianco indicano posizione precisa</span>
         </div>
       </div>
     </div>
