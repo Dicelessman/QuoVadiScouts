@@ -121,8 +121,9 @@
 
   <div class="search-section" role="search">
     <div class="search-container">
-      <input id="search" class="search-input" placeholder="Cerca strutture..." />
+      <input id="search" class="search-input" placeholder="Cerca strutture, comuni o province..." autocomplete="off" aria-autocomplete="list" aria-controls="searchPreviewDropdown" aria-expanded="false" />
       <button id="clearSearch" class="search-clear-btn" aria-label="Cancella ricerca" style="display: none;">✕</button>
+      <div id="searchPreviewDropdown" class="search-preview-dropdown hidden" role="listbox" aria-label="Suggerimenti di ricerca"></div>
     </div>
     <div class="quick-filter-bar" id="quickFilterBar" role="tablist" aria-label="Filtri rapidi">
       <button class="filter-chip active" data-filter="all" role="tab" aria-selected="true">🏠 Tutte</button>

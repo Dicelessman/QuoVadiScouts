@@ -64,6 +64,11 @@ import {
   calculateDistanceKm,
   findCityCoordinates
 } from "./utils/geo.js";
+import {
+  generateSearchSuggestions,
+  highlightMatch,
+  formatCityDisplayName
+} from "./utils/autocomplete.js";
 
 window.normalizeStructureCoordinates = normalizeStructureCoordinates;
 window.cleanPhoneNumber = cleanPhoneNumber;
@@ -73,6 +78,9 @@ window.searchStrutture = searchStrutture;
 window.extractCoordinatesFromGoogleMapsLink = extractCoordinatesFromGoogleMapsLink;
 window.calculateDistanceKm = calculateDistanceKm;
 window.findCityCoordinates = findCityCoordinates;
+window.generateSearchSuggestions = generateSearchSuggestions;
+window.highlightMatch = highlightMatch;
+window.formatCityDisplayName = formatCityDisplayName;
 window.formatStructureShareText = formatStructureShareText;
 window.getWhatsAppShareUrl = getWhatsAppShareUrl;
 
@@ -12123,10 +12131,240 @@ function mostraRisultatiVicinoAMe(struttureVicine, userLat, userLng) {
 function initializeUIEventListeners() {
   console.log('🎯 Inizializzazione event listeners UI...');
 
-  // Search functionality
+  // Search functionality & Chrome-style Autocomplete Preview
   const searchInput = document.getElementById('search');
   const clearSearchBtn = document.getElementById('clearSearch');
   const chipRadiusCity = document.getElementById('chipRadiusCity');
+  const searchPreviewDropdown = document.getElementById('searchPreviewDropdown');
+
+  let selectedPreviewIndex = -1;
+  let currentPreviewItems = [];
+
+  const escapeHtmlHelper = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  const hideSearchPreview = () => {
+    if (searchPreviewDropdown) {
+      searchPreviewDropdown.classList.add('hidden');
+      searchPreviewDropdown.innerHTML = '';
+    }
+    if (searchInput) {
+      searchInput.setAttribute('aria-expanded', 'false');
+      searchInput.removeAttribute('aria-activedescendant');
+    }
+    selectedPreviewIndex = -1;
+    currentPreviewItems = [];
+  };
+
+  const highlightPreviewItem = (index) => {
+    if (!searchPreviewDropdown) return;
+    const items = searchPreviewDropdown.querySelectorAll('.preview-item');
+    items.forEach((el, idx) => {
+      if (idx === index) {
+        el.classList.add('active');
+        el.setAttribute('aria-selected', 'true');
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        if (searchInput) searchInput.setAttribute('aria-activedescendant', el.id);
+      } else {
+        el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+      }
+    });
+  };
+
+  const selectPreviewItem = (item) => {
+    if (!item) return;
+
+    if (item.type === 'city') {
+      const city = item.data;
+      if (searchInput) {
+        searchInput.value = city.name;
+        updateClearButton();
+        updateRadiusCityChipLabel();
+      }
+
+      // Se il filtro attivo è raggio-50, o se la città ha coordinate note, aggiorna subito il raggio
+      if (city.coordinates) {
+        window.searchedLocation = {
+          lat: city.coordinates.lat,
+          lng: city.coordinates.lng,
+          name: city.name,
+          rawQuery: city.name.toLowerCase()
+        };
+        if (chipRadiusCity) {
+          chipRadiusCity.textContent = `🧭 Entro 50km da ${city.name}`;
+        }
+      }
+
+      hideSearchPreview();
+      paginaCorrente = 1;
+      renderStrutture(filtra(strutture));
+    } else if (item.type === 'structure') {
+      const st = item.data;
+      if (searchInput) {
+        searchInput.value = st.name;
+        updateClearButton();
+        updateRadiusCityChipLabel();
+      }
+
+      hideSearchPreview();
+      paginaCorrente = 1;
+      renderStrutture(filtra(strutture));
+
+      // Apri direttamente la scheda dettagliata della struttura selezionata
+      if (typeof mostraSchedaCompleta === 'function' && st.id) {
+        mostraSchedaCompleta(st.id);
+      }
+    }
+  };
+
+  const updateSearchPreview = (query) => {
+    if (!searchPreviewDropdown || !searchInput) return;
+
+    const raw = query ? query.trim() : '';
+    if (raw.length === 0) {
+      hideSearchPreview();
+      return;
+    }
+
+    const cityDb = window.CITY_COORDINATES || (typeof CITY_COORDINATES !== 'undefined' ? CITY_COORDINATES : {});
+    const suggestions = generateSearchSuggestions(raw, strutture || window.strutture || [], cityDb, {
+      maxCities: 5,
+      maxStructures: 6
+    });
+
+    if (suggestions.totalMatches === 0) {
+      searchPreviewDropdown.innerHTML = `
+        <div class="preview-empty-state">
+          🔍 Nessun suggerimento per "<strong>${escapeHtmlHelper(raw)}</strong>"
+          <div style="font-size: 0.75rem; color: var(--text-tertiary, #888); margin-top: 4px;">Premi Invio per cercare nel testo</div>
+        </div>
+      `;
+      searchPreviewDropdown.classList.remove('hidden');
+      searchInput.setAttribute('aria-expanded', 'true');
+      selectedPreviewIndex = -1;
+      currentPreviewItems = [];
+      return;
+    }
+
+    let html = '';
+    currentPreviewItems = [];
+    let itemIdx = 0;
+
+    // 1. SEZIONE CITTÀ O LOCALITÀ (SEMPRE AL PRIMO POSTO)
+    if (suggestions.cities.length > 0) {
+      html += `
+        <div class="preview-section-header">
+          <span>📍 Città o località</span>
+        </div>
+        <div class="preview-section-items">
+      `;
+
+      suggestions.cities.forEach(city => {
+        const cityId = `preview-item-${itemIdx}`;
+        currentPreviewItems.push({
+          type: 'city',
+          data: city,
+          elementId: cityId
+        });
+
+        const titleHtml = highlightMatch(city.name, raw);
+        const provTag = city.province ? ` (${city.province})` : '';
+        const subtitle = city.structureCount > 0
+          ? `🏕️ ${city.structureCount} ${city.structureCount === 1 ? 'struttura scout' : 'strutture scout'}`
+          : `Comune italiano`;
+
+        html += `
+          <div class="preview-item" id="${cityId}" role="option" data-index="${itemIdx}" aria-selected="false">
+            <div class="preview-item-main">
+              <span class="preview-icon">📍</span>
+              <div class="preview-item-text">
+                <div class="preview-item-title">${titleHtml}${provTag}</div>
+                <div class="preview-item-subtitle">${subtitle}</div>
+              </div>
+            </div>
+            <div class="preview-item-action">
+              <span class="preview-badge">Cerca città ➔</span>
+            </div>
+          </div>
+        `;
+        itemIdx++;
+      });
+
+      html += `</div>`;
+    }
+
+    // 2. SEZIONE NOME STRUTTURA (SEMPRE AL SECONDO POSTO)
+    if (suggestions.structures.length > 0) {
+      html += `
+        <div class="preview-section-header">
+          <span>🏕️ Nome struttura</span>
+        </div>
+        <div class="preview-section-items">
+      `;
+
+      suggestions.structures.forEach(st => {
+        const stId = `preview-item-${itemIdx}`;
+        currentPreviewItems.push({
+          type: 'structure',
+          data: st,
+          elementId: stId
+        });
+
+        const titleHtml = highlightMatch(st.name, raw);
+        const tags = [
+          st.casa ? '🏠 Casa' : '',
+          st.terreno ? '🌲 Terreno' : '',
+          st.postiLetto ? `🛌 ${st.postiLetto} posti` : ''
+        ].filter(Boolean).join(' • ');
+
+        const distBadge = st.distanzaKm != null ? ` • 📍 ${st.distanzaKm} km` : '';
+        const subtitle = `${st.luogo ? st.luogo + (st.prov ? ' (' + st.prov + ')' : '') : 'Italia'}${tags ? ' • ' + tags : ''}${distBadge}`;
+
+        html += `
+          <div class="preview-item" id="${stId}" role="option" data-index="${itemIdx}" aria-selected="false">
+            <div class="preview-item-main">
+              <span class="preview-icon">${st.casa && st.terreno ? '🏕️' : st.casa ? '🏡' : '🌲'}</span>
+              <div class="preview-item-text">
+                <div class="preview-item-title">${titleHtml}</div>
+                <div class="preview-item-subtitle">${subtitle}</div>
+              </div>
+            </div>
+            <div class="preview-item-action">
+              <span class="preview-badge">Apri scheda ➔</span>
+            </div>
+          </div>
+        `;
+        itemIdx++;
+      });
+
+      html += `</div>`;
+    }
+
+    searchPreviewDropdown.innerHTML = html;
+    searchPreviewDropdown.classList.remove('hidden');
+    searchInput.setAttribute('aria-expanded', 'true');
+    selectedPreviewIndex = -1;
+
+    // Collega listener click agli elementi renderizzati
+    const renderedItems = searchPreviewDropdown.querySelectorAll('.preview-item');
+    renderedItems.forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(el.dataset.index, 10);
+        if (!isNaN(idx) && currentPreviewItems[idx]) {
+          selectPreviewItem(currentPreviewItems[idx]);
+        }
+      });
+    });
+  };
 
   // Aggiorna l'etichetta del chip "Entro 50km da..." in tempo reale
   const updateRadiusCityChipLabel = () => {
@@ -12142,23 +12380,25 @@ function initializeUIEventListeners() {
     }
   };
 
-  if (searchInput) {
-    // Funzione per aggiornare la visibilità del pulsante clear
-    const updateClearButton = () => {
-      if (clearSearchBtn) {
-        if (searchInput.value.trim().length > 0) {
-          clearSearchBtn.style.display = 'flex';
-        } else {
-          clearSearchBtn.style.display = 'none';
-        }
+  // Funzione per aggiornare la visibilità del pulsante clear
+  const updateClearButton = () => {
+    if (clearSearchBtn) {
+      if (searchInput && searchInput.value.trim().length > 0) {
+        clearSearchBtn.style.display = 'flex';
+      } else {
+        clearSearchBtn.style.display = 'none';
       }
-    };
+    }
+  };
 
+  if (searchInput) {
     let searchDebounceTimer = null;
+
     searchInput.addEventListener('input', () => {
       paginaCorrente = 1;
       updateClearButton();
       updateRadiusCityChipLabel();
+      updateSearchPreview(searchInput.value);
 
       // Se è attivo il filtro rapido raggio-50, risolvi dinamicamente la nuova località
       if (window.activeQuickFilter === 'raggio-50') {
@@ -12182,9 +12422,37 @@ function initializeUIEventListeners() {
       }
     });
 
+    searchInput.addEventListener('focus', () => {
+      if (searchInput.value.trim().length > 0) {
+        updateSearchPreview(searchInput.value);
+      }
+    });
+
     searchInput.addEventListener('keydown', async (e) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
+        if (!searchPreviewDropdown || searchPreviewDropdown.classList.contains('hidden')) {
+          updateSearchPreview(searchInput.value);
+          return;
+        }
+        if (currentPreviewItems.length > 0) {
+          selectedPreviewIndex = (selectedPreviewIndex + 1) % currentPreviewItems.length;
+          highlightPreviewItem(selectedPreviewIndex);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (currentPreviewItems.length > 0) {
+          selectedPreviewIndex = selectedPreviewIndex <= 0 ? currentPreviewItems.length - 1 : selectedPreviewIndex - 1;
+          highlightPreviewItem(selectedPreviewIndex);
+        }
+      } else if (e.key === 'Enter') {
+        if (selectedPreviewIndex >= 0 && currentPreviewItems[selectedPreviewIndex]) {
+          e.preventDefault();
+          selectPreviewItem(currentPreviewItems[selectedPreviewIndex]);
+          return;
+        }
+
+        hideSearchPreview();
         const query = searchInput.value.trim();
         if (window.activeQuickFilter === 'raggio-50' && query) {
           const loc = await resolveLocationCoordinates(query);
@@ -12195,6 +12463,17 @@ function initializeUIEventListeners() {
             renderStrutture(filtra(strutture));
           }
         }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        hideSearchPreview();
+      }
+    });
+
+    // Chiudi dropdown preview quando si clicca fuori da search-container
+    document.addEventListener('click', (e) => {
+      const searchContainer = document.querySelector('.search-container');
+      if (searchContainer && !searchContainer.contains(e.target)) {
+        hideSearchPreview();
       }
     });
 
@@ -12211,6 +12490,7 @@ function initializeUIEventListeners() {
         searchInput.focus();
         updateClearButton();
         updateRadiusCityChipLabel();
+        hideSearchPreview();
 
         // Se era attivo il filtro per raggio località, reimposta su 'all'
         if (window.activeQuickFilter === 'raggio-50') {
