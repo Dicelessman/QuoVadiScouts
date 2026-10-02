@@ -3430,69 +3430,151 @@ input:checked + .toggle-slider:before {
   justify-content: center;
 }
 
-/* Specific Swatches */
+/* ============================================================
+   Specific Swatches — colori verificati contro le tile live
+   ============================================================ */
+
+/* --- SWATCH HELPER: strip orizzontale con shield stile Waymarked Trails --- */
+.legend-swatch-wide {
+  flex-shrink: 0;
+  width: 34px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legend-shield-strip {
+  width: 34px;
+  height: 6px;
+  border-radius: 2px;
+  display: block;
+}
+
+/* --- FERROVIA / OpenRailwayMap standard.mss --- */
+
+/* Alta velocità: #ff0c00 */
+.legend-line-rail-highspeed {
+  width: 26px;
+  height: 5px;
+  background: #ff0c00;
+  border-radius: 2px;
+  box-shadow: 0 0 2px rgba(255, 12, 0, 0.5);
+}
+
+/* Linea principale: #ff8100 */
 .legend-line-rail-main {
   width: 26px;
   height: 4px;
-  background: #d90429;
+  background: #ff8100;
   border-radius: 2px;
-  box-shadow: 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
-.legend-line-rail-secondary {
+/* Linea secondaria / branch: #c4b600 */
+.legend-line-rail-branch {
   width: 26px;
   height: 3px;
-  background: #10b981;
+  background: #c4b600;
   border-radius: 2px;
 }
 
-.legend-line-rail-service {
+/* Tram: #d877b8 */
+.legend-line-rail-tram {
   width: 26px;
-  height: 0;
-  border-top: 2px dashed #9ca3af;
+  height: 3px;
+  background: #d877b8;
+  border-radius: 2px;
 }
 
+/* Metro/Subway: #0300c3 */
+.legend-line-rail-metro {
+  width: 26px;
+  height: 4px;
+  background: #0300c3;
+  border-radius: 2px;
+}
+
+/* Light rail: #00bd14 */
+.legend-line-rail-lightrail {
+  width: 26px;
+  height: 3px;
+  background: #00bd14;
+  border-radius: 2px;
+}
+
+/* Industriale / Spur: #87491d */
+.legend-line-rail-industrial {
+  width: 26px;
+  height: 0;
+  border-top: 2px dashed #87491d;
+}
+
+/* Dismessa / Abbandonata: #70584d */
+.legend-line-rail-disused {
+  width: 26px;
+  height: 0;
+  border-top: 2px dashed #70584d;
+}
+
+/* Stazione / fermata */
 .legend-point-rail-station {
   width: 10px;
   height: 10px;
-  background: #111827;
+  background: #333333;
   border: 2px solid #ffffff;
   border-radius: 2px;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 1px #333333;
 }
 
+/* --- SENTIERI ESCURSIONISTICI / Waymarked Trails Hiking ---
+   I colori degli shield variano per ogni percorso secondo l'osmc:symbol OSM.
+   Le linee sul terreno usano lo stesso colore dello shield. */
+
+/* Linea esempio per itinerari lunghi (bianco-rosso tipico CAI/GR) */
 .legend-line-hike-major {
   width: 26px;
-  height: 4px;
-  background: #dc2626;
-  border-radius: 2px;
+  height: 5px;
+  background: linear-gradient(90deg, #ffffff 25%, #e63946 25%, #e63946 75%, #ffffff 75%);
+  border-radius: 1px;
+  border: 1px solid #ccc;
 }
 
+/* Linea esempio per sentieri regionali (banda colorata tipica) */
 .legend-line-hike-regional {
   width: 26px;
+  height: 4px;
+  background: linear-gradient(90deg, #ea580c 40%, #fbbf24 40%, #fbbf24 60%, #ea580c 60%);
+  border-radius: 1px;
+}
+
+/* Linea locale — monocolore tipico */
+.legend-line-hike-local {
+  width: 26px;
   height: 3px;
-  background: #ea580c;
+  background: #16a34a;
   border-radius: 2px;
 }
 
-.legend-badge-cai {
-  background: #dc2626;
-  color: #ffffff;
-  font-size: 8px;
-  font-weight: 800;
-  padding: 1px 3px;
-  border-radius: 2px;
-  line-height: 1;
-  letter-spacing: 0.5px;
-}
+/* --- PISTE CICLABILI / Waymarked Trails Cycling ---
+   Shield con numero/sigla cicloviaria — colori variabili per itinerario */
 
+/* Ciclovie nazionali / EuroVelo — tipicamente blu intenso */
 .legend-line-cycle-national {
   width: 26px;
-  height: 4px;
-  background: #2563eb;
+  height: 5px;
+  background: #1d4ed8;
   border-radius: 2px;
 }
 
+/* Itinerari regionali — blu medio */
+.legend-line-cycle-regional {
+  width: 26px;
+  height: 4px;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+
+/* Piste locali / urbane — ciano/azzurro */
 .legend-line-cycle-local {
   width: 26px;
   height: 3px;
@@ -3500,38 +3582,41 @@ input:checked + .toggle-slider:before {
   border-radius: 2px;
 }
 
-.legend-badge-cycle {
-  background: #2563eb;
-  color: #ffffff;
-  font-size: 8px;
-  font-weight: 800;
-  padding: 1px 3px;
-  border-radius: 2px;
-  line-height: 1;
-}
+/* --- PERCORSI MTB / Waymarked Trails MTB ---
+   Shield con numero/sigla MTB — colori variabili per tracciato */
 
-.legend-line-mtb-main {
+/* Itinerari MTB ufficiali — ambra/marrone */
+.legend-line-mtb-major {
   width: 26px;
-  height: 4px;
-  background: #b45309;
+  height: 5px;
+  background: #d97706;
   border-radius: 2px;
 }
 
+/* Singletrack & varianti — marrone tratteggiato */
 .legend-line-mtb-track {
   width: 26px;
   height: 0;
-  border-top: 3px dashed #d97706;
+  border-top: 3px dashed #92400e;
 }
 
-.legend-badge-mtb {
-  background: #b45309;
-  color: #ffffff;
-  font-size: 8px;
-  font-weight: 800;
-  padding: 1px 3px;
-  border-radius: 2px;
-  line-height: 1;
+/* Badge difficoltà MTB — pallino colore difficoltà */
+.legend-badge-mtb-diff {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: conic-gradient(#16a34a 0 33%, #f59e0b 33% 66%, #dc2626 66% 100%);
+  border: 1px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
 }
+
+/* Legacy — manteniamo per retrocompatibilità */
+.legend-line-rail-secondary { width: 26px; height: 3px; background: #c4b600; border-radius: 2px; }
+.legend-line-rail-service { width: 26px; height: 0; border-top: 2px dashed #9ca3af; }
+.legend-badge-cai { background: #e63946; color: #fff; font-size: 8px; font-weight: 800; padding: 1px 3px; border-radius: 2px; line-height: 1; letter-spacing: 0.5px; }
+.legend-badge-cycle { background: #1d4ed8; color: #fff; font-size: 8px; font-weight: 800; padding: 1px 3px; border-radius: 2px; line-height: 1; }
+.legend-line-mtb-main { width: 26px; height: 4px; background: #d97706; border-radius: 2px; }
+.legend-badge-mtb { background: #92400e; color: #fff; font-size: 8px; font-weight: 800; padding: 1px 3px; border-radius: 2px; line-height: 1; }
 
 .legend-footer {
   margin-top: 8px;

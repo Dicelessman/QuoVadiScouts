@@ -65,8 +65,14 @@ test('renderLegendHtml generates HTML markup with swatches and labels for active
   assert.ok(html.includes('data-layer-id="cycling"'));
   assert.ok(html.includes('Rete Ferroviaria'));
   assert.ok(html.includes('Piste Ciclabili'));
-  assert.ok(html.includes('legend-line-rail-main'));
+  // Railway: accurate ORM colors — highspeed, main, branch, tram, metro, lightrail, industrial, disused
+  assert.ok(html.includes('legend-line-rail-highspeed'), 'should include AV swatch');
+  assert.ok(html.includes('legend-line-rail-main'), 'should include main line swatch');
+  assert.ok(html.includes('legend-line-rail-branch'), 'should include branch line swatch');
+  assert.ok(html.includes('legend-line-rail-tram'), 'should include tram swatch');
+  // Cycling: accurate shield-based colors
   assert.ok(html.includes('legend-line-cycle-national'));
+  assert.ok(html.includes('legend-line-cycle-regional'));
   // Should NOT contain unselected layers
   assert.ok(!html.includes('data-layer-id="hiking"'));
   assert.ok(!html.includes('data-layer-id="mtb"'));
@@ -111,9 +117,60 @@ test('styles.css contains rules for map-overlay-legend, swatches, and dark mode'
   assert.ok(css.includes('.map-overlay-legend.hidden'));
   assert.ok(css.includes('.map-overlay-legend.minimized'));
   assert.ok(css.includes('[data-theme="dark"] .map-overlay-legend'));
-  assert.ok(css.includes('.legend-line-rail-main'));
+  // Railway swatches — accurate ORM colors
+  assert.ok(css.includes('.legend-line-rail-highspeed'), 'AV swatch #ff0c00');
+  assert.ok(css.includes('.legend-line-rail-main'), 'main line swatch #ff8100');
+  assert.ok(css.includes('.legend-line-rail-branch'), 'branch swatch #c4b600');
+  assert.ok(css.includes('.legend-line-rail-tram'), 'tram swatch #d877b8');
+  assert.ok(css.includes('.legend-line-rail-metro'), 'metro swatch #0300c3');
+  assert.ok(css.includes('.legend-line-rail-lightrail'), 'light rail swatch #00bd14');
+  assert.ok(css.includes('.legend-line-rail-industrial'), 'industrial swatch #87491d');
+  assert.ok(css.includes('.legend-line-rail-disused'), 'disused swatch #70584d');
+  // Hiking / cycling / MTB
   assert.ok(css.includes('.legend-line-hike-major'));
+  assert.ok(css.includes('.legend-line-hike-regional'));
   assert.ok(css.includes('.legend-line-cycle-national'));
-  assert.ok(css.includes('.legend-line-mtb-main'));
+  assert.ok(css.includes('.legend-line-cycle-regional'));
+  assert.ok(css.includes('.legend-line-mtb-major'));
   assert.ok(css.includes('.main-map-container.collapsed #mapOverlayLegend'));
+});
+
+test('railway legend has all 9 correct entries matching OpenRailwayMap CartoCSS colors', () => {
+  const railwayLegend = MAP_OVERLAY_LEGENDS.railway;
+  assert.ok(railwayLegend, 'Railway legend should exist');
+  const types = railwayLegend.items.map(i => i.type);
+  assert.ok(types.includes('rail-highspeed'), 'should have AV (highspeed)');
+  assert.ok(types.includes('rail-main'), 'should have main line');
+  assert.ok(types.includes('rail-branch'), 'should have branch/secondary');
+  assert.ok(types.includes('rail-tram'), 'should have tram');
+  assert.ok(types.includes('rail-metro'), 'should have metro/subway');
+  assert.ok(types.includes('rail-lightrail'), 'should have light rail');
+  assert.ok(types.includes('rail-industrial'), 'should have industrial/spur');
+  assert.ok(types.includes('rail-disused'), 'should have disused/abandoned');
+  assert.ok(types.includes('rail-station'), 'should have station points');
+});
+
+test('hiking legend explains dynamic shield system with 4 entries', () => {
+  const hikingLegend = MAP_OVERLAY_LEGENDS.hiking;
+  assert.ok(hikingLegend, 'Hiking legend should exist');
+  assert.ok(hikingLegend.items.length >= 4, 'Should have at least 4 items');
+  const types = hikingLegend.items.map(i => i.type);
+  assert.ok(types.includes('hike-shield-info'), 'should explain shield system');
+});
+
+test('cycling legend has shield info + 3 tier entries', () => {
+  const cyclingLegend = MAP_OVERLAY_LEGENDS.cycling;
+  assert.ok(cyclingLegend.items.length >= 4);
+  const types = cyclingLegend.items.map(i => i.type);
+  assert.ok(types.includes('cycle-national'));
+  assert.ok(types.includes('cycle-regional'));
+  assert.ok(types.includes('cycle-local'));
+});
+
+test('MTB legend has shield info + difficulty indicator', () => {
+  const mtbLegend = MAP_OVERLAY_LEGENDS.mtb;
+  assert.ok(mtbLegend.items.length >= 4);
+  const types = mtbLegend.items.map(i => i.type);
+  assert.ok(types.includes('mtb-shield-info'));
+  assert.ok(types.includes('mtb-difficulty'));
 });

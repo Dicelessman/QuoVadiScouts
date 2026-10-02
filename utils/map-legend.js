@@ -1,11 +1,24 @@
 /**
  * Utility e configurazione per la legenda dinamica dei layer overlay della mappa.
- * Gli overlay sono DINAMICI (tile server live basati su OpenStreetMap e Waymarked Trails),
- * non file GeoJSON o layer statici memorizzati localmente.
+ *
+ * Gli overlay sono DINAMICI (tile server live basati su OpenStreetMap e Waymarked Trails).
+ *
+ * Colori OpenRailwayMap (standard.mss — CartoCSS ufficiale):
+ *   Alta velocità:   #ff0c00 (rosso vivo)
+ *   Linea principale:#ff8100 (arancione)
+ *   Linea secondaria:#c4b600 (giallo)
+ *   Tram:            #d877b8 (rosa/magenta)
+ *   Metro:           #0300c3 (blu scuro)
+ *   Light rail:      #00bd14 (verde)
+ *   Industriale/Spur:#87491d (marrone)
+ *   Dismessa:        #70584d (marrone grigio)
+ *
+ * Colori Waymarked Trails: variano dinamicamente per ogni percorso in base all'osmc:symbol
+ * del database OSM — la legenda descrive il sistema di shield, non colori fissi per categoria.
  */
 
 /**
- * Metadati tecnici sui layer overlay per verificare natura dinamica e fonti
+ * Metadati tecnici sui layer overlay.
  */
 export const LAYER_METADATA = {
   railway: {
@@ -51,31 +64,64 @@ export const LAYER_METADATA = {
 };
 
 /**
- * Definizioni per la legenda visiva di ciascun layer
+ * Definizioni per la legenda visiva di ciascun layer.
+ * Colori ferroviari da standard.mss (CartoCSS ufficiale OpenRailwayMap):
+ *   https://github.com/OpenRailwayMap/OpenRailwayMap-CartoCSS/blob/master/standard.mss
  */
 export const MAP_OVERLAY_LEGENDS = {
+
   railway: {
     id: 'railway',
     title: '🚂 Rete Ferroviaria',
     providerName: 'OpenRailwayMap',
     items: [
       {
+        type: 'rail-highspeed',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-highspeed"></span></span>',
+        label: 'Alta velocità',
+        subtext: 'Linee AV e TAV — usage=highspeed (#ff0c00)'
+      },
+      {
         type: 'rail-main',
         swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-main"></span></span>',
-        label: 'Linee principali & AV',
-        subtext: 'Alta velocità ed assi ferroviari primari'
+        label: 'Linea principale',
+        subtext: 'Linee a lungo percorso — usage=main (#ff8100)'
       },
       {
-        type: 'rail-secondary',
-        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-secondary"></span></span>',
-        label: 'Linee secondarie & regionali',
-        subtext: 'Linee a traffico regionale e locale'
+        type: 'rail-branch',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-branch"></span></span>',
+        label: 'Linea secondaria / regionale',
+        subtext: 'Linee locali e a binario singolo — usage=branch (#c4b600)'
       },
       {
-        type: 'rail-service',
-        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-service"></span></span>',
-        label: 'Scali merci & raccordi',
-        subtext: 'Binari di servizio e industriali'
+        type: 'rail-tram',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-tram"></span></span>',
+        label: 'Tram',
+        subtext: 'Tramvie urbane — railway=tram (#d877b8)'
+      },
+      {
+        type: 'rail-metro',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-metro"></span></span>',
+        label: 'Metro / Subway',
+        subtext: 'Metropolitane — railway=subway (#0300c3)'
+      },
+      {
+        type: 'rail-lightrail',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-lightrail"></span></span>',
+        label: 'Light Rail',
+        subtext: 'Ferrovie urbane leggere — railway=light_rail (#00bd14)'
+      },
+      {
+        type: 'rail-industrial',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-industrial"></span></span>',
+        label: 'Raccordi industriali / Spur',
+        subtext: 'Binari di servizio e raccordi merci (#87491d)'
+      },
+      {
+        type: 'rail-disused',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-rail-disused"></span></span>',
+        label: 'Dismessa / Abbandonata',
+        subtext: 'Linee fuori servizio o abbandonate (#70584d)'
       },
       {
         type: 'rail-station',
@@ -85,78 +131,99 @@ export const MAP_OVERLAY_LEGENDS = {
       }
     ]
   },
+
   hiking: {
     id: 'hiking',
     title: '🥾 Sentieri Escursionistici',
     providerName: 'Waymarked Trails Hiking',
     items: [
       {
+        type: 'hike-shield-info',
+        swatchHtml: '<span class="legend-swatch-wide"><span class="legend-shield-strip" style="background:linear-gradient(90deg,#e63946 33%,#fff 33%,#fff 67%,#e63946 67%)"></span></span>',
+        label: 'Shield segnavia (colori variabili)',
+        subtext: 'Ogni percorso mostra lo shield dell\'osmc:symbol OSM — il colore rispecchia la segnaletica reale sul terreno'
+      },
+      {
         type: 'hike-major',
         swatchHtml: '<span class="legend-swatch"><span class="legend-line-hike-major"></span></span>',
-        label: 'Itinerari Nazionali & Cammini',
-        subtext: 'Sentiero Italia, Francigena, Grandi Randonnée'
+        label: 'Itinerari lunghi & cammini',
+        subtext: 'Sentiero Italia, Via Francigena, GR — percorsi con shield rosso/bianco'
       },
       {
         type: 'hike-regional',
         swatchHtml: '<span class="legend-swatch"><span class="legend-line-hike-regional"></span></span>',
-        label: 'Sentieri regionali & reti CAI',
-        subtext: 'Tracciati escursionistici con numero'
+        label: 'Percorsi regionali & CAI',
+        subtext: 'Reti escursionistiche con numero CAI — shield con banda colorata'
       },
       {
-        type: 'hike-cai',
-        swatchHtml: '<span class="legend-swatch"><span class="legend-badge-cai">CAI</span></span>',
-        label: 'Segnavia e codici sentiero',
-        subtext: 'Sigle tappe e segnaletica ufficiale'
+        type: 'hike-local',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-hike-local"></span></span>',
+        label: 'Sentieri locali & anelli',
+        subtext: 'Percorsi di zona senza numerazione fissa'
       }
     ]
   },
+
   cycling: {
     id: 'cycling',
     title: '🚴 Piste Ciclabili',
     providerName: 'Waymarked Trails Cycling',
     items: [
       {
+        type: 'cycle-shield-info',
+        swatchHtml: '<span class="legend-swatch-wide"><span class="legend-shield-strip" style="background:linear-gradient(90deg,#1d4ed8 0%,#1d4ed8 40%,#60a5fa 40%,#60a5fa 60%,#1d4ed8 60%)"></span></span>',
+        label: 'Shield itinerario (colori variabili)',
+        subtext: 'Ogni percorso mostra il numero/sigla ufficiale — EuroVelo, ciclovie nazionali e locali'
+      },
+      {
         type: 'cycle-national',
         swatchHtml: '<span class="legend-swatch"><span class="legend-line-cycle-national"></span></span>',
-        label: 'Ciclovie Nazionali & EuroVelo',
-        subtext: 'Grandi itinerari cicloturistici continui'
+        label: 'Ciclovie nazionali & EuroVelo',
+        subtext: 'Grandi assi cicloturistici continui'
+      },
+      {
+        type: 'cycle-regional',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-cycle-regional"></span></span>',
+        label: 'Itinerari regionali',
+        subtext: 'Percorsi ciclabili di media distanza'
       },
       {
         type: 'cycle-local',
         swatchHtml: '<span class="legend-swatch"><span class="legend-line-cycle-local"></span></span>',
-        label: 'Piste ciclabili regionali & urbane',
-        subtext: 'Vie verdi e collegamenti comunali'
-      },
-      {
-        type: 'cycle-badge',
-        swatchHtml: '<span class="legend-swatch"><span class="legend-badge-cycle">EV</span></span>',
-        label: 'Segnavia cicloturistici',
-        subtext: 'Sigle percorso e frecce direzionali'
+        label: 'Piste locali & urbane',
+        subtext: 'Greenway, vie verdi e piste comunali'
       }
     ]
   },
+
   mtb: {
     id: 'mtb',
     title: '🚵 Percorsi MTB',
     providerName: 'Waymarked Trails MTB',
     items: [
       {
-        type: 'mtb-main',
-        swatchHtml: '<span class="legend-swatch"><span class="legend-line-mtb-main"></span></span>',
-        label: 'Itinerari Mountain Bike ufficiali',
-        subtext: 'Percorsi fuoristrada tabellati'
+        type: 'mtb-shield-info',
+        swatchHtml: '<span class="legend-swatch-wide"><span class="legend-shield-strip" style="background:linear-gradient(90deg,#92400e 0%,#d97706 50%,#92400e 100%)"></span></span>',
+        label: 'Shield MTB (colori variabili)',
+        subtext: 'Percorsi con shield che rispecchia la classificazione locale del tracciato'
+      },
+      {
+        type: 'mtb-major',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-line-mtb-major"></span></span>',
+        label: 'Itinerari MTB ufficiali',
+        subtext: 'Percorsi tabellati e numerati'
       },
       {
         type: 'mtb-track',
         swatchHtml: '<span class="legend-swatch"><span class="legend-line-mtb-track"></span></span>',
-        label: 'Singletrack & varianti tecniche',
-        subtext: 'Sentieri tecnici per mountain bike'
+        label: 'Singletrack & varianti',
+        subtext: 'Sterrati tecnici e fuoristrada'
       },
       {
-        type: 'mtb-badge',
-        swatchHtml: '<span class="legend-swatch"><span class="legend-badge-mtb">MTB</span></span>',
-        label: 'Segnaletica percorsi e grado',
-        subtext: 'Livelli di difficoltà e indicazioni'
+        type: 'mtb-difficulty',
+        swatchHtml: '<span class="legend-swatch"><span class="legend-badge-mtb-diff"></span></span>',
+        label: 'Grado di difficoltà',
+        subtext: 'Livello 0–6 secondo scala IMBA/MTB project'
       }
     ]
   }
@@ -164,8 +231,6 @@ export const MAP_OVERLAY_LEGENDS = {
 
 /**
  * Verifica se un overlay specifico è dinamico.
- * @param {string} layerId
- * @returns {boolean}
  */
 export function isLayerOverlayDynamic(layerId) {
   return LAYER_METADATA[layerId]?.isDynamic === true;
@@ -173,8 +238,6 @@ export function isLayerOverlayDynamic(layerId) {
 
 /**
  * Restituisce i dati di legenda per i layer attualmente attivi.
- * @param {string[]} activeLayerIds - Array di ID dei layer attivi (es. ['railway', 'hiking'])
- * @returns {Array} Sezioni di legenda attive
  */
 export function getActiveLegendData(activeLayerIds) {
   if (!Array.isArray(activeLayerIds) || activeLayerIds.length === 0) {
@@ -187,8 +250,6 @@ export function getActiveLegendData(activeLayerIds) {
 
 /**
  * Genera l'HTML dinamico per la legenda in base ai layer attivi.
- * @param {string[]} activeLayerIds
- * @returns {string} Markup HTML
  */
 export function renderLegendHtml(activeLayerIds) {
   const activeSections = getActiveLegendData(activeLayerIds);
