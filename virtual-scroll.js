@@ -130,6 +130,9 @@ class VirtualScroller {
   
   // Stima quanti elementi per riga in base alla larghezza dello schermo
   getEstimatedItemsPerRow() {
+    if (this.container && (this.container.classList.contains('list-mode') || this.container.classList.contains('results-container--list')) || document.body.classList.contains('list-view')) {
+      return 1;
+    }
     const width = window.innerWidth;
     if (width >= 1280) return 4;
     if (width >= 1024) return 3;

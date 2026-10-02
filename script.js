@@ -512,6 +512,178 @@ function getCardActionsHTML(s) {
   `;
 }
 
+// === Builder unificato per la scheda struttura (Card / Elenco) ===
+function buildStructureCardElement(s, isList, isInElenco, idx) {
+  const card = document.createElement("div");
+  card.className = isList ? "card structure-card list-row" : "card structure-card";
+  card.dataset.id = s.id;
+
+  const coordLat = s.coordinate?.lat || s.coordinate_lat;
+  const coordLng = s.coordinate?.lng || s.coordinate_lng;
+  const hasCoords = coordLat && coordLng;
+  const cleanPhone = cleanPhoneNumber(s.Contatto);
+
+  if (isList) {
+    // --- MODALITÀ ELENCO (LIST VIEW): Riga orizzontale compatta ---
+    let typeClass = 'house';
+    let typeIcon = '<i class="fas fa-home"></i>';
+    if (s.Casa && s.Terreno) {
+      typeClass = 'both';
+      typeIcon = '<i class="fas fa-campground"></i>';
+    } else if (s.Terreno) {
+      typeClass = 'land';
+      typeIcon = '<i class="fas fa-tree"></i>';
+    }
+
+    card.innerHTML = `
+      <div class="list-item-container">
+        <div class="list-item-left">
+          <div class="list-type-badge ${typeClass}" title="${s.Casa && s.Terreno ? 'Casa e Terreno' : (s.Terreno ? 'Terreno' : 'Casa')}">
+            ${typeIcon}
+          </div>
+          <div class="list-details">
+            <div class="list-title-row">
+              <h3 class="list-title clickable-title" data-id="${s.id}" title="${s.Struttura || ''}">${s.Struttura || "Suggerisci nome"}</h3>
+              ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+              ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
+              ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
+              ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
+            </div>
+            <div class="list-meta-row">
+              <span class="list-meta-item"><i class="fas fa-map-marker-alt"></i> ${s.Luogo || 'Luogo non specificato'} (${s.Prov || '-'})</span>
+              ${s.Letti ? `<span class="list-meta-item"><i class="fas fa-bed"></i> ${s.Letti} posti</span>` : ''}
+              ${s.Branco ? `<span class="list-meta-item" title="Posti Branco">🐺 ${s.Branco}</span>` : ''}
+              ${s.Reparto ? `<span class="list-meta-item" title="Posti Reparto">⚜️ ${s.Reparto}</span>` : ''}
+              ${s.Compagnia ? `<span class="list-meta-item" title="Posti Clan/Compagnia">🥾 ${s.Compagnia}</span>` : ''}
+              ${cleanPhone ? `<span class="list-meta-item"><i class="fas fa-phone"></i> ${s.Contatto}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="list-item-actions">
+          <button class="list-action-btn view-details" data-id="${s.id}" title="Apri scheda completa">
+            <i class="fas fa-info-circle"></i> Scheda
+          </button>
+          ${cleanPhone ? `
+          <a href="tel:${cleanPhone}" class="list-action-btn call-action" title="Chiama ${s.Contatto}" onclick="event.stopPropagation()">
+            <i class="fas fa-phone-alt"></i>
+          </a>` : ''}
+          ${hasCoords ? `
+          <button class="list-action-btn map-pin-action btn-ghost" data-lat="${coordLat}" data-lng="${coordLng}" title="Mostra su mappa">
+            <i class="fas fa-map-marker-alt"></i>
+          </button>` : ''}
+          <button class="list-action-btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
+            📝
+          </button>
+          <button class="list-action-btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}" title="${isInElenco ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}">
+            ${isInElenco ? '⭐' : '☆'}
+          </button>
+        </div>
+      </div>
+    `;
+  } else {
+    // --- MODALITÀ SCHEDE (CARD VIEW): Card verticale ricca di dettagli ---
+    card.innerHTML = `
+      <div class="card-header">
+        <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
+        <div class="card-actions">
+          <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}" title="${isInElenco ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}">
+            ${isInElenco ? '⭐' : '☆'}
+          </button>
+          <button class="btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
+            📝
+          </button>
+        </div>
+      </div>
+      
+      <div class="card-content">
+        <div class="card-field">
+          <span class="card-field-icon">📍</span>
+          <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
+        </div>
+        
+        ${s.Info ? `<div class="card-field">
+          <span class="card-field-icon">ℹ️</span>
+          <span class="card-field-value">${s.Info}</span>
+        </div>` : ''}
+        
+        <div class="card-badges">
+          ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
+          ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
+          ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
+          ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
+          ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
+          ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
+        </div>
+        
+        ${s.Letti || s.Branco || s.Reparto || s.Compagnia ? `
+        <div class="card-field">
+          <span class="card-field-icon">🏕️</span>
+          <span class="card-field-value">
+            ${s.Letti ? `Letti: ${s.Letti}` : ''}
+            ${s.Branco ? ` • Branco: ${s.Branco}` : ''}
+            ${s.Reparto ? ` • Reparto: ${s.Reparto}` : ''}
+            ${s.Compagnia ? ` • Compagnia: ${s.Compagnia}` : ''}
+          </span>
+        </div>` : ''}
+        
+        ${s.Referente ? `<div class="card-field">
+          <span class="card-field-icon">👤</span>
+          <span class="card-field-value">${s.Referente}</span>
+        </div>` : ''}
+        
+        ${s.Email ? `<div class="card-field">
+          <span class="card-field-icon">📧</span>
+          <span class="card-field-value">${s.Email}</span>
+        </div>` : ''}
+        
+        ${s.Sito ? `<div class="card-field">
+          <span class="card-field-icon">🌐</span>
+          <span class="card-field-value">${s.Sito}</span>
+        </div>` : ''}
+        
+        ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx === 0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
+        
+        ${s.Contatto ? `<div class="card-field">
+          <span class="card-field-icon">📞</span>
+          <span class="card-field-value">${s.Contatto}</span>
+        </div>` : ''}
+        
+        ${s['Ultimo controllo'] ? `<div class="card-field">
+          <span class="card-field-icon">📅</span>
+          <span class="card-field-value">Ultimo controllo: ${s['Ultimo controllo']}</span>
+        </div>` : ''}
+        ${getCardActionsHTML(s)}
+      </div>
+    `;
+  }
+
+  // Event listeners per la card
+  const titleEl = card.querySelector('.clickable-title');
+  if (titleEl) {
+    titleEl.addEventListener('click', () => mostraSchedaCompleta(s.id));
+  }
+  const toggleBtn = card.querySelector('.toggle-elenco');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const id = s.id;
+      if (elencoPersonale.includes(id)) {
+        rimuoviDallElenco(id);
+        toggleBtn.classList.remove('in-elenco');
+        toggleBtn.textContent = '☆';
+        toggleBtn.title = 'Aggiungi ai preferiti';
+      } else {
+        aggiungiAllElenco(id);
+        toggleBtn.classList.add('in-elenco');
+        toggleBtn.textContent = '⭐';
+        toggleBtn.title = 'Rimuovi dai preferiti';
+      }
+    });
+  }
+
+  return card;
+}
+
 function renderStrutture(lista) {
   // Log solo se DEBUG è attivo
   if (DEBUG) {
@@ -543,10 +715,27 @@ function renderStrutture(lista) {
 
   if (container) {
     container.innerHTML = "";
-    // Assicurati che il container mantenga sempre la classe CSS per il grid layout
+    // Assicurati che il container mantenga sempre la classe CSS per il grid o list layout
     if (!container.classList.contains('results-container')) {
       container.classList.add('results-container');
     }
+    if (isListViewMode) {
+      container.classList.add('list-mode', 'results-container--list');
+      document.body.classList.add('list-view');
+    } else {
+      container.classList.remove('list-mode', 'results-container--list');
+      document.body.classList.remove('list-view');
+    }
+  }
+
+  // Pulisci eventuale virtual scroller precedente
+  if (window.currentVirtualScroller) {
+    try {
+      window.currentVirtualScroller.destroy();
+    } catch (e) {
+      console.warn('Virtual scroller cleanup warning:', e);
+    }
+    window.currentVirtualScroller = null;
   }
 
   if (lista.length === 0) {
@@ -562,157 +751,19 @@ function renderStrutture(lista) {
 
   // Se la lista è molto lunga, usa virtual scrolling e mostra tutto senza paginazione
   if (lista.length > 100 && typeof window.createVirtualScroller === 'function' && container) {
-    const buildCardElement = (s) => {
-      const card = document.createElement("div");
-      card.className = "card structure-card";
-      card.dataset.id = s.id;
+    const buildCardElement = (s, idx) => {
       const isInElenco = elencoPersonale.includes(s.id);
-      if (isListViewMode) {
-        card.innerHTML = `
-        <div class="card-header">
-          <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
-          <div class="card-actions">
-            <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}">
-              ${isInElenco ? '⭐' : '☆'}
-            </button>
-            <button class="btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
-              📝
-            </button>
-          </div>
-        </div>
-        
-        <div class="card-content">
-          <div class="card-field">
-            <span class="card-field-icon">📍</span>
-            <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
-          </div>
-          
-          <div class="card-badges">
-            ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
-            ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
-            ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
-            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
-            ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
-            ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
-          </div>
-          
-          ${s.Referente || s.Contatto ? `
-          <div class="card-field">
-            <span class="card-field-icon">👤</span>
-            <span class="card-field-value">${s.Referente || ''} ${s.Contatto ? `• ${s.Contatto}` : ''}</span>
-          </div>` : ''}
-          
-          ${s.Info ? `<div class="card-field">
-            <span class="card-field-icon">ℹ️</span>
-            <span class="card-field-value">${s.Info.length > 100 ? s.Info.substring(0, 100) + '...' : s.Info}</span>
-          </div>` : ''}
-          ${getCardActionsHTML(s)}
-        </div>
-      `;
-      } else {
-        card.innerHTML = `
-        <div class="card-header">
-          <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
-          <div class="card-actions">
-            <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}">
-              ${isInElenco ? '⭐' : '☆'}
-            </button>
-            <button class="btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
-              📝
-            </button>
-          </div>
-        </div>
-        
-        <div class="card-content">
-          <div class="card-field">
-            <span class="card-field-icon">📍</span>
-            <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
-          </div>
-          
-          ${s.Info ? `<div class="card-field">
-            <span class="card-field-icon">ℹ️</span>
-            <span class="card-field-value">${s.Info}</span>
-          </div>` : ''}
-          
-          <div class="card-badges">
-            ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
-            ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
-            ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
-            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
-            ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
-            ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
-          </div>
-          
-          ${s.Letti || s.Branco || s.Reparto || s.Compagnia ? `
-          <div class="card-field">
-            <span class="card-field-icon">🏕️</span>
-            <span class="card-field-value">
-              ${s.Letti ? `Letti: ${s.Letti}` : ''}
-              ${s.Branco ? ` • Branco: ${s.Branco}` : ''}
-              ${s.Reparto ? ` • Reparto: ${s.Reparto}` : ''}
-              ${s.Compagnia ? ` • Compagnia: ${s.Compagnia}` : ''}
-            </span>
-          </div>` : ''}
-          
-          ${s.Referente ? `<div class="card-field">
-            <span class="card-field-icon">👤</span>
-            <span class="card-field-value">${s.Referente}</span>
-          </div>` : ''}
-          
-          ${s.Email ? `<div class="card-field">
-            <span class="card-field-icon">📧</span>
-            <span class="card-field-value">${s.Email}</span>
-          </div>` : ''}
-          
-          ${s.Sito ? `<div class="card-field">
-            <span class="card-field-icon">🌐</span>
-            <span class="card-field-value">${s.Sito}</span>
-          </div>` : ''}
-          
-          ${s.Contatto ? `<div class="card-field">
-            <span class="card-field-icon">📞</span>
-            <span class="card-field-value">${s.Contatto}</span>
-          </div>` : ''}
-          
-          ${s['Ultimo controllo'] ? `<div class="card-field">
-            <span class="card-field-icon">📅</span>
-            <span class="card-field-value">Ultimo controllo: ${s['Ultimo controllo']}</span>
-          </div>` : ''}
-          ${getCardActionsHTML(s)}
-        </div>
-      `;
-      }
-      // Event listeners per la card
-      const titleEl = card.querySelector('.clickable-title');
-      if (titleEl) {
-        titleEl.addEventListener('click', () => mostraSchedaCompleta(s.id));
-      }
-      const toggleBtn = card.querySelector('.toggle-elenco');
-      if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => {
-          const id = s.id;
-          if (elencoPersonale.includes(id)) {
-            rimuoviDallElenco(id);
-            toggleBtn.classList.remove('in-elenco');
-            toggleBtn.textContent = '☆';
-          } else {
-            aggiungiAllElenco(id);
-            toggleBtn.classList.add('in-elenco');
-            toggleBtn.textContent = '⭐';
-          }
-        });
-      }
-      return card;
+      return buildStructureCardElement(s, isListViewMode, isInElenco, idx);
     };
-    // Inizializza virtual scroller
+
     container.style.position = 'relative';
     try {
-      const scroller = window.createVirtualScroller(container, lista, buildCardElement, {
-        placeholderHeight: isListViewMode ? 140 : 220,
+      window.currentVirtualScroller = window.createVirtualScroller(container, lista, buildCardElement, {
+        placeholderHeight: isListViewMode ? 58 : 220,
         minItemsToVirtualize: 20,
         rootMargin: '400px'
       });
-      scroller.init();
+      window.currentVirtualScroller.init();
     } catch (error) {
       console.error('❌ Errore durante inizializzazione virtual scroller:', error);
       throw error;
@@ -728,130 +779,8 @@ function renderStrutture(lista) {
   const listaPagina = lista.slice(inizio, fine);
 
   listaPagina.forEach((s, idx) => {
-    const card = document.createElement("div");
-    card.className = "card structure-card";
-    card.dataset.id = s.id;
     const isInElenco = elencoPersonale.includes(s.id);
-    if (isListViewMode) {
-      // Modalità elenco - layout orizzontale compatto
-      card.innerHTML = `
-        <div class="card-header">
-          <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
-          <div class="card-actions">
-            <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}">
-              ${isInElenco ? '⭐' : '☆'}
-            </button>
-            <button class="btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
-              📝
-            </button>
-          </div>
-        </div>
-        
-        <div class="card-content">
-          <div class="card-field">
-            <span class="card-field-icon">📍</span>
-            <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
-          </div>
-          
-          <div class="card-badges">
-            ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
-            ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
-            ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
-            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
-            ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
-            ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
-          </div>
-          
-          ${s.Referente || s.Contatto ? `
-          <div class="card-field">
-            <span class="card-field-icon">👤</span>
-            <span class="card-field-value">${s.Referente || ''} ${s.Contatto ? `• ${s.Contatto}` : ''}</span>
-          </div>` : ''}
-          
-          ${s.Info ? `<div class="card-field">
-            <span class="card-field-icon">ℹ️</span>
-            <span class="card-field-value">${s.Info.length > 100 ? s.Info.substring(0, 100) + '...' : s.Info}</span>
-          </div>` : ''}
-          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx === 0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
-          ${getCardActionsHTML(s)}
-        </div>
-      `;
-    } else {
-      // Modalità schede - layout verticale completo
-      card.innerHTML = `
-        <div class="card-header">
-          <h3 class="card-title clickable-title" data-id="${s.id}">${s.Struttura || "Suggerisci nome"}</h3>
-          <div class="card-actions">
-            <button class="btn btn-ghost toggle-elenco ${isInElenco ? 'in-elenco' : ''}" data-id="${s.id}">
-              ${isInElenco ? '⭐' : '☆'}
-            </button>
-            <button class="btn btn-ghost notes-btn" onclick="mostraNotePersonali('${s.id}')" title="Note personali">
-              📝
-            </button>
-          </div>
-        </div>
-        
-        <div class="card-content">
-          <div class="card-field">
-            <span class="card-field-icon">📍</span>
-            <span class="card-field-value">${s.Luogo || "Luogo non specificato"}, ${s.Prov || "Provincia non specificata"}</span>
-          </div>
-          
-          ${s.Info ? `<div class="card-field">
-            <span class="card-field-icon">ℹ️</span>
-            <span class="card-field-value">${s.Info}</span>
-          </div>` : ''}
-          
-          <div class="card-badges">
-            ${s.Casa ? '<span class="badge badge-primary">🏠 Casa</span>' : ''}
-            ${s.Terreno ? '<span class="badge badge-primary">🌲 Terreno</span>' : ''}
-            ${s.stato ? `<span class="status-badge ${s.stato}">${getStatoLabel(s.stato)}</span>` : ''}
-            ${s.distanzaKm != null ? `<span class="distance-badge">📍 ${s.distanzaKm} km</span>` : ''}
-            ${s.rating?.average ? `<span class="rating-badge">⭐ ${s.rating.average.toFixed(1)}</span>` : ''}
-            ${s.segnalazioni?.length ? `<span class="reports-badge">⚠️ ${s.segnalazioni.length}</span>` : ''}
-          </div>
-          
-          ${s.Letti || s.Branco || s.Reparto || s.Compagnia ? `
-          <div class="card-field">
-            <span class="card-field-icon">🏕️</span>
-            <span class="card-field-value">
-              ${s.Letti ? `Letti: ${s.Letti}` : ''}
-              ${s.Branco ? ` • Branco: ${s.Branco}` : ''}
-              ${s.Reparto ? ` • Reparto: ${s.Reparto}` : ''}
-              ${s.Compagnia ? ` • Compagnia: ${s.Compagnia}` : ''}
-            </span>
-          </div>` : ''}
-          
-          ${s.Referente ? `<div class="card-field">
-            <span class="card-field-icon">👤</span>
-            <span class="card-field-value">${s.Referente}</span>
-          </div>` : ''}
-          
-          ${s.Email ? `<div class="card-field">
-            <span class="card-field-icon">📧</span>
-            <span class="card-field-value">${s.Email}</span>
-          </div>` : ''}
-          
-          ${s.Sito ? `<div class="card-field">
-            <span class="card-field-icon">🌐</span>
-            <span class="card-field-value">${s.Sito}</span>
-          </div>` : ''}
-          ${s.immagini?.length ? `<img src="${(s.immagini[0]?.thumbnailUrl || s.immagini[0]?.url) ?? ''}" alt="Anteprima" loading="lazy" ${idx === 0 ? 'fetchpriority="high"' : ''} style="display:none;width:0;height:0;"/>` : ''}
-          
-          ${s.Contatto ? `<div class="card-field">
-            <span class="card-field-icon">📞</span>
-            <span class="card-field-value">${s.Contatto}</span>
-          </div>` : ''}
-          
-          ${s['Ultimo controllo'] ? `<div class="card-field">
-            <span class="card-field-icon">📅</span>
-            <span class="card-field-value">Ultimo controllo: ${s['Ultimo controllo']}</span>
-          </div>` : ''}
-          ${getCardActionsHTML(s)}
-        </div>
-      `;
-    }
-
+    const card = buildStructureCardElement(s, isListViewMode, isInElenco, idx);
     container.appendChild(card);
   });
 
@@ -10302,37 +10231,58 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 window.mostraSchedaCompleta = mostraSchedaCompleta;
 
 // === Toggle modalità visualizzazione ===
-function toggleViewMode() {
-  isListViewMode = !isListViewMode;
-
-  // Aggiorna il toggle button
+function updateViewModeUI() {
   const toggleBtn = document.getElementById('viewToggle');
-  const viewIcon = toggleBtn.querySelector('.view-icon');
-  const viewLabel = toggleBtn.querySelector('.view-label');
+  const segCards = document.querySelector('[data-view-seg="cards"]');
+  const segList = document.querySelector('[data-view-seg="list"]');
+  const viewIcon = toggleBtn?.querySelector('.view-icon');
+  const viewLabel = toggleBtn?.querySelector('.view-label');
+  const container = document.getElementById('results');
 
   if (isListViewMode) {
-    viewIcon.textContent = '📄';
-    viewLabel.textContent = 'Schede';
-    toggleBtn.classList.add('active');
-
-    // Aggiungi classe al body per stili CSS
     document.body.classList.add('list-view');
+    if (container) {
+      container.classList.add('list-mode', 'results-container--list');
+    }
+    if (segCards) segCards.classList.remove('active');
+    if (segList) segList.classList.add('active');
+    if (toggleBtn) toggleBtn.classList.add('active');
+    if (viewIcon) viewIcon.textContent = '📄';
+    if (viewLabel) viewLabel.textContent = 'Schede';
   } else {
-    viewIcon.textContent = '📋';
-    viewLabel.textContent = 'Elenco';
-    toggleBtn.classList.remove('active');
-
-    // Rimuovi classe dal body
     document.body.classList.remove('list-view');
+    if (container) {
+      container.classList.remove('list-mode', 'results-container--list');
+    }
+    if (segCards) segCards.classList.add('active');
+    if (segList) segList.classList.remove('active');
+    if (toggleBtn) toggleBtn.classList.remove('active');
+    if (viewIcon) viewIcon.textContent = '📋';
+    if (viewLabel) viewLabel.textContent = 'Elenco';
+  }
+}
+
+function toggleViewMode(targetMode) {
+  if (targetMode === 'list') {
+    isListViewMode = true;
+  } else if (targetMode === 'cards') {
+    isListViewMode = false;
+  } else {
+    isListViewMode = !isListViewMode;
   }
 
-  // Ricarica i risultati con la nuova modalità
-  const listaFiltrata = filtra(strutture);
-  renderStrutture(listaFiltrata);
+  updateViewModeUI();
 
   // Salva preferenza utente
   localStorage.setItem('viewMode', isListViewMode ? 'list' : 'cards');
+
+  // Ricarica i risultati con la nuova modalità
+  const listaFiltrata = typeof filtra === 'function' ? filtra(window.strutture || []) : (window.strutture || []);
+  renderStrutture(listaFiltrata);
 }
+
+window.toggleViewMode = toggleViewMode;
+window.updateViewModeUI = updateViewModeUI;
 
 // === Reset filtri ===
 function resetFiltri() {
@@ -11377,21 +11327,8 @@ async function bootstrapApp() {
 
     // Carica preferenza modalità visualizzazione
     const savedViewMode = localStorage.getItem('viewMode');
-    if (savedViewMode === 'list') {
-      isListViewMode = true;
-      document.body.classList.add('list-view');
-
-      // Aggiorna il toggle button
-      const toggleBtn = document.getElementById('viewToggle');
-      if (toggleBtn) {
-        const viewIcon = toggleBtn.querySelector('.view-icon');
-        const viewLabel = toggleBtn.querySelector('.view-label');
-
-        if (viewIcon) viewIcon.textContent = '📄';
-        if (viewLabel) viewLabel.textContent = 'Schede';
-        toggleBtn.classList.add('active');
-      }
-    }
+    isListViewMode = savedViewMode === 'list';
+    updateViewModeUI();
 
     // Inizializza UI event listeners
     initializeNewUI();
@@ -11565,9 +11502,24 @@ async function bootstrapApp() {
     // exportBtn gestito in initializeUIEventListeners()
 
     // Event listener per toggle visualizzazione
-    const viewToggle = document.getElementById("viewToggle");
-    if (viewToggle) {
-      viewToggle.addEventListener("click", toggleViewMode);
+    const viewToggleItem = document.getElementById("viewToggleItem") || document.querySelector(".view-toggle");
+    if (viewToggleItem) {
+      viewToggleItem.addEventListener("click", (e) => {
+        const segBtn = e.target.closest('[data-view-seg]');
+        if (segBtn) {
+          e.stopPropagation();
+          const mode = segBtn.dataset.viewSeg;
+          toggleViewMode(mode);
+        } else {
+          toggleViewMode();
+        }
+      });
+      viewToggleItem.addEventListener("keydown", (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleViewMode();
+        }
+      });
     }
 
     // Event listener per ricerca avanzata
@@ -13052,9 +13004,42 @@ function initializeUIEventListeners() {
   }
 
   // Delegazione eventi per azioni rapide delle card (Mappa e Dettagli)
+  // Delegazione eventi per azioni rapide delle card (Mappa, Dettagli, Preferiti, Titoli)
   const resultsContainer = document.getElementById('results');
   if (resultsContainer) {
     resultsContainer.addEventListener('click', (e) => {
+      // Click pulsante toggle-elenco (preferiti)
+      const toggleBtn = e.target.closest('.toggle-elenco');
+      if (toggleBtn) {
+        e.stopPropagation();
+        const id = toggleBtn.dataset.id || toggleBtn.closest('.structure-card')?.dataset.id;
+        if (id) {
+          if (elencoPersonale.includes(id)) {
+            rimuoviDallElenco(id);
+            toggleBtn.classList.remove('in-elenco');
+            toggleBtn.textContent = '☆';
+            toggleBtn.title = 'Aggiungi ai preferiti';
+          } else {
+            aggiungiAllElenco(id);
+            toggleBtn.classList.add('in-elenco');
+            toggleBtn.textContent = '⭐';
+            toggleBtn.title = 'Rimuovi dai preferiti';
+          }
+        }
+        return;
+      }
+
+      // Click titolo card o riga elenco
+      const titleClickEl = e.target.closest('.clickable-title');
+      if (titleClickEl) {
+        e.stopPropagation();
+        const id = titleClickEl.dataset.id || titleClickEl.closest('.structure-card')?.dataset.id;
+        if (id) {
+          mostraSchedaCompleta(id);
+        }
+        return;
+      }
+
       // Click pulsante Mappa su card
       const mapPinBtn = e.target.closest('.map-pin-action');
       if (mapPinBtn) {
@@ -13169,16 +13154,6 @@ function initializeUIEventListeners() {
     exportBtn.addEventListener('click', () => {
       if (typeof window.esportaElencoPersonale === 'function') {
         window.esportaElencoPersonale();
-      }
-    });
-  }
-
-  // View toggle
-  const viewToggle = document.getElementById('viewToggle');
-  if (viewToggle) {
-    viewToggle.addEventListener('click', () => {
-      if (typeof window.toggleViewMode === 'function') {
-        window.toggleViewMode();
       }
     });
   }

@@ -389,13 +389,15 @@
             <span class="menu-icon"><i class="fas fa-undo"></i></span>
             <span class="menu-label">Reset Filtri</span>
           </button>
-          <div class="view-toggle menu-item">
+          <div class="view-toggle menu-item" id="viewToggleItem" role="button" tabindex="0" title="Cambia visualizzazione tra Schede ed Elenco">
             <span class="menu-icon"><i class="fas fa-eye"></i></span>
             <span class="menu-label">Visualizzazione</span>
-            <button id="viewToggle" class="view-switch">
-              <span class="view-icon"><i class="fas fa-list"></i></span>
-              <span class="view-label">Elenco</span>
-            </button>
+            <div class="view-switch-segmented" id="viewToggle" role="group" aria-label="Modalità di visualizzazione">
+              <span class="view-seg-btn active" data-view-seg="cards"><i class="fas fa-th-large"></i> Schede</span>
+              <span class="view-seg-btn" data-view-seg="list"><i class="fas fa-list-ul"></i> Elenco</span>
+              <span class="view-icon" style="display:none;"><i class="fas fa-list"></i></span>
+              <span class="view-label" style="display:none;">Elenco</span>
+            </div>
           </div>
         </div>
       </section>
