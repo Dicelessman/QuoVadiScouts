@@ -119,7 +119,7 @@
     }
   </style>
   <link rel="preload" href="/styles.css" as="style">
-  <link rel="manifest" href="/api/manifest.js" />
+  <link rel="manifest" href="/manifest.json" />
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
   <link rel="preload" href="styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -593,9 +593,10 @@
         }
       }, 10000);
     }
+  </script>
 
-    <!-- PWA Install Banner -->
-    <aside id="pwaInstallBanner" class="pwa-install-banner hidden" role="dialog" aria-label="Installa QuoVadiScout">
+  <!-- PWA Install Banner -->
+  <aside id="pwaInstallBanner" class="pwa-install-banner hidden" role="dialog" aria-label="Installa QuoVadiScout">
       <div class="pwa-install-content">
         <div class="pwa-install-icon">⚜️</div>
         <div class="pwa-install-text">
@@ -652,10 +653,9 @@
           showCustomNotification('✅ App installata con successo!', 'success');
         }
       });
-    </script>
 
-    // Inizializzazione icone personalizzate
-    document.addEventListener('DOMContentLoaded', () => {
+      // Inizializzazione icone personalizzate
+      document.addEventListener('DOMContentLoaded', () => {
       // Aggiorna tutte le icone del menu
       if (typeof updateMenuIcons === 'function') {
         updateMenuIcons();

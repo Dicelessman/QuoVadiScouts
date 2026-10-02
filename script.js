@@ -1740,19 +1740,21 @@ function filtra(lista) {
     filtrata.sort((a, b) => (a.distanzaKm ?? 9999) - (b.distanzaKm ?? 9999));
   } else {
     // Applica ordinamento standard
-    const sortBy = document.getElementById("sort-by").value;
-  filtrata.sort((a, b) => {
-    switch (sortBy) {
-      case 'struttura':
-        return (a.Struttura || '').localeCompare(b.Struttura || '');
-      case 'luogo':
-        return (a.Luogo || '').localeCompare(b.Luogo || '');
-      case 'provincia':
-        return (a.Prov || '').localeCompare(b.Prov || '');
-      default:
-        return 0;
-    }
-  });
+    const sortByEl = document.getElementById("sort-by");
+    const sortBy = sortByEl ? sortByEl.value : 'struttura';
+    filtrata.sort((a, b) => {
+      switch (sortBy) {
+        case 'struttura':
+          return (a.Struttura || '').localeCompare(b.Struttura || '');
+        case 'luogo':
+          return (a.Luogo || '').localeCompare(b.Luogo || '');
+        case 'provincia':
+          return (a.Prov || '').localeCompare(b.Prov || '');
+        default:
+          return 0;
+      }
+    });
+  }
 
   return filtrata;
 }
