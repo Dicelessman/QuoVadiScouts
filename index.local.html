@@ -147,11 +147,65 @@
         <span id="mapToggleIndicator" class="map-toggle-indicator">▼</span>
       </button>
       <div class="map-controls">
+        <div class="map-layers-dropdown" style="position: relative;">
+          <button id="layersMenuBtn" class="btn-map-control" title="Layer aggiuntivi">🗺️</button>
+          <div id="layersMenu" class="layers-menu hidden">
+            <div class="layers-menu-header">Layer Overlay</div>
+            <label class="layer-option">
+              <input type="checkbox" id="layer-railway" data-layer="railway">
+              <span>🚂 Rete Ferroviaria</span>
+            </label>
+            <label class="layer-option">
+              <input type="checkbox" id="layer-hiking" data-layer="hiking">
+              <span>🥾 Sentieri Escursionistici</span>
+            </label>
+            <label class="layer-option">
+              <input type="checkbox" id="layer-cycling" data-layer="cycling">
+              <span>🚴 Piste Ciclabili</span>
+            </label>
+            <label class="layer-option">
+              <input type="checkbox" id="layer-mtb" data-layer="mtb">
+              <span>🚵 Percorsi MTB</span>
+            </label>
+            <div class="layers-menu-divider"></div>
+            <button id="clearAllLayersBtn" class="layer-clear-btn">
+              🗑️ Rimuovi Tutti i Layer
+            </button>
+            <div class="layers-menu-hint">
+              <span>🧭 Gli overlay attivi mostrano la legenda automatica sulla mappa</span>
+            </div>
+          </div>
+        </div>
         <button id="centerMapBtn" class="btn-map-control" title="Centro su di me">📍</button>
         <button id="toggleMapBtn" class="btn-map-control" title="Mostra/Nascondi mappa">👁️</button>
       </div>
     </div>
     <div id="mainMap" class="main-map"></div>
+
+    <!-- Legenda dinamica overlay mappa -->
+    <div id="mapOverlayLegend" class="map-overlay-legend hidden" role="region" aria-label="Legenda overlay mappa">
+      <div class="legend-header" id="legendHeader" title="Clicca per ridurre o espandere la legenda">
+        <div class="legend-title-wrapper">
+          <span class="legend-icon">🧭</span>
+          <span class="legend-title">Legenda Overlay</span>
+          <span id="legendActiveBadge" class="legend-active-badge">0</span>
+        </div>
+        <div class="legend-actions">
+          <button id="legendToggleBtn" class="legend-btn-toggle" type="button" aria-label="Riduci o espandi legenda" title="Riduci o espandi">
+            <span id="legendToggleIcon">−</span>
+          </button>
+        </div>
+      </div>
+      <div id="legendBody" class="legend-body">
+        <div id="legendContent" class="legend-content">
+          <!-- Popolato dinamicamente in base ai layer attivi -->
+        </div>
+        <div class="legend-footer">
+          <span class="legend-live-indicator">●</span>
+          <span>Dati live OpenStreetMap &amp; Waymarked Trails</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <nav id="mainMenu" class="main-menu hidden" role="navigation" aria-label="Menu principale">

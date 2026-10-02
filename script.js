@@ -75,6 +75,13 @@ import {
   restoreStructureSnapshot,
   mostraPopupConfermaSalvataggio
 } from "./utils/unsaved-changes.js";
+import {
+  renderLegendHtml,
+  getActiveLegendData,
+  isLayerOverlayDynamic,
+  LAYER_METADATA,
+  MAP_OVERLAY_LEGENDS
+} from "./utils/map-legend.js";
 
 window.normalizeStructureCoordinates = normalizeStructureCoordinates;
 window.cleanPhoneNumber = cleanPhoneNumber;
@@ -93,6 +100,11 @@ window.cloneStructureSnapshot = cloneStructureSnapshot;
 window.hasStructureChanges = hasStructureChanges;
 window.restoreStructureSnapshot = restoreStructureSnapshot;
 window.mostraPopupConfermaSalvataggio = mostraPopupConfermaSalvataggio;
+window.renderLegendHtml = renderLegendHtml;
+window.getActiveLegendData = getActiveLegendData;
+window.isLayerOverlayDynamic = isLayerOverlayDynamic;
+window.LAYER_METADATA = LAYER_METADATA;
+window.MAP_OVERLAY_LEGENDS = MAP_OVERLAY_LEGENDS;
 
 /**
  * Risolve le coordinate per una città o località (usando database locale o fallback online Nominatim).
@@ -3649,6 +3661,67 @@ function setupMainMapControls() {
       }
     });
 
+    // === Gestione Legenda Dinamica Overlay ===
+    const mapOverlayLegendEl = document.getElementById('mapOverlayLegend');
+    const legendContentEl = document.getElementById('legendContent');
+    const legendActiveBadgeEl = document.getElementById('legendActiveBadge');
+    const legendHeaderEl = document.getElementById('legendHeader');
+    const legendToggleBtnEl = document.getElementById('legendToggleBtn');
+    const legendToggleIconEl = document.getElementById('legendToggleIcon');
+
+    function updateDynamicMapLegend() {
+      if (!mapOverlayLegendEl || !legendContentEl) return;
+
+      const activeLayerIds = Object.keys(layerConfigs).filter(layerId => {
+        const checkbox = document.getElementById(`layer-${layerId}`);
+        return checkbox && checkbox.checked;
+      });
+
+      if (activeLayerIds.length === 0) {
+        mapOverlayLegendEl.classList.add('hidden');
+        return;
+      }
+
+      mapOverlayLegendEl.classList.remove('hidden');
+
+      if (legendActiveBadgeEl) {
+        const count = activeLayerIds.length;
+        legendActiveBadgeEl.textContent = `${count} ${count === 1 ? 'attivo' : 'attivi'}`;
+      }
+
+      legendContentEl.innerHTML = renderLegendHtml(activeLayerIds);
+    }
+
+    function toggleLegendMinimize(e) {
+      if (e && typeof e.stopPropagation === 'function') {
+        e.stopPropagation();
+      }
+      if (!mapOverlayLegendEl) return;
+      const isMinimized = mapOverlayLegendEl.classList.toggle('minimized');
+      if (legendToggleIconEl) {
+        legendToggleIconEl.textContent = isMinimized ? '+' : '−';
+      }
+      if (legendToggleBtnEl) {
+        legendToggleBtnEl.setAttribute('title', isMinimized ? 'Espandi legenda' : 'Riduci legenda');
+        legendToggleBtnEl.setAttribute('aria-expanded', isMinimized ? 'false' : 'true');
+      }
+    }
+
+    if (legendToggleBtnEl) {
+      legendToggleBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleLegendMinimize();
+      });
+    }
+
+    if (legendHeaderEl) {
+      legendHeaderEl.addEventListener('click', () => {
+        toggleLegendMinimize();
+      });
+    }
+
+    window.updateDynamicMapLegend = updateDynamicMapLegend;
+
     // Gestione checkbox layer
     Object.keys(layerConfigs).forEach(layerId => {
       const checkbox = document.getElementById(`layer-${layerId}`);
@@ -3675,6 +3748,9 @@ function setupMainMapControls() {
             window.mapsManager.map.removeLayer(layer);
             console.log(`❌ Layer ${layerConfigs[layerId].name} disattivato`);
           }
+
+          // Aggiorna la legenda dinamica
+          updateDynamicMapLegend();
         });
       }
     });
@@ -3703,6 +3779,9 @@ function setupMainMapControls() {
           }
         });
 
+        // Aggiorna la legenda dinamica
+        updateDynamicMapLegend();
+
         if (removedCount > 0) {
           console.log(`🗑️ Rimossi ${removedCount} layer attivi`);
         } else {
@@ -3710,6 +3789,9 @@ function setupMainMapControls() {
         }
       });
     }
+
+    // Inizializza stato legenda all'avvio
+    updateDynamicMapLegend();
   }
 
   // Pulsante centro su di me
@@ -3755,6 +3837,10 @@ function setupMainMapControls() {
       if (toggleMapBtn) {
         toggleMapBtn.textContent = '🙈';
         toggleMapBtn.setAttribute('title', 'Nascondi la mappa');
+      }
+      // Aggiorna lo stato della legenda se ci sono layer attivi
+      if (typeof window.updateDynamicMapLegend === 'function') {
+        window.updateDynamicMapLegend();
       }
       // Ricalcola le dimensioni della mappa Leaflet
       if (window.mapsManager && window.mapsManager.map) {

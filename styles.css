@@ -2916,6 +2916,7 @@ input:checked + .toggle-slider:before {
 
 /* === MAPPA PRINCIPALE === */
 .main-map-container {
+  position: relative;
   background: var(--bg-primary);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
@@ -2935,6 +2936,10 @@ input:checked + .toggle-slider:before {
 .main-map-container.collapsed .main-map {
   height: 0;
   overflow: hidden;
+}
+
+.main-map-container.collapsed #mapOverlayLegend {
+  display: none !important;
 }
 
 .map-header {
@@ -3099,7 +3104,7 @@ input:checked + .toggle-slider:before {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   min-width: 220px;
-  z-index: 1000;
+  z-index: 1100;
   padding: var(--space-2);
   display: flex;
   flex-direction: column;
@@ -3204,6 +3209,362 @@ input:checked + .toggle-slider:before {
 
 [data-theme="dark"] .layer-clear-btn:hover {
   background: var(--danger-hover, #c82333);
+}
+
+.layers-menu-hint {
+  margin-top: var(--space-1);
+  padding: 4px 6px;
+  border-top: 1px dashed var(--border-light);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+[data-theme="dark"] .layers-menu-hint {
+  border-top-color: var(--border-medium);
+  color: var(--text-secondary);
+}
+
+/* === MAP OVERLAY DYNAMIC LEGEND === */
+.map-overlay-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 990;
+  max-width: 320px;
+  width: calc(100% - 32px);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  font-size: 0.82rem;
+  pointer-events: auto;
+}
+
+[data-theme="dark"] .map-overlay-legend {
+  background: rgba(26, 32, 44, 0.94);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}
+
+.map-overlay-legend.hidden {
+  display: none !important;
+}
+
+.map-overlay-legend.minimized {
+  width: auto;
+  max-width: 230px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.map-overlay-legend.minimized .legend-body {
+  display: none;
+}
+
+.map-overlay-legend.minimized .legend-header {
+  border-bottom: none;
+  padding: 6px 10px;
+}
+
+.legend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--border-light, #e5e7eb);
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+}
+
+[data-theme="dark"] .legend-header {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: var(--border-medium, #374151);
+}
+
+.legend-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  font-size: 0.82rem;
+  min-width: 0;
+}
+
+.legend-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.legend-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend-active-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--primary, #2f6b2f);
+  color: #ffffff;
+  padding: 1px 6px;
+  border-radius: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .legend-active-badge {
+  background: var(--primary, #3b82f6);
+}
+
+.legend-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.legend-btn-toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border-radius: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+  padding: 0;
+}
+
+.legend-btn-toggle:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary, #111827);
+}
+
+[data-theme="dark"] .legend-btn-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.legend-body {
+  padding: 10px 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.legend-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.legend-group {
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border-light, #e5e7eb);
+}
+
+.legend-group:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+[data-theme="dark"] .legend-group {
+  border-bottom-color: var(--border-medium, #374151);
+}
+
+.legend-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--primary, #2f6b2f);
+  margin-bottom: 6px;
+}
+
+[data-theme="dark"] .legend-group-title {
+  color: var(--primary, #60a5fa);
+}
+
+.legend-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.77rem;
+  color: var(--text-primary, #1f2937);
+  line-height: 1.25;
+}
+
+.legend-item-text {
+  flex: 1;
+}
+
+.legend-swatch {
+  flex-shrink: 0;
+  width: 26px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Specific Swatches */
+.legend-line-rail-main {
+  width: 26px;
+  height: 4px;
+  background: #d90429;
+  border-radius: 2px;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.legend-line-rail-secondary {
+  width: 26px;
+  height: 3px;
+  background: #10b981;
+  border-radius: 2px;
+}
+
+.legend-line-rail-service {
+  width: 26px;
+  height: 0;
+  border-top: 2px dashed #9ca3af;
+}
+
+.legend-point-rail-station {
+  width: 10px;
+  height: 10px;
+  background: #111827;
+  border: 2px solid #ffffff;
+  border-radius: 2px;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.legend-line-hike-major {
+  width: 26px;
+  height: 4px;
+  background: #dc2626;
+  border-radius: 2px;
+}
+
+.legend-line-hike-regional {
+  width: 26px;
+  height: 3px;
+  background: #ea580c;
+  border-radius: 2px;
+}
+
+.legend-badge-cai {
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 3px;
+  border-radius: 2px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+}
+
+.legend-line-cycle-national {
+  width: 26px;
+  height: 4px;
+  background: #2563eb;
+  border-radius: 2px;
+}
+
+.legend-line-cycle-local {
+  width: 26px;
+  height: 3px;
+  background: #06b6d4;
+  border-radius: 2px;
+}
+
+.legend-badge-cycle {
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 3px;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.legend-line-mtb-main {
+  width: 26px;
+  height: 4px;
+  background: #b45309;
+  border-radius: 2px;
+}
+
+.legend-line-mtb-track {
+  width: 26px;
+  height: 0;
+  border-top: 3px dashed #d97706;
+}
+
+.legend-badge-mtb {
+  background: #b45309;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 3px;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.legend-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-light, #f3f4f6);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+[data-theme="dark"] .legend-footer {
+  border-top-color: var(--border-medium, #374151);
+}
+
+.legend-live-indicator {
+  color: #10b981;
+  font-size: 0.65rem;
+  animation: pulse-live 2s infinite ease-in-out;
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+@media (max-width: 480px) {
+  .map-overlay-legend {
+    bottom: 12px;
+    left: 8px;
+    max-width: calc(100% - 16px);
+  }
 }
 
 /* ==========================================================================

@@ -248,6 +248,9 @@
             <button id="clearAllLayersBtn" class="layer-clear-btn">
               🗑️ Rimuovi Tutti i Layer
             </button>
+            <div class="layers-menu-hint">
+              <span>🧭 Gli overlay attivi mostrano la legenda automatica sulla mappa</span>
+            </div>
           </div>
         </div>
         <button id="centerMapBtn" class="btn-map-control" title="Centro su di me">📍</button>
@@ -255,6 +258,31 @@
       </div>
     </div>
     <div id="mainMap" class="main-map"></div>
+
+    <!-- Legenda dinamica overlay mappa -->
+    <div id="mapOverlayLegend" class="map-overlay-legend hidden" role="region" aria-label="Legenda overlay mappa">
+      <div class="legend-header" id="legendHeader" title="Clicca per ridurre o espandere la legenda">
+        <div class="legend-title-wrapper">
+          <span class="legend-icon">🧭</span>
+          <span class="legend-title">Legenda Overlay</span>
+          <span id="legendActiveBadge" class="legend-active-badge">0</span>
+        </div>
+        <div class="legend-actions">
+          <button id="legendToggleBtn" class="legend-btn-toggle" type="button" aria-label="Riduci o espandi legenda" title="Riduci o espandi">
+            <span id="legendToggleIcon">−</span>
+          </button>
+        </div>
+      </div>
+      <div id="legendBody" class="legend-body">
+        <div id="legendContent" class="legend-content">
+          <!-- Popolato dinamicamente in base ai layer attivi -->
+        </div>
+        <div class="legend-footer">
+          <span class="legend-live-indicator">●</span>
+          <span>Dati live OpenStreetMap &amp; Waymarked Trails</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Main Navigation Menu -->
