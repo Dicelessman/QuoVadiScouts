@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="it" class="no-js">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes" />
+  <title>Nuova Struttura - QuoVadiScout</title>
+  <script>
+    document.documentElement.classList.remove('no-js');
+    document.documentElement.classList.add('js');
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark' || savedTheme === 'light') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <meta name="description" content="Inserisci una nuova struttura o terreno scout in QuoVadiScout" />
+  <meta name="theme-color" content="#2f6b2f" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="/api/firebase-config.js" defer onerror="this.onerror=null;this.src='firebase-config.local.js'"></script>
+  <script src="city-database.js" defer></script>
+  <script src="maps.js?v=1.3.4" defer></script>
+  <style>
+    .new-structure-page {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 16px 16px 88px;
+    }
+
+    .status-banner-card {
+      position: sticky;
+      top: 64px;
+      z-index: 90;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-xl, 12px);
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .status-banner-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .draft-badge {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+
+    .completeness-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .completeness-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .completeness-bar-track {
+      flex: 1;
+      height: 10px;
+      background: var(--bg-tertiary);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .completeness-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: #dc2626;
+      transition: width 0.25s ease, background-color 0.25s ease;
+    }
+
+    .completeness-score {
+      font-size: 0.9rem;
+      font-weight: 700;
+      min-width: 44px;
+      text-align: right;
+    }
+
+    .completeness-missing {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    .missing-chip {
+      background: rgba(245, 158, 11, 0.14);
+      color: #b45309;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    [data-theme="dark"] .missing-chip {
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.2);
+    }
+
+    .auth-warning-banner {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .form-sections-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 16px;
+    }
+
+    .form-section-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-light);
+      border-left: 4px solid #2f6b2f;
+      border-radius: var(--radius-xl, 12px);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .form-section-card--full {
+      grid-column: 1 / -1;
+    }
+
+    .form-section-title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .field-group label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .field-group input[type="text"],
+    .field-group input[type="number"],
+    .field-group input[type="email"],
+    .field-group input[type="url"],
+    .field-group input[type="tel"],
+    .field-group select,
+    .field-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border-medium);
+      border-radius: 6px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .field-group input:focus,
+    .field-group select:focus,
+    .field-group textarea:focus {
+      outline: 2px solid rgba(47, 107, 47, 0.35);
+      border-color: #2f6b2f;
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+    }
+
+    .checkbox-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .checkbox-pill input[type="checkbox"] {
+      width: 17px;
+      height: 17px;
+      accent-color: #2f6b2f;
+      cursor: pointer;
+    }
+
+    .feature-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .geo-actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .map-picker-box {
+      border: 1px solid var(--border-medium);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .map-picker-header {
+      padding: 8px 12px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+
+    #newStructureMap {
+      height: 280px;
+      width: 100%;
+    }
+
+    .page-actions-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 95;
+      background: var(--bg-primary);
+      border-top: 1px solid var(--border-light);
+      padding: 12px 16px;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .page-actions-inner {
+      max-width: 1040px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-action-primary {
+      background: #28a745;
+      color: #ffffff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action-primary:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .btn-action-secondary {
+      background: var(--secondary, #64748b);
+      color: #ffffff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-geo {
+      background: #007bff;
+      color: #ffffff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-geo--city {
+      background: #17a2b8;
+    }
+
+    .btn-clear-draft {
+      background: transparent;
+      color: var(--danger, #dc2626);
+      border: 1px solid var(--danger, #dc2626);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    @media (max-width: 560px) {
+      .field-row-2,
+      .geo-actions-row,
+      .feature-row {
+        grid-template-columns: 1fr;
+      }
+
+      .page-actions-inner {
+        justify-content: stretch;
+      }
+
+      .page-actions-inner button {
+        flex: 1;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="app-header">
+    <div class="header-main">
+      <div class="header-brand">
+        <h1 class="app-title">➕ Nuova Struttura</h1>
+      </div>
+      <div class="header-actions">
+        <button id="backToHomeBtn" type="button" class="btn-menu" aria-label="Torna alla mappa">
+          ← Torna alla Mappa
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="new-structure-page" role="main">
+    <div id="authWarningBanner" class="auth-warning-banner hidden">
+      <span>⚠️ Devi effettuare l'accesso dalla home prima di poter salvare la nuova struttura su Firestore. La tua bozza resta comunque salvata su questo dispositivo.</span>
+      <a href="index.html" class="btn-action-secondary" style="text-decoration: none; padding: 6px 12px;">Vai al Login</a>
+    </div>
+
+    <section class="status-banner-card" aria-label="Stato bozza e completezza">
+      <div class="status-banner-top">
+        <span id="draftStatusText" class="draft-badge">📝 Nuova bozza</span>
+        <button id="clearDraftBtn" type="button" class="btn-clear-draft">🧹 Svuota bozza</button>
+      </div>
+      <div class="completeness-row">
+        <span class="completeness-label">Completezza scheda:</span>
+        <div class="completeness-bar-track" aria-hidden="true">
+          <div id="completenessBarFill" class="completeness-bar-fill"></div>
+        </div>
+        <span id="completenessScoreText" class="completeness-score">0%</span>
+      </div>
+      <div id="completenessMissingList" class="completeness-missing"></div>
+    </section>
+
+    <form id="newStructureForm" novalidate>
+      <div class="form-sections-grid">
+        <!-- 1. Informazioni Principali -->
+        <section class="form-section-card">
+          <h2 class="form-section-title">🏕️ Informazioni Principali</h2>
+          <div class="field-group">
+            <label for="field-Struttura">Nome Struttura *</label>
+            <input type="text" id="field-Struttura" data-field="Struttura" placeholder="Es. Casa Scout San Giorgio" required>
+          </div>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-Luogo">Luogo / Comune</label>
+              <input type="text" id="field-Luogo" data-field="Luogo" placeholder="Es. Vinadio">
+            </div>
+            <div class="field-group">
+              <label for="field-Prov">Provincia</label>
+              <input type="text" id="field-Prov" data-field="Prov" list="provinceOptions" maxlength="5" placeholder="Es. CN" style="text-transform: uppercase;">
+              <datalist id="provinceOptions"></datalist>
+            </div>
+          </div>
+          <div class="field-group">
+            <label for="field-Indirizzo">Indirizzo</label>
+            <input type="text" id="field-Indirizzo" data-field="Indirizzo" placeholder="Via, località, numero civico...">
+          </div>
+          <div class="field-group">
+            <label for="field-stato">Stato di disponibilità</label>
+            <select id="field-stato" data-field="stato">
+              <option value="attiva">🟢 Attiva</option>
+              <option value="temporaneamente_non_attiva">🟡 Temporaneamente non attiva</option>
+              <option value="non_piu_attiva">🔴 Non più attiva</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="field-Info">Descrizione e Info generali</label>
+            <textarea id="field-Info" data-field="Info" rows="3" placeholder="Descrizione della struttura, contesto, particolarità..."></textarea>
+          </div>
+        </section>
+
+        <!-- 2. Tipologia e Destinatari -->
+        <section class="form-section-card">
+          <h2 class="form-section-title">🏷️ Tipologia e Adatto per</h2>
+          <div class="field-group">
+            <label>Tipologia struttura</label>
+            <div class="checkbox-grid">
+              <label class="checkbox-pill"><input type="checkbox" id="field-Casa" data-field="Casa"> 🏠 Casa</label>
+              <label class="checkbox-pill"><input type="checkbox" id="field-Terreno" data-field="Terreno"> 🌲 Terreno</label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Branche / Destinatari</label>
+            <div class="checkbox-grid">
+              <label class="checkbox-pill"><input type="checkbox" id="field-Branco" data-field="Branco"> 🐺 Branco</label>
+              <label class="checkbox-pill"><input type="checkbox" id="field-Reparto" data-field="Reparto"> ⚜️ Reparto</label>
+              <label class="checkbox-pill"><input type="checkbox" id="field-Compagnia" data-field="Compagnia"> 🥾 Compagnia / Clan</label>
+              <label class="checkbox-pill"><input type="checkbox" id="field-Gruppo" data-field="Gruppo"> 🏕️ Gruppo</label>
+              <label class="checkbox-pill"><input type="checkbox" id="field-Sezione" data-field="Sezione"> 🏛️ Sezione</label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Posizione Geografica & Mappa -->
+        <section class="form-section-card form-section-card--full">
+          <h2 class="form-section-title">📍 Posizione Geografica &amp; Mappa</h2>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-coordinate_lat">Latitudine</label>
+              <input type="number" step="any" id="field-coordinate_lat" data-field="coordinate_lat" placeholder="es. 44.307200">
+            </div>
+            <div class="field-group">
+              <label for="field-coordinate_lng">Longitudine</label>
+              <input type="number" step="any" id="field-coordinate_lng" data-field="coordinate_lng" placeholder="es. 7.175300">
+            </div>
+          </div>
+          <div class="field-group">
+            <label for="field-google_maps_link">Link Google Maps (estrae automaticamente le coordinate)</label>
+            <input type="url" id="field-google_maps_link" data-field="google_maps_link" placeholder="https://www.google.com/maps/...">
+          </div>
+          <div class="geo-actions-row">
+            <button type="button" id="btnGeocodeAddress" class="btn-geo">🔍 Da Indirizzo</button>
+            <button type="button" id="btnCenterCity" class="btn-geo btn-geo--city">🏢 Su Città</button>
+          </div>
+          <div class="map-picker-box">
+            <div class="map-picker-header">
+              <span><strong>Posiziona sulla mappa</strong></span>
+              <span>Clicca o trascina il segnaposto per impostare le coordinate esatte</span>
+            </div>
+            <div id="newStructureMap"></div>
+          </div>
+        </section>
+
+        <!-- 4. Caratteristiche e Logistica -->
+        <section class="form-section-card">
+          <h2 class="form-section-title">🛌 Caratteristiche e Logistica</h2>
+          <div class="feature-row">
+            <label class="checkbox-pill"><input type="checkbox" id="chk-Letti" data-feature-check="Letti"> Letti</label>
+            <div class="field-group"><input type="text" id="field-Letti" data-feature-text="Letti" placeholder="Es. 35 posti letto / brande"></div>
+          </div>
+          <div class="feature-row">
+            <label class="checkbox-pill"><input type="checkbox" id="chk-Cucina" data-feature-check="Cucina"> Cucina</label>
+            <div class="field-group"><input type="text" id="field-Cucina" data-feature-text="Cucina" placeholder="Es. Attrezzata, fuochi industriali..."></div>
+          </div>
+          <div class="feature-row">
+            <label class="checkbox-pill"><input type="checkbox" id="chk-Spazi" data-feature-check="Spazi"> Spazi</label>
+            <div class="field-group"><input type="text" id="field-Spazi" data-feature-text="Spazi" placeholder="Es. Salone, refettorio, prato..."></div>
+          </div>
+          <div class="feature-row">
+            <label class="checkbox-pill"><input type="checkbox" id="chk-Fuochi" data-feature-check="Fuochi"> Fuochi</label>
+            <div class="field-group"><input type="text" id="field-Fuochi" data-feature-text="Fuochi" placeholder="Es. Consentiti nel braciere"></div>
+          </div>
+          <div class="feature-row">
+            <label class="checkbox-pill"><input type="checkbox" id="chk-Hike" data-feature-check="Hike"> Hike</label>
+            <div class="field-group"><input type="text" id="field-Hike" data-feature-text="Hike" placeholder="Es. Sentieri vicini"></div>
+          </div>
+          <div class="field-group">
+            <label for="field-Riscaldamento">Riscaldamento</label>
+            <input type="text" id="field-Riscaldamento" data-field="Riscaldamento" placeholder="Es. Termosifoni / stufa / a consumo">
+          </div>
+          <div class="field-group">
+            <label for="field-Trasporti">Trasporti</label>
+            <input type="text" id="field-Trasporti" data-field="Trasporti" placeholder="Es. Stazione treni / fermata bus">
+          </div>
+          <div class="field-group">
+            <label for="field-Escursioni">Escursioni nei dintorni</label>
+            <input type="text" id="field-Escursioni" data-field="Escursioni" placeholder="Es. Sentiero per il rifugio">
+          </div>
+        </section>
+
+        <!-- 5. Costi € -->
+        <section class="form-section-card">
+          <h2 class="form-section-title">💶 Costi €</h2>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-A-persona">A persona</label>
+              <input type="text" id="field-A-persona" data-field="A persona" placeholder="Es. 8 €">
+            </div>
+            <div class="field-group">
+              <label for="field-A-notte">A notte</label>
+              <input type="text" id="field-A-notte" data-field="A notte" placeholder="Es. 12 €">
+            </div>
+          </div>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-A-giornata">A giornata</label>
+              <input type="text" id="field-A-giornata" data-field="A giornata" placeholder="Es. 150 €">
+            </div>
+            <div class="field-group">
+              <label for="field-Forfait">Forfait</label>
+              <input type="text" id="field-Forfait" data-field="Forfait" placeholder="Es. 300 € weekend">
+            </div>
+          </div>
+          <div class="field-group">
+            <label for="field-Offerta">Offerta / Tariffa agevolata</label>
+            <input type="text" id="field-Offerta" data-field="Offerta" placeholder="Es. Offerta libera / convenzione">
+          </div>
+          <div class="field-group">
+            <label for="field-Altri-costi">Altri costi (luce, gas, pulizie...)</label>
+            <input type="text" id="field-Altri-costi" data-field="Altri costi" placeholder="Es. Riscaldamento a consumo">
+          </div>
+        </section>
+
+        <!-- 6. Contatti e Gestione -->
+        <section class="form-section-card form-section-card--full">
+          <h2 class="form-section-title">📞 Contatti e Gestione</h2>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-Referente">Referente</label>
+              <input type="text" id="field-Referente" data-field="Referente" placeholder="Nome e cognome referente">
+            </div>
+            <div class="field-group">
+              <label for="field-Contatto">Contatto principale</label>
+              <input type="tel" id="field-Contatto" data-field="Contatto" placeholder="Numero di telefono">
+            </div>
+          </div>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-IIcontatto">Secondo contatto</label>
+              <input type="tel" id="field-IIcontatto" data-field="IIcontatto" placeholder="Telefono alternativo">
+            </div>
+            <div class="field-group">
+              <label for="field-Email">Email</label>
+              <input type="email" id="field-Email" data-field="Email" placeholder="email@esempio.it">
+            </div>
+          </div>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-Sito">Sito Web</label>
+              <input type="url" id="field-Sito" data-field="Sito" placeholder="https://www.esempio.it">
+            </div>
+            <div class="field-group">
+              <label for="field-Da-chi">Inserita / Verificata da</label>
+              <input type="text" id="field-Da-chi" data-field="Da chi" placeholder="Nome / Gruppo scout">
+            </div>
+          </div>
+          <div class="field-row-2">
+            <div class="field-group">
+              <label for="field-Ultimo-controllo">Ultimo controllo</label>
+              <input type="text" id="field-Ultimo-controllo" data-field="Ultimo controllo" placeholder="GG/MM/AAAA">
+            </div>
+            <div class="field-group">
+              <label for="field-Altre-info">Altre info</label>
+              <input type="text" id="field-Altre-info" data-field="Altre info" placeholder="Ulteriori dettagli utili">
+            </div>
+          </div>
+          <div class="field-group">
+            <label for="field-Note">Note</label>
+            <textarea id="field-Note" data-field="Note" rows="3" placeholder="Annotazioni aggiuntive..."></textarea>
+          </div>
+        </section>
+      </div>
+    </form>
+  </main>
+
+  <div class="page-actions-bar">
+    <div class="page-actions-inner">
+      <button id="cancelNewStructureBtn" type="button" class="btn-action-secondary">❌ Annulla</button>
+      <button id="saveNewStructureBtn" type="button" class="btn-action-primary">💾 Crea Struttura</button>
+    </div>
+  </div>
+
+  <script type="module" src="nuova-struttura.js"></script>
+</body>
+
+</html>

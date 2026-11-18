@@ -18,6 +18,10 @@ const STATIC_ASSETS = [
   '/dashboard.html',
   '/dashboard.css',
   '/dashboard.js',
+  '/nuova-struttura.html',
+  '/nuova-struttura.js',
+  '/revisione.html',
+  '/revisione.js',
   '/manifest.json',
   // CDN resources
   'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js',

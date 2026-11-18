@@ -12,6 +12,11 @@ import {
     getAuth,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import {
+    normalizeFirestoreStructureDoc,
+    deduplicateStructures,
+    calculateStructureCompleteness
+} from "./utils/structure.js";
 
 // Initialize Firebase
 const app = initializeApp(window.FirebaseConfig);
@@ -25,54 +30,7 @@ let currentEditingId = null;
 
 // === COMPLETENESS ALGORITHM ===
 function calculateCompleteness(s) {
-    let score = 0;
-    let missing = [];
-
-    // 1. CRITICAL (40%)
-    // Name (Base requirement, assumed present if record exists, but let's check)
-    if (s.Struttura) score += 0; else missing.push('Nome'); // 0 points, purely mandatory
-
-    // Location (15%)
-    if (s.Luogo && s.Prov) score += 15; else missing.push('Luogo');
-
-    // Coordinates/Address (15%)
-    if ((s.coordinate_lat && s.coordinate_lng) || s.Indirizzo) {
-        score += 15;
-    } else {
-        missing.push('Posizione');
-    }
-
-    // Contact (10%)
-    if (s.Contatto || s.Email || s.Sito) {
-        score += 10;
-    } else {
-        missing.push('Contatto');
-    }
-
-    // 2. IMPORTANT (40%)
-    // Payment Info (15%)
-    const hasPayment = s['A persona'] || s['A giornata'] || s['A notte'] || s.Offerta || s.Forfait || s['Altri costi'];
-    if (hasPayment) score += 15; else missing.push('Costi');
-
-    // Referente (10%)
-    if (s.Referente) score += 10; else missing.push('Referente');
-
-    // Info/Notes (15%)
-    const hasInfo = s.Info || s.Note || s['Altre info'];
-    if (hasInfo) score += 15; else missing.push('Info');
-
-    // 3. BONUS (20%)
-    // Features (15%)
-    const hasFeatures = s.Letti || s.Spazi || s.Fuochi || s.Hike || s.Cucina || s.Riscaldamento;
-    if (hasFeatures) score += 15;
-
-    // Google Maps Link (5%)
-    if (s.google_maps_link) score += 5;
-
-    return {
-        score: Math.min(100, score),
-        missing: missing
-    };
+    return calculateStructureCompleteness(s);
 }
 
 // === RENDER ===
@@ -159,7 +117,8 @@ async function loadData() {
     try {
         const q = query(collection(db, "strutture"), orderBy("Struttura"));
         const snapshot = await getDocs(q);
-        allStructures = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const rawStructures = snapshot.docs.map(d => normalizeFirestoreStructureDoc(d.id, d.data()));
+        allStructures = deduplicateStructures(rawStructures);
         renderList();
     } catch (error) {
         console.error("Error loading data:", error);

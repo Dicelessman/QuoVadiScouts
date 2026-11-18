@@ -58,7 +58,14 @@ import {
   calculatePagination,
   searchStrutture,
   formatStructureShareText,
-  getWhatsAppShareUrl
+  getWhatsAppShareUrl,
+  normalizeFirestoreStructureDoc,
+  sanitizeStructureForFirestore,
+  deduplicateStructures,
+  calculateStructureCompleteness,
+  parseStructureDate,
+  getStructureLastUpdateDate,
+  evaluateStructureMapVisibility
 } from "./utils/structure.js";
 window.escapeHtml = escapeHtml;
 import {
@@ -98,6 +105,13 @@ window.highlightMatch = highlightMatch;
 window.formatCityDisplayName = formatCityDisplayName;
 window.formatStructureShareText = formatStructureShareText;
 window.getWhatsAppShareUrl = getWhatsAppShareUrl;
+window.normalizeFirestoreStructureDoc = normalizeFirestoreStructureDoc;
+window.sanitizeStructureForFirestore = sanitizeStructureForFirestore;
+window.deduplicateStructures = deduplicateStructures;
+window.calculateStructureCompleteness = calculateStructureCompleteness;
+window.parseStructureDate = parseStructureDate;
+window.getStructureLastUpdateDate = getStructureLastUpdateDate;
+window.evaluateStructureMapVisibility = evaluateStructureMapVisibility;
 window.cloneStructureSnapshot = cloneStructureSnapshot;
 window.hasStructureChanges = hasStructureChanges;
 window.restoreStructureSnapshot = restoreStructureSnapshot;
@@ -361,9 +375,17 @@ async function caricaStrutture() {
 
     if (cached && timestamp && (Date.now() - parseInt(timestamp)) < CACHE_DURATION) {
       console.log('📦 Carico strutture da cache');
-      const dati = JSON.parse(cached);
-      console.log(`✅ Caricate ${dati.length} strutture da cache (${Math.round((Date.now() - parseInt(timestamp)) / 1000)}s fa)`);
-      return dati;
+      const parsedCache = JSON.parse(cached);
+      const hasInvalidIds = Array.isArray(parsedCache) &&
+        parsedCache.some(s => s && typeof s.id === 'string' && s.id.startsWith('new_'));
+      if (!hasInvalidIds) {
+        const dati = deduplicateStructures(parsedCache);
+        console.log(`✅ Caricate ${dati.length} strutture da cache (${Math.round((Date.now() - parseInt(timestamp)) / 1000)}s fa)`);
+        return dati;
+      }
+      console.log('🗑️ Cache contenente ID legacy new_, ricarico da Firestore...');
+      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(cacheTimestamp);
     }
 
     console.log('🔗 Connessione a Firestore...');
@@ -374,12 +396,12 @@ async function caricaStrutture() {
     console.log('✅ Connessione Firestore riuscita');
     console.log('📄 Documenti trovati:', snapshot.docs.length);
 
-    const dati = snapshot.docs.map((d) => {
+    const rawDati = snapshot.docs.map((d) => {
       const docData = d.data();
       console.log(`📋 Documento ${d.id}:`, docData);
 
-      // Sincronizza formato coordinate per compatibilità
-      const struttura = { id: d.id, ...docData };
+      // Normalizza ID documento Firestore (evita che un eventuale docData.id legacy sovrascriva d.id)
+      const struttura = normalizeFirestoreStructureDoc(d.id, docData);
       if (struttura.coordinate_lat && struttura.coordinate_lng && !struttura.coordinate) {
         struttura.coordinate = { lat: struttura.coordinate_lat, lng: struttura.coordinate_lng };
       } else if (struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng &&
@@ -402,7 +424,9 @@ async function caricaStrutture() {
       return struttura;
     });
 
-    console.log(`✅ Caricate ${dati.length} strutture da Firestore`);
+    const dati = deduplicateStructures(rawDati);
+
+    console.log(`✅ Caricate ${dati.length} strutture da Firestore (da ${rawDati.length} documenti)`);
 
     // Salva in cache
     localStorage.setItem(cacheKey, JSON.stringify(dati));
@@ -446,8 +470,9 @@ async function caricaStruttureLocali() {
       }
       return s;
     });
-    console.log(`Caricate ${arricchite.length} strutture da file locale`);
-    return arricchite;
+    const deduplicate = deduplicateStructures(arricchite);
+    console.log(`Caricate ${deduplicate.length} strutture da file locale`);
+    return deduplicate;
   } catch (error) {
     console.error('Errore nel caricamento locale:', error);
     // Dati di esempio se tutto fallisce
@@ -2220,6 +2245,24 @@ function chiudiModale() {
   strutturaCorrente = null;
 }
 
+// Helper per eliminare da Firestore sia il documento principale che eventuali duplicati uniti
+async function deleteStructureDocsFromFirestore(id, duplicateIds = []) {
+  const idsToDelete = Array.from(new Set([id, ...(Array.isArray(duplicateIds) ? duplicateIds : [])]))
+    .filter(docId => docId && !String(docId).startsWith('new_'));
+
+  if (idsToDelete.length === 0) return;
+
+  await deleteDoc(doc(db, "strutture", idsToDelete[0]));
+  for (let i = 1; i < idsToDelete.length; i++) {
+    try {
+      await deleteDoc(doc(db, "strutture", idsToDelete[i]));
+      console.log('🧹 Duplicato eliminato da Firestore:', idsToDelete[i]);
+    } catch (dupErr) {
+      console.warn('⚠️ Impossibile eliminare duplicato Firestore:', idsToDelete[i], dupErr);
+    }
+  }
+}
+
 // === Elimina struttura ===
 async function eliminaStruttura(id) {
   // 🔒 SICUREZZA: Verifica autenticazione
@@ -2238,6 +2281,9 @@ async function eliminaStruttura(id) {
 
       // Rimuovi la struttura dall'array locale immediatamente per feedback visivo
       const index = strutture.findIndex(s => s.id === id);
+      const duplicateIds = index !== -1 && Array.isArray(strutture[index]._duplicateIds)
+        ? [...strutture[index]._duplicateIds]
+        : [];
       if (index !== -1) {
         strutture.splice(index, 1);
         window.strutture = strutture;
@@ -2246,9 +2292,8 @@ async function eliminaStruttura(id) {
         console.log('✅ Struttura rimossa dall\'array locale');
       }
 
-      // Elimina da Firestore
-      const strutturaRef = doc(db, "strutture", id);
-      await deleteDoc(strutturaRef);
+      // Elimina da Firestore (inclusi eventuali duplicati)
+      await deleteStructureDocsFromFirestore(id, duplicateIds);
       console.log('✅ Struttura eliminata da Firestore');
 
       // Ricarica da Firestore per sincronizzazione completa
@@ -2271,6 +2316,7 @@ async function eliminaStrutturaConConferma(id) {
     console.error('Struttura non trovata:', id);
     return;
   }
+  const duplicateIds = Array.isArray(struttura._duplicateIds) ? [...struttura._duplicateIds] : [];
 
   // Rimuovi modal esistente se presente
   const existingModal = document.getElementById('confirmDeleteModal');
@@ -2354,7 +2400,11 @@ async function eliminaStrutturaConConferma(id) {
       modal.remove();
       // Chiudi anche la scheda completa se aperta
       if (modalScheda) {
+        window._hasActiveUnsavedChanges = null;
+        window._onSchedaBackAction = null;
+        isEditMode = false;
         modalScheda.remove();
+        modalScheda = null;
       }
 
       // Invalidiamo la cache locale PRIMA dell'eliminazione
@@ -2372,9 +2422,8 @@ async function eliminaStrutturaConConferma(id) {
         console.log('✅ Struttura rimossa dall\'array locale');
       }
 
-      // Elimina da Firestore
-      const strutturaRef = doc(db, "strutture", id);
-      await deleteDoc(strutturaRef);
+      // Elimina da Firestore (inclusi eventuali duplicati)
+      await deleteStructureDocsFromFirestore(id, duplicateIds);
       console.log('✅ Struttura eliminata da Firestore');
 
       // Mostra messaggio di successo
@@ -2441,71 +2490,10 @@ async function eliminaStrutturaConConferma(id) {
 
 
 
-// === Aggiungi nuova struttura ===
+// === Aggiungi nuova struttura (pagina separata) ===
 async function aggiungiStruttura() {
-  // Crea una struttura vuota per la nuova struttura
-  const nuovaStruttura = {
-    id: 'new_' + Date.now(), // ID temporaneo
-    Struttura: '',
-    Luogo: '',
-    Indirizzo: '',
-    Prov: '',
-    Info: '',
-    'A persona': '',
-    'A giornata': '',
-    'A notte': '',
-    Offerta: '',
-    Forfait: '',
-    Riscaldamento: '',
-    Cucina: '',
-    'Altri costi': '',
-    'Altre info': '',
-    Terreno: false,
-    Casa: false,
-    Letti: '',
-    Cucina: '',
-    Spazi: '',
-    Fuochi: '',
-    Hike: '',
-    Escursioni: '',
-    Trasporti: '',
-    Branco: false,
-    Reparto: false,
-    Compagnia: false,
-    Gruppo: false,
-    Sezione: false,
-    Referente: '',
-    Email: '',
-    Sito: '',
-    Contatto: '',
-    IIcontatto: '',
-    'Ultimo controllo': '',
-    'Da chi': '',
-    Note: '',
-    'Altre info': '',
-    // Nuovi campi per il sistema avanzato
-    stato: 'attiva',
-    coordinate_lat: null,
-    coordinate_lng: null,
-    google_maps_link: '',
-    coordinate: { lat: null, lng: null },
-    rating: { total: 0, count: 0, average: 0 },
-    segnalazioni: [],
-    immagini: [],
-    lastModified: new Date(),
-    lastModifiedBy: auth.currentUser?.uid || null,
-    createdAt: new Date(),
-    createdBy: auth.currentUser?.uid || null,
-    version: 1
-  };
-
-  // NON aggiungere la struttura temporanea all'array globale
-  // Verrà aggiunta solo dopo il salvataggio su Firestore
-  // Questo evita duplicati nella visualizzazione
-
-  // Apri la scheda in modalità creazione passando la struttura direttamente
-  // La scheda userà questa struttura temporanea senza aggiungerla all'array
-  mostraSchedaCompletaConStruttura(nuovaStruttura);
+  closeMenu();
+  window.location.href = 'nuova-struttura.html';
 }
 
 // === Sezione Aiuto ===
@@ -3791,6 +3779,16 @@ function setupMainMapControls() {
   });
 
   window.toggleMarkerLegend = toggleMarkerLegend;
+
+  // Toggle visibilità strutture da aggiornare (<50% o >= 1 anno) nella legenda segnalini
+  const toggleLowVisibilityBtn = document.getElementById('toggleLowVisibilityMarkers');
+  if (toggleLowVisibilityBtn) {
+    toggleLowVisibilityBtn.addEventListener('change', (e) => {
+      if (window.mapsManager && typeof window.mapsManager.setShowLowVisibilityMarkers === 'function') {
+        window.mapsManager.setShowLowVisibilityMarkers(e.target.checked);
+      }
+    });
+  }
 
   // Pulsante centro su di me
   const centerMapBtn = document.getElementById('centerMapBtn');
@@ -8160,7 +8158,8 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
   // Determina se è una nuova struttura: solo se l'ID inizia con 'new_'
   // Se la struttura ha già un ID Firestore valido (non inizia con 'new_'), è una struttura esistente
-  const isNewStructure = strutturaId.startsWith('new_');
+  const isNewStructure = String(strutturaId).startsWith('new_');
+  isEditMode = isNewStructure;
 
   // Se è una nuova struttura, salvala nella mappa temporanea per riferimento
   if (isNewStructure) {
@@ -8176,6 +8175,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   // Snapshot originale per tracciare e ripristinare modifiche
   let initialStrutturaSnapshot = cloneStructureSnapshot(struttura);
   let isFormDirty = false;
+  let isSavingScheda = false;
 
   const checkUnsavedChanges = () => {
     if (!isEditMode) return false;
@@ -8199,6 +8199,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   }
 
   function chiudiScheda(skipHistoryBack = false) {
+    isEditMode = false;
     window._hasActiveUnsavedChanges = null;
     window._onSchedaBackAction = null;
     document.removeEventListener('keydown', onKeyDownEscape);
@@ -10016,6 +10017,10 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
   // Funzione per salvare modifiche
   async function salvaModificheScheda(strutturaId) {
+    if (isSavingScheda) return false;
+    isSavingScheda = true;
+    if (saveBtn) saveBtn.disabled = true;
+
     try {
       // Sincronizza i valori attuali dei campi del form nell'oggetto struttura
       if (content) {
@@ -10035,7 +10040,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
 
       // Determina se è una nuova struttura basandosi sull'ID corrente (non sulla variabile locale)
       // Se l'ID inizia con 'new_', è una nuova struttura, altrimenti è un aggiornamento
-      const isNuovaStruttura = strutturaId.startsWith('new_');
+      const isNuovaStruttura = String(strutturaId).startsWith('new_');
 
       if (isNuovaStruttura) {
         // Aggiorna metadati per nuova struttura
@@ -10053,12 +10058,12 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         if (struttura.Struttura && struttura.Luogo && struttura.Prov) {
           const strutturaEsistente = strutture.find(s =>
             s.Struttura && struttura.Struttura &&
-            s.Struttura.trim() === struttura.Struttura.trim() &&
+            s.Struttura.trim().toLowerCase() === struttura.Struttura.trim().toLowerCase() &&
             s.Luogo && struttura.Luogo &&
-            s.Luogo.trim() === struttura.Luogo.trim() &&
+            s.Luogo.trim().toLowerCase() === struttura.Luogo.trim().toLowerCase() &&
             s.Prov && struttura.Prov &&
-            s.Prov.trim() === struttura.Prov.trim() &&
-            s.id && !s.id.startsWith('new_') // Solo strutture già salvate
+            s.Prov.trim().toLowerCase() === struttura.Prov.trim().toLowerCase() &&
+            s.id && !String(s.id).startsWith('new_') // Solo strutture già salvate
           );
 
           if (strutturaEsistente) {
@@ -10068,12 +10073,17 @@ async function mostraSchedaCompletaConStruttura(struttura) {
           }
         }
 
-        // Crea nuova struttura in Firestore
-        const docRef = await addDoc(colRef, struttura);
+        // Crea nuova struttura in Firestore senza scrivere il campo id temporaneo
+        const firestorePayload = sanitizeStructureForFirestore(struttura);
+        const docRef = await addDoc(colRef, firestorePayload);
 
         // Aggiorna l'ID con quello di Firestore
         const nuovoId = docRef.id;
         struttura.id = nuovoId;
+
+        // Invalida cache locale per forzare ricaricamento pulito
+        localStorage.removeItem('strutture_cache');
+        localStorage.removeItem('strutture_cache_timestamp');
 
         // Verifica che non esista già nell'array prima di aggiungerla
         const giaPresente = strutture.find(s => s.id === nuovoId);
@@ -10144,9 +10154,27 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         struttura.lastModifiedBy = getCurrentUser()?.uid || null;
         struttura.version = (struttura.version || 1) + 1;
 
+        const duplicateIds = Array.isArray(struttura._duplicateIds) ? [...struttura._duplicateIds] : [];
+        const firestorePayload = sanitizeStructureForFirestore(struttura);
+
         // Aggiorna struttura esistente
         const docRef = doc(db, "strutture", strutturaId);
-        await updateDoc(docRef, struttura);
+        await updateDoc(docRef, firestorePayload);
+
+        // Rimuove eventuali documenti duplicati orfani associati a questa struttura
+        if (duplicateIds.length > 0) {
+          for (const dupId of duplicateIds) {
+            if (dupId && dupId !== strutturaId && !String(dupId).startsWith('new_')) {
+              try {
+                await deleteDoc(doc(db, "strutture", dupId));
+                console.log('🧹 Documento duplicato rimosso da Firestore:', dupId);
+              } catch (dupErr) {
+                console.warn('⚠️ Impossibile rimuovere documento duplicato:', dupId, dupErr);
+              }
+            }
+          }
+          delete struttura._duplicateIds;
+        }
 
         // INVALIDARE CACHE LOCALE per forzare ricaricamento
         localStorage.removeItem('strutture_cache');
@@ -10198,6 +10226,9 @@ async function mostraSchedaCompletaConStruttura(struttura) {
       console.error('❌ Errore nel salvataggio:', error);
       alert('❌ Errore nel salvataggio: ' + error.message);
       return false;
+    } finally {
+      isSavingScheda = false;
+      if (saveBtn) saveBtn.disabled = false;
     }
   }
 
@@ -10229,9 +10260,12 @@ async function mostraSchedaCompletaConStruttura(struttura) {
   creaContenutoScheda();
   await creaGalleriaImmagini();
 
-  // Chiudi modal cliccando fuori
+  // Chiudi modal cliccando fuori (solo in modalità visualizzazione; in modifica non chiudere mai)
   modalScheda.addEventListener('click', (e) => {
     if (e.target === modalScheda) {
+      if (isEditMode) {
+        return;
+      }
       const intercettato = gestisciUscitaConConferma(() => chiudiScheda());
       if (!intercettato) {
         if (isNewStructure) {
@@ -10447,15 +10481,7 @@ function initializeNewUI() {
     console.warn('⚠️ Theme toggle non trovato');
   }
 
-  // Empty state button
-  const addBtnEmpty = document.getElementById('addBtnEmpty');
-  const addBtn = document.getElementById('add-btn');
-  if (addBtnEmpty && addBtn) {
-    addBtnEmpty.addEventListener('click', () => {
-      addBtn.click();
-    });
-  }
-
+  // Empty state button gestito in initializeUIEventListeners()
   console.log('✅ Nuova UI inizializzata');
 }
 
@@ -11511,16 +11537,7 @@ async function bootstrapApp() {
       });
     }
 
-    const addBtn = document.getElementById("add-btn");
-    if (addBtn) {
-      addBtn.addEventListener("click", aggiungiStruttura);
-    }
-
-    const resetBtn = document.getElementById("resetBtn");
-    if (resetBtn) {
-      resetBtn.addEventListener("click", resetFiltri);
-    }
-    // exportBtn gestito in initializeUIEventListeners()
+    // addBtn, resetBtn ed exportBtn gestiti in initializeUIEventListeners()
 
     // Event listener per toggle visualizzazione
     const viewToggleItem = document.getElementById("viewToggleItem") || document.querySelector(".view-toggle");

@@ -5,6 +5,10 @@ import {
   collection,
   getDocs
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import {
+  normalizeFirestoreStructureDoc,
+  deduplicateStructures
+} from "./utils/structure.js";
 
 // === Configurazione Firebase ===
 // Caricata runtime da /api/firebase-config.js
@@ -74,7 +78,8 @@ async function caricaStrutture() {
   try {
     console.log('📊 Caricamento dati per dashboard...');
     const snapshot = await getDocs(colRef);
-    const struttureLocali = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const rawStrutture = snapshot.docs.map(d => normalizeFirestoreStructureDoc(d.id, d.data()));
+    const struttureLocali = deduplicateStructures(rawStrutture);
     
     // Aggiorna le strutture globali
     window.strutture = struttureLocali;

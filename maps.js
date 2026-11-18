@@ -48,6 +48,8 @@ class MapsManager {
     this.routingControl = null;
     this.railwayLayer = null;
     this.overlayLayers = {};
+    this.showLowVisibilityMarkers = true;
+    this.lastStructuresList = [];
   }
 
   async initialize(containerId = 'map') {
@@ -127,6 +129,116 @@ class MapsManager {
     }
   }
 
+  setShowLowVisibilityMarkers(show) {
+    this.showLowVisibilityMarkers = Boolean(show);
+    this.updateMarkers(this.lastStructuresList || window.strutture || []);
+  }
+
+  getStructureVisibility(struttura) {
+    if (typeof window.evaluateStructureMapVisibility === 'function') {
+      return window.evaluateStructureMapVisibility(struttura);
+    }
+
+    // Fallback standalone se utils/structure.js non fosse ancora esposto
+    const hasVal = (v) => (typeof v === 'boolean' ? v === true : (v !== undefined && v !== null && String(v).trim() !== ''));
+    let score = 0;
+    if (hasVal(struttura?.Luogo) && hasVal(struttura?.Prov)) score += 15;
+    if ((struttura?.coordinate_lat && struttura?.coordinate_lng) ||
+      (struttura?.coordinate?.lat && struttura?.coordinate?.lng) ||
+      hasVal(struttura?.Indirizzo)) {
+      score += 15;
+    }
+    if (hasVal(struttura?.Contatto) || hasVal(struttura?.Email) || hasVal(struttura?.Sito)) score += 10;
+    if (hasVal(struttura?.['A persona']) || hasVal(struttura?.['A giornata']) ||
+      hasVal(struttura?.['A notte']) || hasVal(struttura?.Offerta) ||
+      hasVal(struttura?.Forfait) || hasVal(struttura?.['Altri costi'])) {
+      score += 15;
+    }
+    if (hasVal(struttura?.Referente)) score += 10;
+    if (hasVal(struttura?.Info) || hasVal(struttura?.Note) || hasVal(struttura?.['Altre info'])) score += 15;
+    if (hasVal(struttura?.Letti) || hasVal(struttura?.Spazi) ||
+      hasVal(struttura?.Fuochi) || hasVal(struttura?.Hike) ||
+      hasVal(struttura?.Cucina) || hasVal(struttura?.Riscaldamento)) {
+      score += 15;
+    }
+    if (hasVal(struttura?.google_maps_link)) score += 5;
+    score = Math.min(100, score);
+
+    const parseDateFallback = (val) => {
+      if (!val) return null;
+      if (val instanceof Date) return Number.isNaN(val.getTime()) ? null : val;
+      if (typeof val === 'object' && typeof val.toDate === 'function') return val.toDate();
+      if (typeof val === 'object' && (typeof val.seconds === 'number' || typeof val._seconds === 'number')) {
+        return new Date((val.seconds ?? val._seconds) * 1000);
+      }
+      if (typeof val === 'string') {
+        const m = val.trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+        if (m) {
+          let y = parseInt(m[3], 10);
+          if (y < 100) y += y >= 70 ? 1900 : 2000;
+          return new Date(y, parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+        }
+      }
+      const d = new Date(val);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const candidates = [
+      struttura?.lastModified,
+      struttura?.reviewStatus?.lastReviewedDate,
+      struttura?.['Ultimo controllo'],
+      struttura?.updatedAt,
+      struttura?.createdAt
+    ];
+    let latestDate = null;
+    for (const c of candidates) {
+      const d = parseDateFallback(c);
+      if (d && (!latestDate || d.getTime() > latestDate.getTime())) {
+        latestDate = d;
+      }
+    }
+
+    const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+    const isOutdated = !latestDate || (Date.now() - latestDate.getTime()) >= ONE_YEAR_MS;
+    const isIncomplete = score < 50;
+    const isLowVisibility = isIncomplete || isOutdated;
+    const reasons = [];
+    if (isIncomplete) reasons.push(`Scheda completa al ${score}% (< 50%)`);
+    if (isOutdated) {
+      reasons.push(latestDate
+        ? 'Non aggiornata da oltre 1 anno'
+        : 'Data ultimo aggiornamento non presente');
+    }
+
+    return {
+      completenessScore: score,
+      lastUpdateDate: latestDate,
+      isOutdated,
+      isIncomplete,
+      isLowVisibility,
+      reasons
+    };
+  }
+
+  buildVisibilityPopupHtml(vis) {
+    if (!vis) return '';
+    const completenessHtml = `
+      <div style="margin: 6px 0; font-size: 12px; color: #555;">
+        📊 Completezza scheda: <strong>${vis.completenessScore}%</strong>
+      </div>
+    `;
+    if (!vis.isLowVisibility) {
+      return completenessHtml;
+    }
+    return `
+      ${completenessHtml}
+      <div style="margin: 6px 0; padding: 6px 8px; border-radius: 4px; background: #fff3cd; border-left: 3px solid #f59e0b; color: #856404; font-size: 12px;">
+        <strong>⚠️ Scheda da verificare/aggiornare</strong><br>
+        ${vis.reasons.map(r => escapeHtml(r)).join('<br>')}
+      </div>
+    `;
+  }
+
   addStructureMarker(struttura) {
     if (!this.isInitialized || !this.map) return;
 
@@ -148,12 +260,16 @@ class MapsManager {
         return;
       }
 
-      // Crea icona personalizzata basata sul tipo
-      const icon = this.createStructureIcon(struttura);
+      const vis = this.getStructureVisibility(struttura);
 
-      // Crea marker
-      const marker = L.marker([lat, lng], { icon })
-        .bindPopup(this.createStructurePopup(struttura));
+      // Crea icona personalizzata basata sul tipo
+      const icon = this.createStructureIcon(struttura, vis);
+
+      // Crea marker (zIndexOffset negativo per strutture con bassa visibilità)
+      const marker = L.marker([lat, lng], {
+        icon,
+        zIndexOffset: vis.isLowVisibility ? -250 : 0
+      }).bindPopup(this.createStructurePopup(struttura, vis));
 
       this.markers.push({
         marker,
@@ -335,15 +451,25 @@ class MapsManager {
     const finalLat = lat + offsetLat;
     const finalLng = lng + offsetLng;
 
+    const vis = this.getStructureVisibility(struttura);
+
     // Crea icona personalizzata per marker di fallback (C = città, P = provincia)
     const fallbackColor = isCityFallback ? '#f97316' : '#8b5cf6';
     const fallbackLetter = isCityFallback ? 'C' : 'P';
     const fallbackTitle = isCityFallback ? 'Posizione approx. città' : 'Posizione approx. provincia';
+    const markerTitle = vis.isLowVisibility
+      ? `${fallbackTitle} • ${vis.reasons.join(' • ')}`
+      : fallbackTitle;
+    const iconSize = vis.isLowVisibility ? 20 : 22;
+    const borderCss = vis.isLowVisibility ? '2px dashed #fff' : '2px solid #fff';
+    const visibilityCss = vis.isLowVisibility ? 'opacity: 0.52; filter: saturate(0.5);' : '';
+    const warningDot = vis.isLowVisibility ? '<span class="marker-warning-dot" aria-hidden="true">!</span>' : '';
+
     const icon = L.divIcon({
-      className: 'custom-div-icon',
-      html: `<div title="${fallbackTitle}" style="background-color: ${fallbackColor}; color: #ffffff; border: 2px solid #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${fallbackLetter}</div>`,
-      iconSize: [22, 22],
-      iconAnchor: [11, 11]
+      className: vis.isLowVisibility ? 'custom-div-icon custom-marker--low-visibility' : 'custom-div-icon',
+      html: `<div title="${escapeHtml(markerTitle)}" style="position: relative; background-color: ${fallbackColor}; color: #ffffff; border: ${borderCss}; border-radius: 50%; width: ${iconSize}px; height: ${iconSize}px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); ${visibilityCss}">${fallbackLetter}${warningDot}</div>`,
+      iconSize: [iconSize, iconSize],
+      iconAnchor: [Math.round(iconSize / 2), Math.round(iconSize / 2)]
     });
 
     const safeStruttura = escapeHtml(struttura.Struttura || 'Struttura senza nome');
@@ -354,10 +480,13 @@ class MapsManager {
     const safeEmail = escapeHtml(struttura.Email || '');
     const safeInfo = escapeHtml(struttura.Info || '');
     const safeId = escapeHtml(struttura.id || '');
+    const visibilityPopupHtml = this.buildVisibilityPopupHtml(vis);
 
     // Crea marker con popup personalizzato
-    const marker = L.marker([finalLat, finalLng], { icon })
-      .bindPopup(`
+    const marker = L.marker([finalLat, finalLng], {
+      icon,
+      zIndexOffset: vis.isLowVisibility ? -250 : 0
+    }).bindPopup(`
         <div style="min-width: 200px;">
           <h4 style="margin: 0 0 8px 0; color: #2c5530;">${safeStruttura}</h4>
           <p style="margin: 4px 0;"><strong>📍 Luogo:</strong> ${safeLuogo}, ${safeProv}</p>
@@ -365,6 +494,7 @@ class MapsManager {
             <strong>⚠️ Posizione approssimativa</strong><br>
             Coordinate basate su: ${isCityFallback ? 'Città (media)' : 'Provincia'}
           </p>
+          ${visibilityPopupHtml}
           ${safeReferente ? `<p style="margin: 4px 0;"><strong>👤 Referente:</strong> ${safeReferente}</p>` : ''}
           ${safeContatto ? `<p style="margin: 4px 0;"><strong>📞 Contatto:</strong> ${safeContatto}</p>` : ''}
           ${safeEmail ? `<p style="margin: 4px 0;"><strong>📧 Email:</strong> ${safeEmail}</p>` : ''}
@@ -392,7 +522,8 @@ class MapsManager {
     console.log(`📍 Marker di fallback (${isCityFallback ? 'CITTA' : 'PROV'}) aggiunto per: ${struttura.Struttura}`);
   }
 
-  createStructureIcon(struttura) {
+  createStructureIcon(struttura, visibility = null) {
+    const vis = visibility || this.getStructureVisibility(struttura);
     let iconHtml = '<i class="fas fa-campground"></i>';
     let iconColor = '#2f6b2f';
 
@@ -414,27 +545,38 @@ class MapsManager {
       iconHtml = '<i class="fas fa-seedling"></i>';
     }
 
+    const size = vis.isLowVisibility ? 26 : 30;
+    const anchor = Math.round(size / 2);
+    const fontSize = vis.isLowVisibility ? 13 : 16;
+    const borderStyle = vis.isLowVisibility ? '2px dashed rgba(255,255,255,0.95)' : '2px solid white';
+    const lowVisStyles = vis.isLowVisibility ? 'opacity: 0.52; filter: saturate(0.5);' : '';
+    const warningDot = vis.isLowVisibility ? '<span class="marker-warning-dot" aria-hidden="true">!</span>' : '';
+    const titleAttr = vis.isLowVisibility ? `title="${escapeHtml(vis.reasons.join(' • '))}"` : '';
+
     return L.divIcon({
-      html: `<div style="
+      html: `<div ${titleAttr} style="
+        position: relative;
         background: ${iconColor};
         color: white;
         border-radius: 50%;
-        width: 30px;
-        height: 30px;
+        width: ${size}px;
+        height: ${size}px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 16px;
-        border: 2px solid white;
+        font-size: ${fontSize}px;
+        border: ${borderStyle};
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      ">${iconHtml}</div>`,
-      className: 'custom-marker',
-      iconSize: [30, 30],
-      iconAnchor: [15, 15]
+        ${lowVisStyles}
+      ">${iconHtml}${warningDot}</div>`,
+      className: vis.isLowVisibility ? 'custom-marker custom-marker--low-visibility' : 'custom-marker',
+      iconSize: [size, size],
+      iconAnchor: [anchor, anchor]
     });
   }
 
-  createStructurePopup(struttura) {
+  createStructurePopup(struttura, visibility = null) {
+    const vis = visibility || this.getStructureVisibility(struttura);
     const safeStruttura = escapeHtml(struttura.Struttura || 'Struttura senza nome');
     const safeLuogo = escapeHtml(struttura.Luogo || 'N/A');
     const safeProv = escapeHtml(struttura.Prov || 'N/A');
@@ -442,6 +584,7 @@ class MapsManager {
     const safeContatto = escapeHtml(struttura.Contatto || '');
     const safeEmail = escapeHtml(struttura.Email || '');
     const safeId = escapeHtml(struttura.id || '');
+    const visibilityPopupHtml = this.buildVisibilityPopupHtml(vis);
 
     const popupContent = `
       <div style="min-width: 200px;">
@@ -454,6 +597,7 @@ class MapsManager {
           ${struttura.Terreno ? '<span style="background: #17a2b8; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-right: 4px;">🌱 Terreno</span>' : ''}
           ${struttura.stato ? `<span style="background: ${this.getStateColor(struttura.stato)}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px;">${this.getStateIcon(struttura.stato)} ${this.getStateLabel(struttura.stato)}</span>` : ''}
         </div>
+        ${visibilityPopupHtml}
         ${safeReferente ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Referente:</strong> ${safeReferente}</p>` : ''}
         ${safeContatto ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Contatto:</strong> ${safeContatto}</p>` : ''}
         ${safeEmail ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Email:</strong> ${safeEmail}</p>` : ''}
@@ -527,8 +671,35 @@ class MapsManager {
 
     this.clearMarkers();
 
-    // Processa ogni struttura per ottenere coordinate
-    for (const struttura of strutture) {
+    const inputList = Array.isArray(strutture) ? strutture : [];
+    this.lastStructuresList = inputList;
+
+    const deduplicated = typeof window.deduplicateStructures === 'function'
+      ? window.deduplicateStructures(inputList)
+      : inputList;
+
+    const seenIds = new Set();
+    const seenKeys = new Set();
+    let renderedCount = 0;
+
+    // Processa ogni struttura per ottenere coordinate evitando duplicati
+    for (const struttura of deduplicated) {
+      if (!struttura) continue;
+      if (struttura.id && seenIds.has(String(struttura.id))) continue;
+
+      const normName = String(struttura.Struttura || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const normLuogo = String(struttura.Luogo || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const compositeKey = normName ? `${normName}|${normLuogo}` : '';
+      if (compositeKey && seenKeys.has(compositeKey)) continue;
+
+      if (struttura.id) seenIds.add(String(struttura.id));
+      if (compositeKey) seenKeys.add(compositeKey);
+
+      const vis = this.getStructureVisibility(struttura);
+      if (!this.showLowVisibilityMarkers && vis.isLowVisibility) {
+        continue;
+      }
+
       // Se ha coordinate precise, mostra direttamente
       if ((struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng) ||
         (struttura.coordinate_lat && struttura.coordinate_lng)) {
@@ -537,8 +708,9 @@ class MapsManager {
         // Fallback: usa coordinate di provincia (senza geocoding automatico)
         this.addStructureMarkerWithFallback(struttura);
       }
+      renderedCount++;
     }
-    console.log(`📍 ${strutture.length} marker aggiornati sulla mappa`);
+    console.log(`📍 ${renderedCount} marker aggiornati sulla mappa`);
   }
 
   // Funzione rimossa: tentaGeocodingAutomatico

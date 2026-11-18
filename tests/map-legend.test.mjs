@@ -247,3 +247,35 @@ test('index.html and index.local.html have Scout compass menu button with badge 
   assert.ok(css.includes('.btn-menu--scout[aria-expanded="true"]'), 'styles.css must handle open state');
 });
 
+test('index.html and index.local.html include low-visibility marker legend swatch and toggle', () => {
+  const indexHtml = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const localHtml = fs.readFileSync(path.join(projectRoot, 'index.local.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'styles.css'), 'utf8');
+
+  assert.ok(indexHtml.includes('marker-swatch--low-visibility'), 'index.html must show low-visibility swatch');
+  assert.ok(indexHtml.includes('id="toggleLowVisibilityMarkers"'), 'index.html must have low-visibility toggle');
+  assert.ok(localHtml.includes('marker-swatch--low-visibility'), 'index.local.html must show low-visibility swatch');
+  assert.ok(localHtml.includes('id="toggleLowVisibilityMarkers"'), 'index.local.html must have low-visibility toggle');
+
+  assert.ok(css.includes('.custom-marker--low-visibility'), 'styles.css must style low-visibility map markers');
+  assert.ok(css.includes('.marker-swatch--low-visibility'), 'styles.css must style low-visibility legend swatch');
+});
+
+test('standalone new structure page exists with form, draft persistence, and live completeness bar', () => {
+  const htmlPath = path.join(projectRoot, 'nuova-struttura.html');
+  const jsPath = path.join(projectRoot, 'nuova-struttura.js');
+  assert.ok(fs.existsSync(htmlPath), 'nuova-struttura.html must exist');
+  assert.ok(fs.existsSync(jsPath), 'nuova-struttura.js must exist');
+
+  const html = fs.readFileSync(htmlPath, 'utf8');
+  const js = fs.readFileSync(jsPath, 'utf8');
+  const scriptJs = fs.readFileSync(path.join(projectRoot, 'script.js'), 'utf8');
+
+  assert.ok(html.includes('id="newStructureForm"'), 'nuova-struttura.html must have newStructureForm');
+  assert.ok(html.includes('id="completenessBarFill"'), 'nuova-struttura.html must have completeness progress bar');
+  assert.ok(html.includes('id="newStructureMap"'), 'nuova-struttura.html must have map container');
+  assert.ok(js.includes('quovadiscout_new_structure_draft'), 'nuova-struttura.js must persist draft in localStorage');
+  assert.ok(js.includes('sanitizeStructureForFirestore'), 'nuova-struttura.js must sanitize payload for Firestore');
+  assert.ok(scriptJs.includes("window.location.href = 'nuova-struttura.html'"), 'script.js aggiungiStruttura must navigate to nuova-struttura.html');
+});
+
