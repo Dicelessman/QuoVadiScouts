@@ -2,11 +2,15 @@ import { calculateDistanceKm } from './geo.js';
 
 export function normalizeStructureCoordinates(struttura) {
   const s = { ...struttura };
-  if (s.coordinate && s.coordinate.lat && s.coordinate.lng) {
-    s.coordinate_lat = s.coordinate_lat ?? s.coordinate.lat;
-    s.coordinate_lng = s.coordinate_lng ?? s.coordinate.lng;
-  } else if (s.coordinate_lat != null && s.coordinate_lng != null) {
-    s.coordinate = s.coordinate ?? { lat: s.coordinate_lat, lng: s.coordinate_lng };
+  const hasObjCoords = s.coordinate && s.coordinate.lat != null && s.coordinate.lng != null &&
+    s.coordinate.lat !== '' && s.coordinate.lng !== '' &&
+    !Number.isNaN(Number(s.coordinate.lat)) && !Number.isNaN(Number(s.coordinate.lng));
+  if (hasObjCoords) {
+    s.coordinate_lat = (s.coordinate_lat != null && s.coordinate_lat !== '') ? s.coordinate_lat : s.coordinate.lat;
+    s.coordinate_lng = (s.coordinate_lng != null && s.coordinate_lng !== '') ? s.coordinate_lng : s.coordinate.lng;
+  } else if (s.coordinate_lat != null && s.coordinate_lng != null && s.coordinate_lat !== '' && s.coordinate_lng !== '' &&
+    !Number.isNaN(Number(s.coordinate_lat)) && !Number.isNaN(Number(s.coordinate_lng))) {
+    s.coordinate = { lat: s.coordinate_lat, lng: s.coordinate_lng };
   }
   return s;
 }
@@ -175,13 +179,36 @@ function hasFilledValue(val) {
   return val !== undefined && val !== null && String(val).trim() !== '';
 }
 
+function getValidCoordinatesPair(s) {
+  if (!s || typeof s !== 'object') return null;
+  const pairs = [
+    [s.coordinate?.lat, s.coordinate?.lng],
+    [s.coordinate_lat, s.coordinate_lng]
+  ];
+  for (const [rawLat, rawLng] of pairs) {
+    if (rawLat !== null && rawLat !== undefined && rawLat !== '' &&
+        rawLng !== null && rawLng !== undefined && rawLng !== '') {
+      const lat = Number(rawLat);
+      const lng = Number(rawLng);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+  }
+  return null;
+}
+
 function hasValidCoordinates(s) {
-  if (!s || typeof s !== 'object') return false;
-  const lat = s.coordinate?.lat ?? s.coordinate_lat;
-  const lng = s.coordinate?.lng ?? s.coordinate_lng;
-  return lat !== null && lat !== undefined && lat !== '' &&
-    lng !== null && lng !== undefined && lng !== '' &&
-    !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng));
+  return getValidCoordinatesPair(s) !== null;
+}
+
+/**
+ * Restituisce true per record fantasma (completamente vuoti) o già marcati come duplicati eliminati.
+ */
+export function isGhostOrDeletedStructure(s) {
+  if (!s || typeof s !== 'object') return true;
+  if (s.isDeletedDuplicate === true) return true;
+  return !hasFilledValue(s.Struttura) && !hasFilledValue(s.Luogo) && !hasFilledValue(s.Indirizzo);
 }
 
 /**
@@ -206,6 +233,7 @@ export function sanitizeStructureForFirestore(struttura) {
   delete sanitized.id;
   delete sanitized._legacyId;
   delete sanitized._duplicateIds;
+  delete sanitized._ghostIds;
   delete sanitized.distanzaKm;
   return sanitized;
 }
@@ -447,12 +475,41 @@ export function evaluateStructureMapVisibility(s, now = new Date()) {
   };
 }
 
+const PIEDMONT_PROVINCES = new Set(['CN', 'TO', 'AT', 'AL', 'BI', 'NO', 'VB', 'VC']);
+
+const GENERIC_STRUCTURE_NAMES = new Set([
+  'casa',
+  'parrocchia',
+  'terreno',
+  'oratorio',
+  'sede scout',
+  'colonia',
+  'casa parrocchiale',
+  'casa alpina',
+  'centro vacanze',
+  'istituto di suore',
+  'rifugio',
+  'baita'
+]);
+
 function normalizeMatchText(str) {
   return String(str || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+function hasPlausibleProvinceCoordinates(s) {
+  const coords = getValidCoordinatesPair(s);
+  if (!coords) return false;
+  const prov = String(s.Prov || '').toUpperCase().trim();
+  if (PIEDMONT_PROVINCES.has(prov)) {
+    return coords.lat >= 43.7 && coords.lat <= 46.6;
+  }
+  return true;
+}
+
 function getRecordQuality(s) {
-  const hasCoords = hasValidCoordinates(s) ? 1000 : 0;
+  const hasCoords = hasValidCoordinates(s)
+    ? (hasPlausibleProvinceCoordinates(s) ? 1000 : 100)
+    : 0;
   const hasRealId = s.id && !String(s.id).startsWith('new_') ? 500 : 0;
   const { score } = calculateStructureCompleteness(s);
   const updateDate = getStructureLastUpdateDate(s);
@@ -472,42 +529,83 @@ function isBetterRecord(candidate, current) {
 function areDuplicateStructures(a, b) {
   if (!a || !b) return false;
   if (a.id && b.id && String(a.id) === String(b.id)) return true;
-  if (a._legacyId && b._legacyId && String(a._legacyId) === String(b._legacyId)) return true;
-  if (a._legacyId && b.id && String(a._legacyId) === String(b.id)) return true;
-  if (b._legacyId && a.id && String(b._legacyId) === String(a.id)) return true;
 
   const nameA = normalizeMatchText(a.Struttura);
   const nameB = normalizeMatchText(b.Struttura);
+
+  const sameLegacyId = (a._legacyId && b._legacyId && String(a._legacyId) === String(b._legacyId)) ||
+    (a._legacyId && b.id && String(a._legacyId) === String(b.id)) ||
+    (b._legacyId && a.id && String(b._legacyId) === String(a.id));
+  if (sameLegacyId && (!nameA || !nameB || nameA === nameB)) {
+    return true;
+  }
+
   if (!nameA || !nameB || nameA !== nameB) return false;
 
   const luogoA = normalizeMatchText(a.Luogo);
   const luogoB = normalizeMatchText(b.Luogo);
   const provA = normalizeMatchText(a.Prov);
   const provB = normalizeMatchText(b.Prov);
+  const addrA = normalizeMatchText(a.Indirizzo);
+  const addrB = normalizeMatchText(b.Indirizzo);
+
+  if (GENERIC_STRUCTURE_NAMES.has(nameA)) {
+    if (!luogoA || !luogoB || luogoA !== luogoB) return false;
+    if (addrA && addrB && addrA !== addrB) return false;
+    return true;
+  }
 
   if (luogoA === luogoB) return true;
   if ((!luogoA || !luogoB) && provA === provB) return true;
+
+  const provCompatible = !provA || !provB || provA === provB;
+  if (luogoA && luogoB && provCompatible && (luogoA.includes(luogoB) || luogoB.includes(luogoA))) {
+    return true;
+  }
+
+  if (provA && provA === provB) {
+    const sameWebsite = hasFilledValue(a.Sito) && hasFilledValue(b.Sito) &&
+      normalizeMatchText(a.Sito) === normalizeMatchText(b.Sito);
+    const sameEmail = hasFilledValue(a.Email) && hasFilledValue(b.Email) &&
+      normalizeMatchText(a.Email) === normalizeMatchText(b.Email);
+    const phoneA1 = cleanPhoneNumber(String(a.Contatto || ''));
+    const phoneB1 = cleanPhoneNumber(String(b.Contatto || ''));
+    const phoneA2 = cleanPhoneNumber(String(a.IIcontatto || ''));
+    const phoneB2 = cleanPhoneNumber(String(b.IIcontatto || ''));
+    const samePhone = (phoneA1 && phoneB1 && phoneA1 === phoneB1) ||
+      (phoneA2 && phoneB2 && phoneA2 === phoneB2);
+    if (sameWebsite || sameEmail || samePhone) {
+      return true;
+    }
+  }
+
   return false;
 }
 
 function mergeDuplicatePair(first, second) {
-  const winner = isBetterRecord(second, first) ? second : first;
-  const loser = winner === first ? second : first;
+  const normFirst = normalizeStructureCoordinates(first);
+  const normSecond = normalizeStructureCoordinates(second);
+  const winner = isBetterRecord(normSecond, normFirst) ? normSecond : normFirst;
+  const loser = winner === normFirst ? normSecond : normFirst;
 
   const merged = { ...winner };
-  const skipKeys = new Set(['id', '_legacyId', '_duplicateIds', 'distanzaKm']);
+  const skipKeys = new Set(['id', '_legacyId', '_duplicateIds', '_ghostIds', 'distanzaKm']);
+
+  const loserCoords = getValidCoordinatesPair(loser);
+  if (loserCoords && (!hasValidCoordinates(merged) || (!hasPlausibleProvinceCoordinates(merged) && hasPlausibleProvinceCoordinates(loser)))) {
+    merged.coordinate = { ...loserCoords };
+    merged.coordinate_lat = loserCoords.lat;
+    merged.coordinate_lng = loserCoords.lng;
+  }
 
   for (const key of Object.keys(loser)) {
     if (skipKeys.has(key)) continue;
-    const loserVal = loser[key];
-    const winnerVal = merged[key];
-
-    if (key === 'coordinate') {
-      if (!(merged.coordinate?.lat && merged.coordinate?.lng) && loserVal?.lat && loserVal?.lng) {
-        merged.coordinate = { ...loserVal };
-      }
+    if (key === 'coordinate' || key === 'coordinate_lat' || key === 'coordinate_lng') {
       continue;
     }
+
+    const loserVal = loser[key];
+    const winnerVal = merged[key];
 
     if (key === 'rating') {
       if (!(merged.rating?.count > 0) && loserVal?.count > 0) {
@@ -520,8 +618,10 @@ function mergeDuplicatePair(first, second) {
       (Array.isArray(winnerVal) && winnerVal.length === 0);
     const loserFilled = loserVal !== undefined && loserVal !== null && loserVal !== '' &&
       !(Array.isArray(loserVal) && loserVal.length === 0);
+    const loserStringOverBool = typeof winnerVal === 'boolean' &&
+      typeof loserVal === 'string' && loserVal.trim() !== '';
 
-    if (winnerEmpty && loserFilled) {
+    if ((winnerEmpty && loserFilled) || loserStringOverBool) {
       merged[key] = loserVal;
     }
   }
@@ -560,7 +660,7 @@ export function deduplicateStructures(lista) {
   const result = [];
 
   for (const item of lista) {
-    if (!item || typeof item !== 'object') continue;
+    if (isGhostOrDeletedStructure(item)) continue;
     const matchIndex = result.findIndex(existing => areDuplicateStructures(existing, item));
     if (matchIndex === -1) {
       result.push(normalizeStructureCoordinates(item));

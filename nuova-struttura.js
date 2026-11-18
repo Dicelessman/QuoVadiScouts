@@ -325,7 +325,7 @@ async function queryGeocoder(queryText) {
 
 function getCachedStructures() {
   try {
-    const raw = localStorage.getItem('strutture_cache');
+    const raw = localStorage.getItem('strutture_cache_v2') || localStorage.getItem('strutture_cache');
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? deduplicateStructures(parsed) : [];
@@ -432,6 +432,8 @@ async function saveNewStructure() {
 
       localStorage.removeItem('strutture_cache');
       localStorage.removeItem('strutture_cache_timestamp');
+      localStorage.removeItem('strutture_cache_v2');
+      localStorage.removeItem('strutture_cache_v2_timestamp');
     } else {
       // Fallback locale/demo se Firebase non è configurato
       const cached = getCachedStructures();
@@ -439,8 +441,8 @@ async function saveNewStructure() {
         ...cleanPayload,
         id: 'local_' + Date.now()
       });
-      localStorage.setItem('strutture_cache', JSON.stringify(cached));
-      localStorage.setItem('strutture_cache_timestamp', String(Date.now()));
+      localStorage.setItem('strutture_cache_v2', JSON.stringify(cached));
+      localStorage.setItem('strutture_cache_v2_timestamp', String(Date.now()));
     }
 
     clearStoredDraft();

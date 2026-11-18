@@ -1,9 +1,9 @@
-// Service Worker per QuoVadiScout PWA v1.4.0
-const CACHE_NAME = 'quovadiscout-v1.4.0';
-const STATIC_CACHE = 'static-v1.4.0';
-const DYNAMIC_CACHE = 'dynamic-v1.4.0';
-const IMAGE_CACHE = 'images-v1.4.0';
-const FREQUENTLY_USED_CACHE = 'frequently-used-v1.4.0';
+// Service Worker per QuoVadiScout PWA v1.5.0
+const CACHE_NAME = 'quovadiscout-v1.5.0';
+const STATIC_CACHE = 'static-v1.5.0';
+const DYNAMIC_CACHE = 'dynamic-v1.5.0';
+const IMAGE_CACHE = 'images-v1.5.0';
+const FREQUENTLY_USED_CACHE = 'frequently-used-v1.5.0';
 const MAX_CACHED_STRUCTURES = 50;
 
 // Risorse da cachare staticamente
@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   '/index.local.html',
   '/styles.css',
   '/script.js',
+  '/maps.js',
   '/utils/geo.js',
   '/utils/structure.js',
   '/dashboard.html',
@@ -113,11 +114,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Strategia per risorse statiche
+  // Strategia Network First per risorse statiche (.html/.js/.css) per distribuire subito gli aggiornamenti
   if (isStaticAsset(request)) {
     event.respondWith(
-      cacheFirst(request).catch(error => {
-        console.warn('⚠️ Service Worker: Errore cache-first per:', request.url, error);
+      networkFirst(request).catch(error => {
+        console.warn('⚠️ Service Worker: Errore network-first per:', request.url, error);
         return new Response('Risorsa non disponibile', { status: 404 });
       })
     );

@@ -109,8 +109,8 @@ class BackupSyncManager {
     console.log('🏗️ Sincronizzazione cache strutture...');
     
     // Aggiorna cache con nuove strutture dal server
-    const cacheKey = 'strutture_cache';
-    const cacheTimestamp = 'strutture_cache_timestamp';
+    const cacheKey = 'strutture_cache_v2';
+    const cacheTimestamp = 'strutture_cache_v2_timestamp';
     const CACHE_DURATION = 5 * 60 * 1000; // 5 minuti
     
     const cached = localStorage.getItem(cacheKey);
@@ -245,8 +245,8 @@ class BackupSyncManager {
 
   getCacheData() {
     return {
-      structures: localStorage.getItem('strutture_cache'),
-      structuresTimestamp: localStorage.getItem('strutture_cache_timestamp'),
+      structures: localStorage.getItem('strutture_cache_v2'),
+      structuresTimestamp: localStorage.getItem('strutture_cache_v2_timestamp'),
       analytics: localStorage.getItem('analytics_data'),
       notifications: localStorage.getItem('smart_notifications_data')
     };

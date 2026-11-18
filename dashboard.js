@@ -80,6 +80,9 @@ async function caricaStrutture() {
     const snapshot = await getDocs(colRef);
     const rawStrutture = snapshot.docs.map(d => normalizeFirestoreStructureDoc(d.id, d.data()));
     const struttureLocali = deduplicateStructures(rawStrutture);
+
+    localStorage.removeItem('strutture_cache');
+    localStorage.removeItem('strutture_cache_timestamp');
     
     // Aggiorna le strutture globali
     window.strutture = struttureLocali;

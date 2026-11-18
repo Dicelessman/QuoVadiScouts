@@ -15,6 +15,7 @@ import {
   parseStructureDate,
   getStructureLastUpdateDate,
   evaluateStructureMapVisibility,
+  isGhostOrDeletedStructure,
   deduplicateStructures
 } from '../utils/structure.js';
 
@@ -320,4 +321,190 @@ test('calculateStructureCompleteness and evaluateStructureMapVisibility flag <50
   assert.equal(visNoDate.isOutdated, true);
   assert.equal(visNoDate.isLowVisibility, true);
 });
+
+test('normalizeStructureCoordinates replaces null coordinate object when lat/lng scalars exist', () => {
+  const doc = {
+    id: 'UzMLQjbH4tUAqu32rLGz',
+    Struttura: 'Forte di Vinadio',
+    coordinate: { lat: null, lng: null },
+    coordinate_lat: 44.307457,
+    coordinate_lng: 7.172739
+  };
+  const out = normalizeStructureCoordinates(doc);
+  assert.deepEqual(out.coordinate, { lat: 44.307457, lng: 7.172739 });
+  assert.equal(out.coordinate_lat, 44.307457);
+  assert.equal(out.coordinate_lng, 7.172739);
+});
+
+test('deduplicateStructures handles real duplicate pairs, typo coords, descriptive strings vs booleans, and ghost docs', () => {
+  const realWorldDocs = [
+    // Forte di Vinadio: vincitore + duplicato con _legacyId e coordinate {lat: null, lng: null}
+    normalizeFirestoreStructureDoc('4zez6T2vh4bdbKfuPFw3', {
+      Struttura: 'Forte di Vinadio',
+      Luogo: 'Vinadio',
+      Prov: 'CN',
+      Trasporti: 'Bus locale',
+      Cucina: 'Presente',
+      Spazi: 'Ampi',
+      'A persona': '10 euro',
+      coordinate: { lat: 44.307457, lng: 7.172739 },
+      coordinate_lat: 44.307457,
+      coordinate_lng: 7.172739,
+      version: 2,
+      lastModified: '2026-11-17T21:03:22Z'
+    }),
+    normalizeFirestoreStructureDoc('UzMLQjbH4tUAqu32rLGz', {
+      id: 'new_1794907928372',
+      Struttura: 'Forte di Vinadio',
+      Luogo: 'Vinadio',
+      Prov: 'CN',
+      Referente: 'Fondazione Artea',
+      coordinate: { lat: null, lng: null },
+      coordinate_lat: 44.307457,
+      coordinate_lng: 7.172739,
+      version: 1,
+      lastModified: '2026-11-17T09:38:27Z'
+    }),
+    // Parrocchia di San Rocco: 44.3667 (valido in Piemonte) deve battere 42.3669 (refuso)
+    normalizeFirestoreStructureDoc('6iOHu5eMa2ECM9kOyvWW', {
+      id: 'new_1768653018999',
+      Struttura: 'Parrocchia di San Rocco',
+      Luogo: 'Cuneo',
+      Prov: 'CN',
+      Contatto: '0171-491000',
+      Referente: 'Don Mario',
+      Info: 'Oratorio',
+      coordinate_lat: 42.36694,
+      coordinate_lng: 7.52248,
+      lastModified: '2026-01-19T10:00:00Z'
+    }),
+    normalizeFirestoreStructureDoc('MfsqspjPUHpCtVGfotAx', {
+      id: 'new_1768653018999',
+      Struttura: 'Parrocchia di San Rocco',
+      Luogo: 'Cuneo',
+      Prov: 'CN',
+      coordinate: { lat: 44.3667633, lng: 7.5224803 },
+      coordinate_lat: 44.3667633,
+      coordinate_lng: 7.5224803,
+      lastModified: '2026-01-17T10:00:00Z'
+    }),
+    // Casa CNGEI Ca du Pin + Rifugio Santa Libera: stringhe descrittive prevalgono su boolean
+    normalizeFirestoreStructureDoc('v8CDZMll8wVQ0VkGqHpk', {
+      Struttura: 'Rifugio Santa Libera',
+      Luogo: 'Monastero Bormida',
+      Prov: 'AT',
+      Referente: 'Luigi Rosso',
+      Contatto: '3381479177',
+      Email: 'info@rifugio.it',
+      Info: 'Ottimo rifugio',
+      Letti: true,
+      Spazi: false,
+      coordinate_lat: 44.64,
+      coordinate_lng: 8.32,
+      version: 4
+    }),
+    normalizeFirestoreStructureDoc('vasUUhI2IT1aVPLLgvyl', {
+      id: 'new_1762771993738',
+      Struttura: 'Rifugio Santa Libera',
+      Luogo: 'Monastero Bormida',
+      Prov: 'AT',
+      Letti: '30',
+      Spazi: true,
+      coordinate: { lat: null, lng: null },
+      version: 1
+    }),
+    // Monastero di San Biagio: sottostringa luogo + stessa provincia
+    normalizeFirestoreStructureDoc('mQscEXk8bTewyd1k9nxX', {
+      Struttura: 'Monastero di San Biagio',
+      Luogo: 'San Biagio di Mondovì',
+      Prov: 'CN',
+      Sito: 'https://www.monasterodisanbiagio.it/',
+      coordinate_lat: 44.4091959,
+      coordinate_lng: 7.7129077
+    }),
+    normalizeFirestoreStructureDoc('EwQvRP9ZOmzWmcP2RJoy', {
+      Struttura: 'Monastero di San Biagio',
+      Luogo: 'Mondovì',
+      Prov: 'CN',
+      Indirizzo: 'San Biagio',
+      Sito: 'https://www.monasterodisanbiagio.it/',
+      Info: 'Ospitalità scout'
+    }),
+    // Casa Alpina Don Macario: comuni limitrofi + stesso IIcontatto in stessa provincia
+    normalizeFirestoreStructureDoc('R53i8NC4ckfpzn2CKeNK', {
+      Struttura: 'Casa Alpina Don Macario',
+      Luogo: 'Savoulx',
+      Prov: 'TO',
+      IIcontatto: '0112201022',
+      Letti: '140',
+      Info: 'Base alpina',
+      coordinate_lat: 45.03,
+      coordinate_lng: 6.78
+    }),
+    normalizeFirestoreStructureDoc('RKUZNnwvZLf1DuzV4ZFd', {
+      Struttura: 'Casa Alpina Don Macario',
+      Luogo: 'Oulx',
+      Prov: 'TO',
+      IIcontatto: '0112201022',
+      Letti: '140'
+    }),
+    // Nomi generici in luoghi diversi della stessa provincia NON devono essere uniti
+    normalizeFirestoreStructureDoc('generic-1', {
+      Struttura: 'Casa',
+      Luogo: 'Pinerolo',
+      Prov: 'TO'
+    }),
+    normalizeFirestoreStructureDoc('generic-2', {
+      Struttura: 'Casa',
+      Luogo: 'Susa',
+      Prov: 'TO'
+    }),
+    // Record già marcati eliminati e record fantasma vuoti devono essere esclusi
+    normalizeFirestoreStructureDoc('marked-dup', {
+      Struttura: 'Forte di Vinadio',
+      Luogo: 'Vinadio',
+      Prov: 'CN',
+      isDeletedDuplicate: true
+    }),
+    normalizeFirestoreStructureDoc('1sCKmLZClmYhLRN7Z8fM', {
+      id: 'new_1767787145498',
+      Struttura: '',
+      Luogo: ''
+    })
+  ];
+
+  const clean = deduplicateStructures(realWorldDocs);
+  assert.equal(clean.length, 7);
+
+  const vinadio = clean.find(s => s.Struttura === 'Forte di Vinadio');
+  assert.equal(vinadio.id, '4zez6T2vh4bdbKfuPFw3');
+  assert.equal(vinadio.Referente, 'Fondazione Artea');
+  assert.deepEqual(vinadio._duplicateIds, ['UzMLQjbH4tUAqu32rLGz']);
+
+  const sanRocco = clean.find(s => s.Struttura === 'Parrocchia di San Rocco');
+  assert.equal(sanRocco.id, 'MfsqspjPUHpCtVGfotAx');
+  assert.equal(sanRocco.coordinate_lat, 44.3667633);
+  assert.equal(sanRocco.Referente, 'Don Mario');
+  assert.deepEqual(sanRocco._duplicateIds, ['6iOHu5eMa2ECM9kOyvWW']);
+
+  const santaLibera = clean.find(s => s.Struttura === 'Rifugio Santa Libera');
+  assert.equal(santaLibera.id, 'v8CDZMll8wVQ0VkGqHpk');
+  assert.equal(santaLibera.Letti, '30');
+  assert.deepEqual(santaLibera._duplicateIds, ['vasUUhI2IT1aVPLLgvyl']);
+
+  const sanBiagio = clean.find(s => s.Struttura === 'Monastero di San Biagio');
+  assert.equal(sanBiagio.id, 'mQscEXk8bTewyd1k9nxX');
+  assert.equal(sanBiagio.Info, 'Ospitalità scout');
+  assert.deepEqual(sanBiagio._duplicateIds, ['EwQvRP9ZOmzWmcP2RJoy']);
+
+  const donMacario = clean.find(s => s.Struttura === 'Casa Alpina Don Macario');
+  assert.equal(donMacario.id, 'R53i8NC4ckfpzn2CKeNK');
+  assert.deepEqual(donMacario._duplicateIds, ['RKUZNnwvZLf1DuzV4ZFd']);
+
+  assert.equal(clean.filter(s => s.Struttura === 'Casa').length, 2);
+  assert.equal(isGhostOrDeletedStructure({ Struttura: '', Luogo: '' }), true);
+  assert.equal(isGhostOrDeletedStructure({ Struttura: 'X', isDeletedDuplicate: true }), true);
+  assert.equal(clean.some(s => s.id === '1sCKmLZClmYhLRN7Z8fM'), false);
+});
+
 

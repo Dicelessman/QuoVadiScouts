@@ -20,6 +20,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   doc,
   setDoc,
   getDoc,
@@ -61,6 +62,7 @@ import {
   getWhatsAppShareUrl,
   normalizeFirestoreStructureDoc,
   sanitizeStructureForFirestore,
+  isGhostOrDeletedStructure,
   deduplicateStructures,
   calculateStructureCompleteness,
   parseStructureDate,
@@ -107,6 +109,7 @@ window.formatStructureShareText = formatStructureShareText;
 window.getWhatsAppShareUrl = getWhatsAppShareUrl;
 window.normalizeFirestoreStructureDoc = normalizeFirestoreStructureDoc;
 window.sanitizeStructureForFirestore = sanitizeStructureForFirestore;
+window.isGhostOrDeletedStructure = isGhostOrDeletedStructure;
 window.deduplicateStructures = deduplicateStructures;
 window.calculateStructureCompleteness = calculateStructureCompleteness;
 window.parseStructureDate = parseStructureDate;
@@ -345,13 +348,176 @@ window.firestore = {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   doc,
   setDoc,
   getDoc,
   orderBy
 };
 
-async function caricaStrutture() {
+const STRUCTURES_CACHE_KEY = 'strutture_cache_v2';
+const STRUCTURES_CACHE_TIMESTAMP_KEY = 'strutture_cache_v2_timestamp';
+let _activeBonificaPromise = null;
+
+function invalidateStructureCache() {
+  localStorage.removeItem('strutture_cache');
+  localStorage.removeItem('strutture_cache_timestamp');
+  localStorage.removeItem(STRUCTURES_CACHE_KEY);
+  localStorage.removeItem(STRUCTURES_CACHE_TIMESTAMP_KEY);
+}
+window.invalidateStructureCache = invalidateStructureCache;
+
+async function removeOrMarkDuplicateDoc(docId, winnerId = null) {
+  if (!db || !docId || String(docId).startsWith('new_')) return null;
+  const docRef = doc(db, "strutture", docId);
+  try {
+    await deleteDoc(docRef);
+    return 'deleted';
+  } catch (err) {
+    // Le regole Firestore limitano delete agli Admin; gli utenti autenticati possono marcare il duplicato via update
+    await updateDoc(docRef, {
+      isDeletedDuplicate: true,
+      mergedIntoId: winnerId || null,
+      Struttura: '',
+      Luogo: '',
+      Indirizzo: '',
+      coordinate: null,
+      coordinate_lat: null,
+      coordinate_lng: null,
+      lastModified: new Date(),
+      lastModifiedBy: getCurrentUser()?.uid || null
+    });
+    return 'marked';
+  }
+}
+
+async function bonificaDuplicatiFirestore(rawDati, deduplicatedDati, options = { silent: true }) {
+  if (!db || !colRef || !auth?.currentUser) {
+    return { mergedWinners: 0, cleanedDuplicates: 0, cleanedGhosts: 0 };
+  }
+  if (!Array.isArray(deduplicatedDati) && !Array.isArray(rawDati)) {
+    return { mergedWinners: 0, cleanedDuplicates: 0, cleanedGhosts: 0 };
+  }
+
+  if (_activeBonificaPromise) {
+    return await _activeBonificaPromise;
+  }
+
+  _activeBonificaPromise = (async () => {
+    let mergedWinners = 0;
+    let cleanedDuplicates = 0;
+    let cleanedGhosts = 0;
+
+    const listDedup = Array.isArray(deduplicatedDati) ? deduplicatedDati : [];
+    const listRaw = Array.isArray(rawDati) ? rawDati : [];
+
+    const winnersWithDuplicates = listDedup.filter(
+      s => s && s.id && !String(s.id).startsWith('new_') &&
+        Array.isArray(s._duplicateIds) && s._duplicateIds.length > 0
+    );
+    const winnersWithLegacyId = listDedup.filter(
+      s => s && s.id && !String(s.id).startsWith('new_') &&
+        s._legacyId && !(Array.isArray(s._duplicateIds) && s._duplicateIds.length > 0)
+    );
+    const ghostDocs = listRaw.filter(
+      s => s && !s.isDeletedDuplicate && isGhostOrDeletedStructure(s) &&
+        s.id && !String(s.id).startsWith('new_')
+    );
+
+    if (winnersWithDuplicates.length === 0 && winnersWithLegacyId.length === 0 && ghostDocs.length === 0) {
+      return { mergedWinners: 0, cleanedDuplicates: 0, cleanedGhosts: 0 };
+    }
+
+    for (const winner of winnersWithDuplicates) {
+      try {
+        const dupIds = [...winner._duplicateIds];
+        const hadLegacy = Boolean(winner._legacyId);
+        const rawPayload = sanitizeStructureForFirestore(winner);
+        const payload = Object.fromEntries(
+          Object.entries(rawPayload).filter(([, v]) => v !== undefined)
+        );
+        if (hadLegacy) {
+          payload.id = deleteField();
+        }
+        await updateDoc(doc(db, "strutture", winner.id), payload);
+        mergedWinners++;
+
+        let allCleaned = true;
+        for (const dupId of dupIds) {
+          if (!dupId || dupId === winner.id || String(dupId).startsWith('new_')) continue;
+          try {
+            const outcome = await removeOrMarkDuplicateDoc(dupId, winner.id);
+            if (outcome) {
+              cleanedDuplicates++;
+              console.log(`🧹 Duplicato bonificato (${outcome}): ${dupId} -> ${winner.id} (${winner.Struttura})`);
+            }
+          } catch (dupErr) {
+            allCleaned = false;
+            console.warn('⚠️ Impossibile bonificare duplicato Firestore:', dupId, dupErr);
+          }
+        }
+
+        if (allCleaned) {
+          delete winner._duplicateIds;
+          delete winner._legacyId;
+        }
+      } catch (winErr) {
+        console.warn('⚠️ Errore aggiornamento vincitore durante bonifica duplicati:', winner.id, winErr);
+      }
+    }
+
+    for (const item of winnersWithLegacyId) {
+      try {
+        await updateDoc(doc(db, "strutture", item.id), { id: deleteField() });
+        delete item._legacyId;
+      } catch (legErr) {
+        console.warn('⚠️ Impossibile rimuovere _legacyId su Firestore:', item.id, legErr);
+      }
+    }
+
+    for (const ghost of ghostDocs) {
+      try {
+        const outcome = await removeOrMarkDuplicateDoc(ghost.id, null);
+        if (outcome) {
+          cleanedGhosts++;
+          console.log(`🧹 Record fantasma bonificato (${outcome}): ${ghost.id}`);
+        }
+      } catch (ghostErr) {
+        console.warn('⚠️ Impossibile bonificare record fantasma:', ghost.id, ghostErr);
+      }
+    }
+
+    if (listDedup.length > 0 && (cleanedDuplicates > 0 || cleanedGhosts > 0 || mergedWinners > 0)) {
+      try {
+        localStorage.setItem(STRUCTURES_CACHE_KEY, JSON.stringify(listDedup));
+        localStorage.setItem(STRUCTURES_CACHE_TIMESTAMP_KEY, Date.now().toString());
+      } catch (_) {}
+    }
+
+    const totalCleaned = cleanedDuplicates + cleanedGhosts;
+    if (totalCleaned > 0) {
+      const msg = `🧹 Bonificati ${totalCleaned} record duplicati/vuoti su Firestore`;
+      if (typeof showCustomNotification === 'function') {
+        showCustomNotification(msg, 'success');
+      } else if (typeof window.showSuccess === 'function') {
+        window.showSuccess(msg);
+      }
+    } else if (!options?.silent && totalCleaned === 0) {
+      console.log('ℹ️ Nessun duplicato residuo su Firestore');
+    }
+
+    return { mergedWinners, cleanedDuplicates, cleanedGhosts };
+  })();
+
+  try {
+    return await _activeBonificaPromise;
+  } finally {
+    _activeBonificaPromise = null;
+  }
+}
+window.bonificaDuplicatiFirestore = bonificaDuplicatiFirestore;
+
+async function caricaStrutture(options = {}) {
   if (!colRef || !auth) {
     console.log('🔄 Firebase non configurato in questo ambiente, carico strutture locali...');
     return await caricaStruttureLocali();
@@ -364,28 +530,31 @@ async function caricaStrutture() {
     return [];
   }
 
-  const cacheKey = 'strutture_cache';
-  const cacheTimestamp = 'strutture_cache_timestamp';
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minuti
 
-  try {
-    // Controlla cache prima di fare la query
-    const cached = localStorage.getItem(cacheKey);
-    const timestamp = localStorage.getItem(cacheTimestamp);
+  // Rimuovi eventuale vecchia cache v1 non deduplicata/normalizzata
+  localStorage.removeItem('strutture_cache');
+  localStorage.removeItem('strutture_cache_timestamp');
 
-    if (cached && timestamp && (Date.now() - parseInt(timestamp)) < CACHE_DURATION) {
-      console.log('📦 Carico strutture da cache');
-      const parsedCache = JSON.parse(cached);
-      const hasInvalidIds = Array.isArray(parsedCache) &&
-        parsedCache.some(s => s && typeof s.id === 'string' && s.id.startsWith('new_'));
-      if (!hasInvalidIds) {
-        const dati = deduplicateStructures(parsedCache);
-        console.log(`✅ Caricate ${dati.length} strutture da cache (${Math.round((Date.now() - parseInt(timestamp)) / 1000)}s fa)`);
-        return dati;
+  try {
+    // Controlla cache v2 prima di fare la query (salvo richiesta forceRefresh)
+    if (!options.forceRefresh) {
+      const cached = localStorage.getItem(STRUCTURES_CACHE_KEY);
+      const timestamp = localStorage.getItem(STRUCTURES_CACHE_TIMESTAMP_KEY);
+
+      if (cached && timestamp && (Date.now() - parseInt(timestamp, 10)) < CACHE_DURATION) {
+        console.log('📦 Carico strutture da cache v2');
+        const parsedCache = JSON.parse(cached);
+        const hasInvalidIds = Array.isArray(parsedCache) &&
+          parsedCache.some(s => s && ((typeof s.id === 'string' && s.id.startsWith('new_')) || (Array.isArray(s._duplicateIds) && s._duplicateIds.length > 0)));
+        if (!hasInvalidIds) {
+          const dati = deduplicateStructures(parsedCache);
+          console.log(`✅ Caricate ${dati.length} strutture da cache (${Math.round((Date.now() - parseInt(timestamp, 10)) / 1000)}s fa)`);
+          return dati;
+        }
+        console.log('🗑️ Cache contenente duplicati o ID legacy, ricarico da Firestore...');
+        invalidateStructureCache();
       }
-      console.log('🗑️ Cache contenente ID legacy new_, ricarico da Firestore...');
-      localStorage.removeItem(cacheKey);
-      localStorage.removeItem(cacheTimestamp);
     }
 
     console.log('🔗 Connessione a Firestore...');
@@ -398,20 +567,12 @@ async function caricaStrutture() {
 
     const rawDati = snapshot.docs.map((d) => {
       const docData = d.data();
-      console.log(`📋 Documento ${d.id}:`, docData);
 
-      // Normalizza ID documento Firestore (evita che un eventuale docData.id legacy sovrascriva d.id)
-      const struttura = normalizeFirestoreStructureDoc(d.id, docData);
-      if (struttura.coordinate_lat && struttura.coordinate_lng && !struttura.coordinate) {
-        struttura.coordinate = { lat: struttura.coordinate_lat, lng: struttura.coordinate_lng };
-      } else if (struttura.coordinate && struttura.coordinate.lat && struttura.coordinate.lng &&
-        !struttura.coordinate_lat && !struttura.coordinate_lng) {
-        struttura.coordinate_lat = struttura.coordinate.lat;
-        struttura.coordinate_lng = struttura.coordinate.lng;
-      }
+      // Normalizza ID documento Firestore (evita che un eventuale docData.id legacy sovrascriva d.id) e coordinate
+      const struttura = normalizeStructureCoordinates(normalizeFirestoreStructureDoc(d.id, docData));
 
       // Prova a ottenere coordinate da Google Maps se non ci sono coordinate precise
-      if (!struttura.coordinate && !struttura.coordinate_lat && struttura.google_maps_link) {
+      if ((!struttura.coordinate || !struttura.coordinate.lat) && !struttura.coordinate_lat && struttura.google_maps_link) {
         const coordinate = estraiCoordinateDaGoogleMaps(struttura.google_maps_link);
         if (coordinate) {
           struttura.coordinate = coordinate;
@@ -429,9 +590,20 @@ async function caricaStrutture() {
     console.log(`✅ Caricate ${dati.length} strutture da Firestore (da ${rawDati.length} documenti)`);
 
     // Salva in cache
-    localStorage.setItem(cacheKey, JSON.stringify(dati));
-    localStorage.setItem(cacheTimestamp, Date.now().toString());
-    console.log('💾 Strutture salvate in cache');
+    localStorage.setItem(STRUCTURES_CACHE_KEY, JSON.stringify(dati));
+    localStorage.setItem(STRUCTURES_CACHE_TIMESTAMP_KEY, Date.now().toString());
+    console.log('💾 Strutture salvate in cache v2');
+
+    // Avvia bonifica dei duplicati / record vuoti rilevati su Firestore
+    const hasWork = dati.some(s => (Array.isArray(s._duplicateIds) && s._duplicateIds.length > 0) || s._legacyId) ||
+      rawDati.some(s => s && !s.isDeletedDuplicate && isGhostOrDeletedStructure(s));
+    if (hasWork) {
+      const bonificaPromise = bonificaDuplicatiFirestore(rawDati, dati, { silent: options.awaitBonifica !== true })
+        .catch(err => console.warn('⚠️ Errore bonifica automatica duplicati:', err));
+      if (options.awaitBonifica) {
+        await bonificaPromise;
+      }
+    }
 
     // Se Firestore è vuoto, prova con i dati locali
     if (dati.length === 0) {
@@ -2168,8 +2340,7 @@ async function salvaModifiche() {
     await secureFirestoreOperation(updateDoc, doc(db, "strutture", strutturaCorrente.id), formData);
 
     // INVALIDARE CACHE LOCALE per forzare ricaricamento
-    localStorage.removeItem('strutture_cache');
-    localStorage.removeItem('strutture_cache_timestamp');
+    invalidateStructureCache();
     console.log('🗑️ Cache invalidata dopo modifica struttura');
 
     // Log attività
@@ -2255,8 +2426,8 @@ async function deleteStructureDocsFromFirestore(id, duplicateIds = []) {
   await deleteDoc(doc(db, "strutture", idsToDelete[0]));
   for (let i = 1; i < idsToDelete.length; i++) {
     try {
-      await deleteDoc(doc(db, "strutture", idsToDelete[i]));
-      console.log('🧹 Duplicato eliminato da Firestore:', idsToDelete[i]);
+      const outcome = await removeOrMarkDuplicateDoc(idsToDelete[i], null);
+      console.log(`🧹 Duplicato bonificato (${outcome}):`, idsToDelete[i]);
     } catch (dupErr) {
       console.warn('⚠️ Impossibile eliminare duplicato Firestore:', idsToDelete[i], dupErr);
     }
@@ -2275,8 +2446,7 @@ async function eliminaStruttura(id) {
   if (confirm("Vuoi davvero eliminare questa struttura?")) {
     try {
       // Invalidiamo la cache locale PRIMA dell'eliminazione
-      localStorage.removeItem('strutture_cache');
-      localStorage.removeItem('strutture_cache_timestamp');
+      invalidateStructureCache();
       console.log('🗑️ Cache invalidata prima dell\'eliminazione');
 
       // Rimuovi la struttura dall'array locale immediatamente per feedback visivo
@@ -2408,8 +2578,7 @@ async function eliminaStrutturaConConferma(id) {
       }
 
       // Invalidiamo la cache locale PRIMA dell'eliminazione
-      localStorage.removeItem('strutture_cache');
-      localStorage.removeItem('strutture_cache_timestamp');
+      invalidateStructureCache();
       console.log('🗑️ Cache invalidata prima dell\'eliminazione');
 
       // Rimuovi la struttura dall'array locale immediatamente per feedback visivo
@@ -4040,10 +4209,10 @@ async function mostraMappa() {
     if (!window.strutture || window.strutture.length === 0) {
       console.log('📦 Caricamento dati locali...');
       try {
-        const datiCache = localStorage.getItem('strutture_cache');
+        const datiCache = localStorage.getItem(STRUCTURES_CACHE_KEY);
         if (datiCache) {
-          window.strutture = JSON.parse(datiCache);
-          console.log('✅ Dati locali caricati da cache:', window.strutture.length, 'strutture');
+          window.strutture = deduplicateStructures(JSON.parse(datiCache));
+          console.log('✅ Dati locali caricati da cache v2:', window.strutture.length, 'strutture');
         } else {
           console.log('ℹ️ Nessuna cache disponibile, inizializzo array vuoto');
           window.strutture = [];
@@ -4219,31 +4388,23 @@ async function eseguiSincronizzazione() {
       return;
     };
 
-    // Esegui sincronizzazione
+    // Esegui sincronizzazione e attendi l'eventuale bonifica duplicati su Firestore
     console.log('🔄 Inizio sincronizzazione con Firestore...');
-    const struttureFresche = await aggiornaMappaConDatiFreschi();
+    const struttureFresche = await aggiornaMappaConDatiFreschi({ awaitBonifica: true, forceRefresh: true });
+    strutture = struttureFresche;
+    window.strutture = struttureFresche;
 
     console.log('✅ Sincronizzazione dati completata:', struttureFresche.length, 'strutture');
 
-    // Aggiorna la mappa se è aperta (solo se diversa dai dati attuali)
+    // Aggiorna sempre la mappa con i dati freschi
     if (window.showStructuresOnMap && typeof window.showStructuresOnMap === 'function') {
-      const struttureAttuali = window.strutture || [];
-      if (struttureFresche.length !== struttureAttuali.length) {
-        console.log('🔄 Aggiornamento mappa con dati freschi');
-        window.showStructuresOnMap(struttureFresche);
-      } else {
-        console.log('ℹ️ Mappa già aggiornata, nessun cambiamento necessario');
-      }
+      console.log('🔄 Aggiornamento mappa con dati freschi');
+      window.showStructuresOnMap(struttureFresche);
     }
 
-    // Aggiorna la lista principale solo se necessario
-    const struttureAttuali = window.strutture || [];
-    if (struttureFresche.length !== struttureAttuali.length) {
-      console.log('🔄 Aggiornamento lista principale');
-      await aggiornaLista();
-    } else {
-      console.log('ℹ️ Lista già aggiornata, nessun cambiamento necessario');
-    }
+    // Aggiorna sempre la lista principale con i dati freschi
+    console.log('🔄 Aggiornamento lista principale');
+    renderStrutture(filtra(strutture));
 
     // Mostra messaggio di successo solo dopo aver completato tutto
     const successModal = document.createElement('div');
@@ -4301,14 +4462,17 @@ async function eseguiSincronizzazione() {
 }
 
 // Funzione per forzare aggiornamento mappa con dati freschi
-async function aggiornaMappaConDatiFreschi() {
+async function aggiornaMappaConDatiFreschi(options = {}) {
   try {
     // Invalida cache e ricarica dati
-    localStorage.removeItem('strutture_cache');
-    localStorage.removeItem('strutture_cache_timestamp');
+    invalidateStructureCache();
 
     // Ricarica strutture da Firestore
-    const struttureFresche = await caricaStrutture();
+    const struttureFresche = await caricaStrutture({
+      forceRefresh: true,
+      awaitBonifica: Boolean(options?.awaitBonifica)
+    });
+    strutture = struttureFresche;
     window.strutture = struttureFresche;
 
     console.log('🔄 Mappa aggiornata con dati freschi da Firestore');
@@ -4487,8 +4651,7 @@ async function processaStruttureSenzaCoordinate() {
   }
 
   // Invalida cache per forzare ricaricamento
-  localStorage.removeItem('strutture_cache');
-  localStorage.removeItem('strutture_cache_timestamp');
+  invalidateStructureCache();
 
   console.log(`🏁 Processamento completato: ${coordinateOttenute} coordinate ottenute su ${processate} strutture processate`);
 
@@ -10082,8 +10245,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         struttura.id = nuovoId;
 
         // Invalida cache locale per forzare ricaricamento pulito
-        localStorage.removeItem('strutture_cache');
-        localStorage.removeItem('strutture_cache_timestamp');
+        invalidateStructureCache();
 
         // Verifica che non esista già nell'array prima di aggiungerla
         const giaPresente = strutture.find(s => s.id === nuovoId);
@@ -10161,13 +10323,13 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         const docRef = doc(db, "strutture", strutturaId);
         await updateDoc(docRef, firestorePayload);
 
-        // Rimuove eventuali documenti duplicati orfani associati a questa struttura
+        // Rimuove/marca eventuali documenti duplicati orfani associati a questa struttura
         if (duplicateIds.length > 0) {
           for (const dupId of duplicateIds) {
             if (dupId && dupId !== strutturaId && !String(dupId).startsWith('new_')) {
               try {
-                await deleteDoc(doc(db, "strutture", dupId));
-                console.log('🧹 Documento duplicato rimosso da Firestore:', dupId);
+                const outcome = await removeOrMarkDuplicateDoc(dupId, strutturaId);
+                console.log(`🧹 Documento duplicato bonificato (${outcome}):`, dupId);
               } catch (dupErr) {
                 console.warn('⚠️ Impossibile rimuovere documento duplicato:', dupId, dupErr);
               }
@@ -10177,8 +10339,7 @@ async function mostraSchedaCompletaConStruttura(struttura) {
         }
 
         // INVALIDARE CACHE LOCALE per forzare ricaricamento
-        localStorage.removeItem('strutture_cache');
-        localStorage.removeItem('strutture_cache_timestamp');
+        invalidateStructureCache();
         console.log('🗑️ Cache invalidata dopo modifica scheda completa');
 
         // Aggiorna la struttura locale
@@ -12156,8 +12317,7 @@ async function geocodificaTutteStrutture() {
         });
 
         // INVALIDARE CACHE LOCALE per forzare ricaricamento
-        localStorage.removeItem('strutture_cache');
-        localStorage.removeItem('strutture_cache_timestamp');
+        invalidateStructureCache();
 
         // Aggiorna anche l'array locale
         struttura.coordinate = coordinates;
@@ -12211,8 +12371,7 @@ async function geocodificaSingolaStruttura(strutturaId) {
       });
 
       // INVALIDARE CACHE LOCALE per forzare ricaricamento
-      localStorage.removeItem('strutture_cache');
-      localStorage.removeItem('strutture_cache_timestamp');
+      invalidateStructureCache();
 
       // Aggiorna anche l'array locale
       struttura.coordinate = coordinates;

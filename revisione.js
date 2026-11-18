@@ -219,6 +219,11 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     try {
         await updateDoc(doc(db, "strutture", currentEditingId), updates);
 
+        localStorage.removeItem('strutture_cache');
+        localStorage.removeItem('strutture_cache_timestamp');
+        localStorage.removeItem('strutture_cache_v2');
+        localStorage.removeItem('strutture_cache_v2_timestamp');
+
         // Update local state
         const idx = allStructures.findIndex(st => st.id === currentEditingId);
         if (idx !== -1) {
